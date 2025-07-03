@@ -44,9 +44,11 @@ func main() {
 	opts.LoaderX64 = loadSourceTemplate(opts.LoaderX64)
 
 	inj := injector.NewInjector()
-	if opts.RandSeed == 0 {
-		fmt.Println("random seed:", inj.Seed())
+	seed := opts.RandSeed
+	if seed == 0 {
+		seed = inj.Seed()
 	}
+	fmt.Println("random seed:", seed)
 
 	fmt.Printf("read input shellcode from \"%s\"\n", sc)
 	shellcode, err := os.ReadFile(sc) // #nosec
