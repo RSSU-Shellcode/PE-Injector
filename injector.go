@@ -23,7 +23,12 @@ type Injector struct {
 
 	// context arguments
 	opts *Options
+	img  *pe.File
+	dup  []byte
 	arch string
+
+	// for write shellcode loader
+	caves []*codeCave
 
 	// for select random register
 	regBox []string
@@ -53,7 +58,7 @@ func NewInjector() *Injector {
 	}
 	rng := rand.New(rand.NewSource(seed)) // #nosec
 	injector := Injector{
-		seed: seed,
+		seed: rng.Int63(),
 		rand: rng,
 	}
 	return &injector
@@ -64,11 +69,15 @@ func (inj *Injector) Inject(shellcode, image []byte, opts *Options) ([]byte, err
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
+	if opts == nil {
+		opts = new(Options)
+	}
+	inj.opts = opts
+	// check image architecture
 	peFile, err := pe.NewFile(bytes.NewReader(image))
 	if err != nil {
 		return nil, err
 	}
-	// check image architecture
 	var arch string
 	switch peFile.Machine {
 	case pe.IMAGE_FILE_MACHINE_I386:
@@ -78,26 +87,40 @@ func (inj *Injector) Inject(shellcode, image []byte, opts *Options) ([]byte, err
 	default:
 		return nil, errors.New("unknown pe image architecture type")
 	}
+	inj.img = peFile
 	inj.arch = arch
-	// check image text section tail has enough
-	// space for write shellcode loader
-	var text *pe.Section
-	for _, section := range peFile.Sections {
-		if section.Name == ".text" {
-			text = section
-			break
-		}
+	// make duplicate about pe image
+	dup := make([]byte, len(image))
+	copy(dup, image)
+	inj.dup = dup
+	// scan code cave in image text section
+	err = inj.scanCodeCave()
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan code cave: %s", err)
 	}
-	if text == nil {
-		return nil, errors.New("cannot find .text section in image")
+	// initialize keystone engine
+	err = inj.initAssembler()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize assembler: %s", err)
 	}
+	defer func() {
+		_ = inj.engine.Close()
+		inj.engine = nil
+	}()
+	// set random seed
+	seed := opts.RandSeed
+	if seed == 0 {
+		seed = inj.rand.Int63()
+	}
+	inj.rand.Seed(seed)
+	// record the last seed
+	inj.seed = seed
+	// build the shellcode loader
 
-	data, _ := text.Data()
-	fmt.Println(len(data))
-
-	fmt.Println(text.Size)
-	fmt.Println(text.VirtualSize)
-
+	// clean context data
+	inj.img = nil
+	inj.dup = nil
+	inj.caves = nil
 	return nil, nil
 }
 
