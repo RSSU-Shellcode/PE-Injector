@@ -8,25 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/For-ACGN/go-keystone"
-)
-
-var (
-	registerX86 = []string{
-		"eax", "ebx", "ecx",
-		"edx", "esi", "edi",
-	}
-
-	registerX64 = []string{
-		"rax", "rbx", "rcx",
-		"rdx", "rsi", "rdi",
-		"r8", "r9", "r10", "r11",
-		"r12", "r13", "r14", "r15",
-	}
 )
 
 // Injector is a simple PE injector for inject shellcode.
@@ -131,7 +116,13 @@ func (inj *Injector) Inject(shellcode, image []byte, opts *Options) ([]byte, err
 	inj.rand.Seed(seed)
 	// record the last seed
 	inj.seed = seed
-	// build the shellcode loader
+	// build shellcode loader
+	loader, err := inj.buildLoader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build loader: %s", err)
+	}
+
+	fmt.Println(len(loader))
 
 	// clean context data
 	inj.img = nil
@@ -159,67 +150,6 @@ func (inj *Injector) assemble(src string) ([]byte, error) {
 		return nil, errors.New("invalid register in assembly source")
 	}
 	return inj.engine.Assemble(src, 0)
-}
-
-func (inj *Injector) getLoaderX86() string {
-	if inj.opts.LoaderX86 != "" {
-		return inj.opts.LoaderX86
-	}
-	return defaultLoaderX86
-}
-
-func (inj *Injector) getLoaderX64() string {
-	if inj.opts.LoaderX64 != "" {
-		return inj.opts.LoaderX64
-	}
-	return defaultLoaderX64
-}
-
-func (inj *Injector) buildRandomRegisterMap() map[string]string {
-	inj.initRegisterBox()
-	register := make(map[string]string, 16)
-	switch inj.arch {
-	case "386":
-		for _, reg := range registerX86 {
-			register[reg] = inj.selectRegister()
-		}
-	case "amd64":
-		for _, reg := range registerX64 {
-			register[reg] = inj.selectRegister()
-		}
-	}
-	return register
-}
-
-func (inj *Injector) initRegisterBox() {
-	var reg []string
-	switch inj.arch {
-	case "386":
-		reg = make([]string, len(registerX86))
-		copy(reg, registerX86)
-	case "amd64":
-		reg = make([]string, len(registerX64))
-		copy(reg, registerX64)
-	}
-	inj.regBox = reg
-}
-
-// selectRegister is used to make sure each register will be selected once.
-func (inj *Injector) selectRegister() string {
-	idx := inj.rand.Intn(len(inj.regBox))
-	reg := inj.regBox[idx]
-	// remove selected register
-	inj.regBox = append(inj.regBox[:idx], inj.regBox[idx+1:]...)
-	return reg
-}
-
-// convert r8 -> r8d, rax -> eax
-func (inj *Injector) registerDWORD(reg string) string {
-	_, err := strconv.Atoi(reg[1:])
-	if err == nil {
-		return reg + "d"
-	}
-	return strings.ReplaceAll(reg, "r", "e")
 }
 
 // Seed is used to get the random seed for debug.
