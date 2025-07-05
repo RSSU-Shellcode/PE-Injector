@@ -36,6 +36,15 @@ var (
 		"r8", "r9", "r10", "r11",
 		"r12", "r13", "r14", "r15",
 	}
+
+	regVolatile = []string{
+		"rax", "rcx", "rdx", "r8", "r9",
+	}
+
+	regStable = []string{
+		"rbx", "rsi", "rdi",
+		"r10", "r11", "r12", "r13", "r14", "r15",
+	}
 )
 
 var (
@@ -45,10 +54,21 @@ var (
 
 type loaderCtx struct {
 	// for replace registers
-	Reg map[string]string
+	Reg  map[string]string
+	RegV map[string]string
+	RegS map[string]string
 
-	// for split each instruction
-	Separator []byte
+	LackProcedure bool
+
+	LackCreateThread   bool
+	LackVirtualAlloc   bool
+	LackVirtualProtect bool
+
+	LoadLibraryWOnly bool
+
+	// "kernel32.dll\0" has 13 or 26 bytes
+	Kernel32    []uint64
+	Kernel32Key []uint64
 }
 
 func (inj *Injector) buildLoader() ([][]byte, error) {
@@ -66,15 +86,24 @@ func (inj *Injector) buildLoader() ([][]byte, error) {
 		"db":  toDB,
 		"hex": toHex,
 		"dr":  toRegDWORD,
+		"is":  insertSeparator,
 	}).Parse(src)
 	if err != nil {
 		return nil, fmt.Errorf("invalid assembly source template: %s", err)
 	}
 	ctx := loaderCtx{
-		Reg:       inj.buildRandomRegisterMap(),
-		Separator: separator,
+		Reg:  inj.buildRandomRegisterMap(),
+		RegV: inj.buildVolatileRegisterMap(),
+		RegS: inj.buildStableRegisterMap(),
+
+		LackProcedure: true,
+
+		LoadLibraryWOnly: true,
+
+		Kernel32:    []uint64{1, 2, 3, 4},
+		Kernel32Key: []uint64{11, 12, 13, 14},
 	}
-	buf := bytes.NewBuffer(make([]byte, 0, 4096))
+	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, &ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build assembly source: %s", err)
@@ -85,6 +114,7 @@ func (inj *Injector) buildLoader() ([][]byte, error) {
 	}
 	fmt.Println(buf.String())
 	fmt.Println(len(inst))
+	fmt.Println(inst)
 	return nil, nil
 }
 
@@ -103,7 +133,16 @@ func (inj *Injector) getLoaderX64() string {
 }
 
 func (inj *Injector) buildRandomRegisterMap() map[string]string {
-	inj.initRegisterBox()
+	var reg []string
+	switch inj.arch {
+	case "386":
+		reg = make([]string, len(registerX86))
+		copy(reg, registerX86)
+	case "amd64":
+		reg = make([]string, len(registerX64))
+		copy(reg, registerX64)
+	}
+	inj.regBox = reg
 	register := make(map[string]string, 16)
 	switch inj.arch {
 	case "386":
@@ -118,17 +157,26 @@ func (inj *Injector) buildRandomRegisterMap() map[string]string {
 	return register
 }
 
-func (inj *Injector) initRegisterBox() {
-	var reg []string
-	switch inj.arch {
-	case "386":
-		reg = make([]string, len(registerX86))
-		copy(reg, registerX86)
-	case "amd64":
-		reg = make([]string, len(registerX64))
-		copy(reg, registerX64)
-	}
+func (inj *Injector) buildVolatileRegisterMap() map[string]string {
+	reg := make([]string, len(regVolatile))
+	copy(reg, regVolatile)
 	inj.regBox = reg
+	register := make(map[string]string, len(regVolatile))
+	for _, reg := range regVolatile {
+		register[reg] = inj.selectRegister()
+	}
+	return register
+}
+
+func (inj *Injector) buildStableRegisterMap() map[string]string {
+	reg := make([]string, len(regStable))
+	copy(reg, regStable)
+	inj.regBox = reg
+	register := make(map[string]string, len(regStable))
+	for _, reg := range regStable {
+		register[reg] = inj.selectRegister()
+	}
+	return register
 }
 
 // selectRegister is used to make sure each register will be selected once.
@@ -166,4 +214,9 @@ func toRegDWORD(reg string) string {
 		return reg + "d"
 	}
 	return strings.ReplaceAll(reg, "r", "e")
+}
+
+// for split each instruction
+func insertSeparator() string {
+	return ";" + toDB(separator) + ";"
 }
