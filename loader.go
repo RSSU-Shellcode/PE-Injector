@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -38,7 +39,8 @@ var (
 	}
 
 	regVolatile = []string{
-		"rax", "rcx", "rdx", "r8", "r9",
+		"rax", "rcx", "rdx",
+		"r8", "r9",
 	}
 
 	regStable = []string{
@@ -58,17 +60,22 @@ type loaderCtx struct {
 	RegV map[string]string
 	RegS map[string]string
 
-	LackProcedure bool
-
+	// store procedure status
+	LackProcedure      bool
 	LackCreateThread   bool
 	LackVirtualAlloc   bool
 	LackVirtualProtect bool
+	LoadLibraryWOnly   bool
 
-	LoadLibraryWOnly bool
-
-	// "kernel32.dll\0" has 13 or 26 bytes
-	Kernel32    []uint64
-	Kernel32Key []uint64
+	// encrypt the data in segments using xor
+	Kernel32DLLStr    []uint64
+	Kernel32DLLKey    []uint64
+	CreateThreadOff   []uint64
+	CreateThreadKey   []uint64
+	VirtualAllocOff   []uint64
+	VirtualAllocKey   []uint64
+	VirtualProtectOff []uint64
+	VirtualProtectKey []uint64
 }
 
 func (inj *Injector) buildLoader() ([][]byte, error) {
@@ -91,20 +98,18 @@ func (inj *Injector) buildLoader() ([][]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid assembly source template: %s", err)
 	}
-	ctx := loaderCtx{
+	ctx := &loaderCtx{
 		Reg:  inj.buildRandomRegisterMap(),
 		RegV: inj.buildVolatileRegisterMap(),
 		RegS: inj.buildStableRegisterMap(),
-
-		LackProcedure: true,
-
-		LoadLibraryWOnly: true,
-
-		Kernel32:    []uint64{1, 2, 3, 4},
-		Kernel32Key: []uint64{11, 12, 13, 14},
 	}
+	err = inj.checkProcedureIsExist(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
-	err = tpl.Execute(buf, &ctx)
+	err = tpl.Execute(buf, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build assembly source: %s", err)
 	}
@@ -186,6 +191,46 @@ func (inj *Injector) selectRegister() string {
 	// remove selected register
 	inj.regBox = append(inj.regBox[:idx], inj.regBox[idx+1:]...)
 	return reg
+}
+
+func (inj *Injector) checkProcedureIsExist(ctx *loaderCtx) error {
+	CreateThread := inj.getProcFromIAT("CreateThread")
+	VirtualAlloc := inj.getProcFromIAT("VirtualAlloc")
+	VirtualProtect := inj.getProcFromIAT("VirtualProtect")
+	var lackProcedure bool
+	if CreateThread == nil {
+		lackProcedure = true
+		ctx.LackCreateThread = true
+	}
+	if VirtualAlloc == nil {
+		lackProcedure = true
+		ctx.LackVirtualAlloc = true
+	}
+	if VirtualProtect == nil {
+		lackProcedure = true
+		ctx.LackVirtualProtect = true
+	}
+	ctx.LackProcedure = lackProcedure
+	if lackProcedure {
+		LoadLibraryA := inj.getProcFromIAT("LoadLibraryA")
+		LoadLibraryW := inj.getProcFromIAT("LoadLibraryW")
+		if LoadLibraryA == nil && LoadLibraryW == nil {
+			return errors.New("LoadLibrary is not exist in IAT")
+		}
+		if LoadLibraryA == nil {
+			ctx.LoadLibraryWOnly = true
+		}
+	}
+	return nil
+}
+
+func (inj *Injector) getProcFromIAT(proc string) *iat {
+	for _, iat := range inj.iat {
+		if iat.proc == proc {
+			return iat
+		}
+	}
+	return nil
 }
 
 func toDB(b []byte) string {
