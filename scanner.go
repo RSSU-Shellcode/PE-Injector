@@ -5,15 +5,16 @@ import (
 	"errors"
 )
 
-// 0x00, 0x00, [n * 0x00], 0x00, 0x00
-// 0xCC, 0xCC, [n * 0xCC], 0xCC, 0xCC
+// 0xCC, 0xCC, [n * 0xCC]
 
 const (
-	jmpInstSize    = 5
 	reserveSize    = 2
-	minCaveSizeX86 = 2*reserveSize + (6 + jmpInstSize)
-	minCaveSizeX64 = 2*reserveSize + (12 + jmpInstSize)
-	minNumCaves    = 64
+	jmpInstSize    = 5
+	maxInstSizeX86 = 7
+	maxInstSizeX64 = 12
+	minCaveSizeX86 = reserveSize + (maxInstSizeX86 + jmpInstSize)
+	minCaveSizeX64 = reserveSize + (maxInstSizeX64 + jmpInstSize)
+	minNumCaves    = 128
 )
 
 type codeCave struct {
@@ -58,24 +59,15 @@ func (inj *Injector) scanCodeCave() error {
 func (inj *Injector) scanSection(section []byte, offset int) []*codeCave {
 	var caves []*codeCave
 	for addr := 0; addr < len(section); addr++ {
-		caveSize := 1
-		switch section[addr] {
-		case 0x00:
-			for j := addr + 1; j < len(section); j++ {
-				if section[j] != 0x00 {
-					break
-				}
-				caveSize++
-			}
-		case 0xCC:
-			for j := addr + 1; j < len(section); j++ {
-				if section[j] != 0xCC {
-					break
-				}
-				caveSize++
-			}
-		default:
+		if section[addr] != 0xCC {
 			continue
+		}
+		caveSize := 1
+		for j := addr + 1; j < len(section); j++ {
+			if section[j] != 0xCC {
+				break
+			}
+			caveSize++
 		}
 		// check the cave size is enough
 		var minCaveSize int
@@ -91,7 +83,7 @@ func (inj *Injector) scanSection(section []byte, offset int) []*codeCave {
 		}
 		caves = append(caves, &codeCave{
 			addr: offset + addr + reserveSize,
-			size: caveSize - 2*reserveSize,
+			size: caveSize - reserveSize,
 		})
 		addr += caveSize
 	}
