@@ -272,8 +272,8 @@ func (inj *Injector) buildProcName(name string, isUTF16 bool) ([]int64, []int64)
 		if num != 0 {
 			num = 4 - num
 		}
-		name = reverseString(name + strings.Repeat("\x00", num))
-		for i := 0; i < len(name); i += 4 {
+		name += strings.Repeat("\x00", num)
+		for i := len(name) - 4; i >= 0; i -= 4 {
 			v := binary.LittleEndian.Uint32([]byte(name[i:]))
 			k := inj.rand.Uint32()
 			val = append(val, int64(v^k))
@@ -285,12 +285,9 @@ func (inj *Injector) buildProcName(name string, isUTF16 bool) ([]int64, []int64)
 		if num != 0 {
 			num = 8 - num
 		}
-		name = reverseString(name + strings.Repeat("\x00", num))
-		for i := 0; i < len(name); i += 8 {
+		name += strings.Repeat("\x00", num)
+		for i := len(name) - 8; i >= 0; i -= 8 {
 			v := int64(binary.LittleEndian.Uint64([]byte(name[i:])))
-
-			fmt.Printf("%X\n", v)
-
 			k := inj.rand.Int63()
 			val = append(val, v^k)
 			key = append(key, k)
@@ -307,16 +304,6 @@ func toUTF16(s string) string {
 		u.WriteByte(0x00)
 	}
 	return u.String()
-}
-
-func reverseString(s string) string {
-	return s
-	b := []byte(s)
-	n := len(b)
-	for i := 0; i < n/2; i++ {
-		b[i], b[n-1-i] = b[n-1-i], b[i]
-	}
-	return string(b)
 }
 
 func toDB(b []byte) string {
