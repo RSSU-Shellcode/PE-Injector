@@ -1,7 +1,6 @@
 package injector
 
 import (
-	"debug/pe"
 	"errors"
 )
 
@@ -18,23 +17,17 @@ const (
 )
 
 type codeCave struct {
-	addr int
-	size int
+	virtualAddr  uint32
+	pointerToRaw uint32
+	size         int
 }
 
 func (inj *Injector) scanCodeCave() error {
-	var text *pe.Section
-	for _, section := range inj.img.Sections {
-		if section.Name == ".text" {
-			text = section
-			break
-		}
-	}
+	text := inj.img.Section(".text")
 	if text == nil {
 		return errors.New("cannot find .text section in image")
 	}
 	// record offset and calculate scan range
-	offset := text.Offset
 	size := text.Size
 	if text.VirtualSize < size {
 		size = text.VirtualSize
@@ -48,7 +41,7 @@ func (inj *Injector) scanCodeCave() error {
 	}
 	section = section[:size-32]
 	// scan code caves
-	caves := inj.scanSection(section, int(offset))
+	caves := inj.scanSection(section, text.VirtualAddress, text.Offset)
 	if len(caves) < minNumCaves {
 		return errors.New("too little code caves")
 	}
@@ -56,7 +49,7 @@ func (inj *Injector) scanCodeCave() error {
 	return nil
 }
 
-func (inj *Injector) scanSection(section []byte, offset int) []*codeCave {
+func (inj *Injector) scanSection(section []byte, va, raw uint32) []*codeCave {
 	var caves []*codeCave
 	for addr := 0; addr < len(section); addr++ {
 		if section[addr] != 0xCC {
@@ -82,8 +75,9 @@ func (inj *Injector) scanSection(section []byte, offset int) []*codeCave {
 			continue
 		}
 		caves = append(caves, &codeCave{
-			addr: offset + addr + reserveSize,
-			size: caveSize - reserveSize,
+			virtualAddr:  va + uint32(addr+reserveSize),
+			pointerToRaw: raw + uint32(addr+reserveSize),
+			size:         caveSize - reserveSize,
 		})
 		addr += caveSize
 	}

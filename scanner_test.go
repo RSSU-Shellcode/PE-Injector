@@ -26,7 +26,7 @@ func TestScanCodeCave(t *testing.T) {
 
 		fmt.Println(len(injector.caves))
 		for _, cave := range injector.caves {
-			fmt.Println(cave.addr, cave.size)
+			fmt.Println(cave.virtualAddr, cave.pointerToRaw, cave.size)
 		}
 	})
 
@@ -43,7 +43,7 @@ func TestScanCodeCave(t *testing.T) {
 
 		fmt.Println(len(injector.caves))
 		for _, cave := range injector.caves {
-			fmt.Println(cave.addr, cave.size)
+			fmt.Println(cave.virtualAddr, cave.pointerToRaw, cave.size)
 		}
 	})
 
