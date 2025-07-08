@@ -5,7 +5,12 @@ import (
 	"encoding/binary"
 )
 
-const importDirectorySize = 5 * 4
+const (
+	imageDOSHeader      = 64
+	imageFileHeaderSize = 20
+	offsetToEntryPoint  = 2 + 1 + 1 + 4 + 4 + 4
+	importDirectorySize = 5 * 4
+)
 
 type iat struct {
 	dll  string
