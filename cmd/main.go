@@ -12,9 +12,9 @@ import (
 
 var (
 	opts  injector.Options
+	img   string
 	sc    string
 	hexSC bool
-	in    string
 	out   string
 )
 
@@ -22,22 +22,22 @@ func init() {
 	flag.Int64Var(&opts.RandSeed, "seed", 0, "specify a random seed for generate loader")
 	flag.StringVar(&opts.LoaderX86, "ldr-x86", "", "specify the x86 loader template file path")
 	flag.StringVar(&opts.LoaderX64, "ldr-x64", "", "specify the x64 loader template file path")
+	flag.StringVar(&img, "img", "", "set input pe image file path")
 	flag.StringVar(&sc, "sc", "", "set input shellcode file path")
 	flag.BoolVar(&hexSC, "hex", false, "input shellcode with hex format")
-	flag.StringVar(&in, "i", "", "set input pe image file path")
 	flag.StringVar(&out, "o", "", "set output pe image file path")
 	flag.Parse()
 }
 
 func main() {
-	if in == "" {
+	if img == "" {
 		flag.Usage()
 		return
 	}
 	if out == "" {
 		err := os.Mkdir("output", 0700)
 		checkError(err)
-		out = filepath.Join("output", filepath.Base(in))
+		out = filepath.Join("output", filepath.Base(img))
 	}
 
 	opts.LoaderX86 = loadSourceTemplate(opts.LoaderX86)
@@ -50,6 +50,11 @@ func main() {
 	}
 	fmt.Println("random seed:", seed)
 
+	fmt.Printf("read input PE image from \"%s\"\n", img)
+	image, err := os.ReadFile(img) // #nosec
+	checkError(err)
+	fmt.Println("input PE image size:", len(image))
+
 	fmt.Printf("read input shellcode from \"%s\"\n", sc)
 	shellcode, err := os.ReadFile(sc) // #nosec
 	checkError(err)
@@ -59,12 +64,7 @@ func main() {
 	}
 	fmt.Println("input shellcode size:", len(shellcode))
 
-	fmt.Printf("read input PE image from \"%s\"\n", in)
-	image, err := os.ReadFile(in) // #nosec
-	checkError(err)
-	fmt.Println("input PE image size:", len(image))
-
-	output, err := inj.Inject(shellcode, image, &opts)
+	output, err := inj.Inject(image, shellcode, &opts)
 	checkError(err)
 
 	fmt.Printf("write output image to \"%s\"\n", out)
