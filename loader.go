@@ -221,10 +221,10 @@ func (inj *Injector) checkProcIsExist(ctx *loaderCtx) error {
 		LoadLibraryW := inj.getProcFromIAT("LoadLibraryW")
 		GetProcAddress := inj.getProcFromIAT("GetProcAddress")
 		if LoadLibraryA == nil && LoadLibraryW == nil {
-			return errors.New("LoadLibrary is not exist in IAT")
+			return errors.New("proc LoadLibrary is not exist in IAT")
 		}
 		if GetProcAddress == nil {
-			return errors.New("GetProcAddress is not exist in IAT")
+			return errors.New("proc GetProcAddress is not exist in IAT")
 		}
 		if LoadLibraryA == nil {
 			ctx.LoadLibraryWOnly = true
@@ -287,7 +287,7 @@ func (inj *Injector) buildProcName(name string, isUTF16 bool) ([]int64, []int64)
 		}
 		name += strings.Repeat("\x00", num)
 		for i := len(name) - 8; i >= 0; i -= 8 {
-			v := int64(binary.LittleEndian.Uint64([]byte(name[i:])))
+			v := int64(binary.LittleEndian.Uint64([]byte(name[i:]))) // #nosec G115
 			k := inj.rand.Int63()
 			val = append(val, v^k)
 			key = append(key, k)

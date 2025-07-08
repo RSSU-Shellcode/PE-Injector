@@ -49,6 +49,7 @@ func (inj *Injector) scanCodeCave() error {
 	return nil
 }
 
+// #nosec G115
 func (inj *Injector) scanSection(section []byte, va, raw uint32) []*codeCave {
 	var caves []*codeCave
 	for addr := 0; addr < len(section); addr++ {

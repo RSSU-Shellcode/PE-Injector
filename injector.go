@@ -166,6 +166,7 @@ func (inj *Injector) assemble(src string) ([]byte, error) {
 	return inj.engine.Assemble(src, 0)
 }
 
+// #nosec G115
 func (inj *Injector) inject(loader [][]byte) error {
 	if len(loader) < 2 {
 		return errors.New("loader must contain at least two instructions")
