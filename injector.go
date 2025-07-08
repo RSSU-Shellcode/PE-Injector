@@ -47,6 +47,13 @@ type Injector struct {
 
 // Options contains options about inject shellcode.
 type Options struct {
+	// specify the target function address that will
+	// be hooked, if it is zero, use the entry point
+	Address uint64
+
+	// overwrite original entry point
+	OverwriteOEP bool
+
 	// specify a random seed for generate loader
 	RandSeed int64
 
@@ -76,35 +83,13 @@ func NewInjector() *Injector {
 }
 
 // Inject is used to inject shellcode to a PE image.
-func (inj *Injector) Inject(shellcode, image []byte, opts *Options) ([]byte, error) {
+func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
-	if opts == nil {
-		opts = new(Options)
-	}
-	inj.opts = opts
-	// check image architecture
-	peFile, err := pe.NewFile(bytes.NewReader(image))
+	err := inj.preprocess(image, opts)
 	if err != nil {
 		return nil, err
-	}
-	var arch string
-	switch peFile.Machine {
-	case pe.IMAGE_FILE_MACHINE_I386:
-		arch = "386"
-	case pe.IMAGE_FILE_MACHINE_AMD64:
-		arch = "amd64"
-	default:
-		return nil, errors.New("unknown pe image architecture type")
-	}
-	inj.img = peFile
-	inj.arch = arch
-	inj.loadImage(image)
-	// scan code cave in image text section
-	err = inj.scanCodeCave()
-	if err != nil {
-		return nil, fmt.Errorf("failed to scan code cave: %s", err)
 	}
 	// initialize keystone engine
 	err = inj.initAssembler()
@@ -115,64 +100,44 @@ func (inj *Injector) Inject(shellcode, image []byte, opts *Options) ([]byte, err
 		_ = inj.engine.Close()
 		inj.engine = nil
 	}()
-	// set random seed
-	seed := opts.RandSeed
-	if seed == 0 {
-		seed = inj.rand.Int63()
-	}
-	inj.rand.Seed(seed)
-	// record the last seed
-	inj.seed = seed
 	// build shellcode loader
 	loader, err := inj.buildLoader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
 	}
-	// make duplicate for make output image
-	dup := make([]byte, len(image))
-	copy(dup, image)
-	inj.dup = dup
-	// inject loader segment
 	err = inj.inject(loader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
 	output := inj.dup
-	// clean context data
-	inj.img = nil
-	inj.dup = nil
-	inj.caves = nil
+	inj.cleanup()
 	return output, nil
 }
 
-func (inj *Injector) initAssembler() error {
-	var err error
-	switch inj.arch {
-	case "386":
-		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
-	case "amd64":
-		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
+// InjectSegment is used to inject shellcode segment to a PE image.
+func (inj *Injector) InjectSegment(image []byte, shellcode [][]byte, opts *Options) ([]byte, error) {
+	if len(shellcode) == 0 {
+		return nil, errors.New("empty shellcode segment")
 	}
+	err := inj.preprocess(image, opts)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return inj.engine.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
+	err = inj.inject(shellcode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inject shellcode segment: %s", err)
+	}
+	output := inj.dup
+	inj.cleanup()
+	return output, nil
 }
 
-func (inj *Injector) assemble(src string) ([]byte, error) {
-	if strings.Contains(src, "<no value>") {
-		return nil, errors.New("invalid register in assembly source")
+func (inj *Injector) inject(shellcode [][]byte) error {
+	if len(shellcode) < 2 {
+		return errors.New("shellcode must contain at least two instructions")
 	}
-	return inj.engine.Assemble(src, 0)
-}
-
-// #nosec G115
-func (inj *Injector) inject(loader [][]byte) error {
-	if len(loader) < 2 {
-		return errors.New("loader must contain at least two instructions")
-	}
-	if len(loader) > len(inj.caves) {
-		return errors.New("not enough caves to inject loader")
+	if len(shellcode) > len(inj.caves) {
+		return errors.New("not enough caves to inject shellcode")
 	}
 	var (
 		entryPoint  uint32
@@ -204,13 +169,13 @@ func (inj *Injector) inject(loader [][]byte) error {
 	}
 	current := first
 	next := inj.selectCodeCave()
-	for i := 0; i < len(loader); i++ {
-		size := len(loader[i])
+	for i := 0; i < len(shellcode); i++ {
+		size := len(shellcode[i])
 		if size > maxInstSize {
-			return errors.New("appear too large instruction in loader")
+			return errors.New("appear too large instruction in shellcode")
 		}
 		var rel int64
-		if i != len(loader)-1 {
+		if i != len(shellcode)-1 {
 			rel = int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
 		} else {
 			rel = int64(entryPoint) - int64(current.virtualAddr+uint32(size)) - 5
@@ -218,7 +183,7 @@ func (inj *Injector) inject(loader [][]byte) error {
 		jmp := make([]byte, 5)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-		inst := append([]byte{}, loader[i]...)
+		inst := append([]byte{}, shellcode[i]...)
 		inst = append(inst, jmp...)
 		copy(inj.dup[current.pointerToRaw:], inst)
 		// update status
@@ -232,6 +197,69 @@ func (inj *Injector) inject(loader [][]byte) error {
 	return nil
 }
 
+func (inj *Injector) preprocess(image []byte, opts *Options) error {
+	if opts == nil {
+		opts = new(Options)
+	}
+	inj.opts = opts
+	// check image architecture
+	peFile, err := pe.NewFile(bytes.NewReader(image))
+	if err != nil {
+		return err
+	}
+	var arch string
+	switch peFile.Machine {
+	case pe.IMAGE_FILE_MACHINE_I386:
+		arch = "386"
+	case pe.IMAGE_FILE_MACHINE_AMD64:
+		arch = "amd64"
+	default:
+		return errors.New("unknown pe image architecture type")
+	}
+	inj.img = peFile
+	inj.arch = arch
+	inj.loadImage(image)
+	// scan code cave in image text section
+	err = inj.scanCodeCave()
+	if err != nil {
+		return fmt.Errorf("failed to scan code cave: %s", err)
+	}
+	// set random seed
+	seed := opts.RandSeed
+	if seed == 0 {
+		seed = inj.rand.Int63()
+	}
+	inj.rand.Seed(seed)
+	// record the last seed
+	inj.seed = seed
+	// make duplicate for make output image
+	dup := make([]byte, len(image))
+	copy(dup, image)
+	inj.dup = dup
+	return nil
+}
+
+func (inj *Injector) initAssembler() error {
+	var err error
+	switch inj.arch {
+	case "386":
+		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
+	case "amd64":
+		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
+	}
+	if err != nil {
+		return err
+	}
+	return inj.engine.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
+}
+
+func (inj *Injector) assemble(src string) ([]byte, error) {
+	if strings.Contains(src, "<no value>") {
+		return nil, errors.New("invalid register in assembly source")
+	}
+	return inj.engine.Assemble(src, 0)
+}
+
 func (inj *Injector) selectCodeCave() *codeCave {
 	i := inj.rand.Intn(len(inj.caves))
 	cave := inj.caves[i]
@@ -241,6 +269,12 @@ func (inj *Injector) selectCodeCave() *codeCave {
 
 func (inj *Injector) removeCodeCave(i int) {
 	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
+}
+
+func (inj *Injector) cleanup() {
+	inj.img = nil
+	inj.dup = nil
+	inj.caves = nil
 }
 
 // Seed is used to get the random seed for debug.
