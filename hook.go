@@ -1,6 +1,7 @@
 package injector
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 
@@ -9,7 +10,10 @@ import (
 
 const nearJumperSize = 1 + 4
 
-func (inj *Injector) hook(address uint64, first *codeCave) error {
+func (inj *Injector) hook(address uint64, cave *codeCave) error {
+	if address+32 > uint64(len(inj.dup)) {
+		return errors.New("target address is overflow")
+	}
 	var mode int
 	switch inj.arch {
 	case "386":
@@ -17,7 +21,7 @@ func (inj *Injector) hook(address uint64, first *codeCave) error {
 	case "amd64":
 		mode = 64
 	}
-	insts, err := disassemble(inj.dup[address:], mode)
+	insts, err := disassemble(inj.dup[address:address+32], mode)
 	if err != nil {
 		return err
 	}
@@ -25,14 +29,28 @@ func (inj *Injector) hook(address uint64, first *codeCave) error {
 	if err != nil {
 		return err
 	}
+	// backup raw instruction that will be hooked
 	var offset uint64
-	relocated := make([][]byte, numInst)
+	rawInst := make([][]byte, numInst)
 	for i := 0; i < numInst; i++ {
-		relocated[i] = make([]byte, insts[i].Len)
-		copy(relocated[i], inj.dup[address+offset:])
+		rawInst[i] = make([]byte, insts[i].Len)
+		copy(rawInst[i], inj.dup[address+offset:])
 		offset += uint64(insts[i].Len)
 	}
-	return err
+	inj.rawInst = rawInst
+	// record the next instruction address
+	inj.retAddr = address + uint64(totalSize)
+	// build a patch for jump to the first code cave
+	patch := make([]byte, 0, totalSize)
+	jmp := make([]byte, 5)
+	jmp[0] = 0xE9
+	rel := int64(cave.pointerToRaw) - int64(address) - 5
+	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+	padding := bytes.Repeat([]byte{0xCC}, totalSize-nearJumperSize)
+	patch = append(patch, jmp...)
+	patch = append(patch, padding...)
+	copy(inj.dup[address:], patch)
+	return nil
 }
 
 func disassemble(data []byte, mode int) ([]*x86asm.Inst, error) {
