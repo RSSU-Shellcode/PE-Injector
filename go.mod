@@ -1,11 +1,13 @@
 module github.com/RSSU-Shellcode/PE-Injector
 
-go 1.22
+go 1.23.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/For-ACGN/go-keystone v1.0.5
 	github.com/stretchr/testify v1.11.1
+
+	golang.org/x/arch v0.20.0
 )
 
 require (
