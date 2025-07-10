@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/For-ACGN/go-keystone"
+	"golang.org/x/arch/x86/x86asm"
 )
 
 // Injector is a simple PE injector for inject shellcode.
@@ -35,6 +35,11 @@ type Injector struct {
 	// about process IAT
 	vm  []byte
 	iat []*iat
+
+	// about disassemble shellcode
+	scInsts []*x86asm.Inst
+	scSeg   [][]byte
+	scArg   []byte
 
 	// about hook function
 	oriInst [][]byte
@@ -62,6 +67,11 @@ type Options struct {
 	// or RVA, remember disable ASLR when debug image.
 	// if it is zero, use the entry point
 	Address uint64
+
+	// some shellcode will append argument stub after
+	// the shellcode body, these data will not be
+	// written to the code cave
+	DataOffset uint64
 
 	// specify a random seed for generate loader
 	RandSeed int64
@@ -92,6 +102,8 @@ func NewInjector() *Injector {
 }
 
 // Inject is used to inject shellcode to a PE image.
+// It will inject a shellcode loader to code cave,
+// loader will decrypt and execute the input shellcode.
 func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
@@ -100,15 +112,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	// initialize keystone engine
-	err = inj.initAssembler()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize assembler: %s", err)
-	}
-	defer func() {
-		_ = inj.engine.Close()
-		inj.engine = nil
-	}()
+
 	// build shellcode loader
 	loader, err := inj.buildShellcodeLoader()
 	if err != nil {
@@ -123,10 +127,8 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 	return output, nil
 }
 
-// InjectSegment is used to inject shellcode segment to a PE image.
-// It is an advanced usage, you must ensure each instruction in
-// segment are position-independent.
-func (inj *Injector) InjectSegment(image []byte, shellcode [][]byte, opts *Options) ([]byte, error) {
+// InjectRaw is used to inject shellcode to a PE image without loader.
+func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode segment")
 	}
@@ -143,13 +145,18 @@ func (inj *Injector) InjectSegment(image []byte, shellcode [][]byte, opts *Optio
 	return output, nil
 }
 
-func (inj *Injector) inject(shellcode [][]byte) error {
-	if len(shellcode) < 2 {
-		return errors.New("shellcode must contain at least two instructions")
+func (inj *Injector) inject(shellcode []byte) error {
+	err := inj.disassembleShellcode(shellcode)
+	if err != nil {
+		return err
 	}
-	if len(shellcode) > len(inj.caves) {
-		return errors.New("not enough caves to inject shellcode")
+	if len(inj.scInsts) < 1 {
+		return errors.New("invalid shellcode")
 	}
+	// TODO calculate
+	// if len(inj.scInsts) > len(inj.caves) {
+	// 	return errors.New("not enough caves to inject shellcode")
+	// }
 	var entryPoint uint32
 	switch inj.arch {
 	case "386":
@@ -163,10 +170,10 @@ func (inj *Injector) inject(shellcode [][]byte) error {
 	} else {
 		targetRVA = entryPoint
 	}
-	// search a cave near the entry point
+	// search a cave near the target RVA
 	var first *codeCave
 	for i, cave := range inj.caves {
-		offset := int64(cave.virtualAddr) - int64(entryPoint)
+		offset := int64(cave.virtualAddr) - int64(targetRVA)
 		if offset <= 4096 && offset >= -4096 {
 			first = cave
 			inj.removeCodeCave(i)
@@ -180,15 +187,15 @@ func (inj *Injector) inject(shellcode [][]byte) error {
 		inj.removeCodeCave(i)
 	}
 	// hook target function
-	err := inj.hook(targetRVA, first)
+	err = inj.hook(targetRVA, first)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to hook target function: %s", err)
 	}
-
+	// build the new instruction
 	current := first
 	next := inj.selectCodeCave()
-	for i := 0; i < len(shellcode); i++ {
-		size := len(shellcode[i])
+	for i := 0; i < len(inj.scSeg); i++ {
+		size := len(inj.scSeg[i])
 		if size+5 > current.size {
 			return errors.New("appear too large instruction in shellcode")
 		}
@@ -196,12 +203,12 @@ func (inj *Injector) inject(shellcode [][]byte) error {
 		if i != len(shellcode)-1 {
 			rel = int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
 		} else {
-			rel = int64(entryPoint) - int64(current.virtualAddr+uint32(size)) - 5
+			rel = int64(targetRVA) - int64(current.virtualAddr+uint32(size)) - 5
 		}
 		jmp := make([]byte, 5)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-		inst := append([]byte{}, shellcode[i]...)
+		inst := append([]byte{}, inj.scSeg[i]...)
 		inst = append(inst, jmp...)
 		copy(inj.dup[current.pointerToRaw:], inst)
 		// update status
@@ -259,25 +266,69 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	return nil
 }
 
-func (inj *Injector) initAssembler() error {
-	var err error
-	switch inj.arch {
-	case "386":
-		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
-	case "amd64":
-		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
+// disassemble shellcode for get each instruction, these will be relocated
+func (inj *Injector) disassembleShellcode(shellcode []byte) error {
+	var argStub []byte
+	offset := inj.opts.DataOffset
+	if offset > 0 {
+		shellcode = shellcode[:offset]
+		arg := shellcode[offset:]
+		argStub = make([]byte, len(arg))
+		copy(argStub, arg)
 	}
+	insts, err := inj.disassemble(shellcode)
+	if err != nil {
+		return fmt.Errorf("failed to disassemble shellcode: %s", err)
+	}
+	var off int
+	segments := make([][]byte, len(insts))
+	for i := 0; i < len(insts); i++ {
+		l := insts[i].Len
+		segments[i] = make([]byte, l)
+		copy(segments[i], shellcode[off:])
+		off += l
+	}
+	inj.scInsts = insts
+	inj.scSeg = segments
+	inj.scArg = argStub
+	return nil
+}
+
+func (inj *Injector) hook(rva uint32, first *codeCave) error {
+	offset := int(inj.rvaToOffset(".text", rva))
+	if offset+32 > len(inj.dup) {
+		return errors.New("target offset is overflow")
+	}
+	insts, err := inj.disassemble(inj.dup[offset : offset+32])
 	if err != nil {
 		return err
 	}
-	return inj.engine.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
-}
-
-func (inj *Injector) assemble(src string) ([]byte, error) {
-	if strings.Contains(src, "<no value>") {
-		return nil, errors.New("invalid register in assembly source")
+	numInst, totalSize, err := calcInstNumAndSize(insts)
+	if err != nil {
+		return err
 	}
-	return inj.engine.Assemble(src, 0)
+	// backup original instruction that will be hooked
+	var off int
+	original := make([][]byte, numInst)
+	for i := 0; i < numInst; i++ {
+		original[i] = make([]byte, insts[i].Len)
+		copy(original[i], inj.dup[offset+off:])
+		off += insts[i].Len
+	}
+	inj.oriInst = original
+	// record the next instruction offset
+	inj.retRVA = rva + uint32(totalSize)
+	// build a patch for jump to the first code cave
+	jmp := make([]byte, 5)
+	jmp[0] = 0xE9
+	rel := int64(first.pointerToRaw) - int64(offset) - 5
+	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+	padding := bytes.Repeat([]byte{0xCC}, totalSize-nearJumpSize)
+	patch := make([]byte, 0, totalSize)
+	patch = append(patch, jmp...)
+	patch = append(patch, padding...)
+	copy(inj.dup[offset:], patch)
+	return nil
 }
 
 func (inj *Injector) selectCodeCave() *codeCave {
