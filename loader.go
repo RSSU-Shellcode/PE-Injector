@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/For-ACGN/go-keystone"
 )
 
 // just for prevent [import _ "embed"] :)
@@ -79,17 +81,24 @@ type loaderCtx struct {
 	VirtualProtectKey []int64
 }
 
-func (inj *Injector) buildLoader() ([][]byte, error) {
-	var (
-		src string
-	)
+func (inj *Injector) buildShellcodeLoader() ([]byte, error) {
+	// initialize keystone engine
+	err := inj.initAssembler()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize assembler: %s", err)
+	}
+	defer func() {
+		_ = inj.engine.Close()
+		inj.engine = nil
+	}()
+	// create assembly source
+	var src string
 	switch inj.arch {
 	case "386":
 		src = inj.getLoaderX86()
 	case "amd64":
 		src = inj.getLoaderX64()
 	}
-	// create assembly source
 	tpl, err := template.New("loader").Funcs(template.FuncMap{
 		"db":  toDB,
 		"hex": toHex,
@@ -128,6 +137,20 @@ func (inj *Injector) buildLoader() ([][]byte, error) {
 	return nil, nil
 }
 
+func (inj *Injector) initAssembler() error {
+	var err error
+	switch inj.arch {
+	case "386":
+		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
+	case "amd64":
+		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
+	}
+	if err != nil {
+		return err
+	}
+	return inj.engine.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
+}
+
 func (inj *Injector) getLoaderX86() string {
 	if inj.opts.LoaderX86 != "" {
 		return inj.opts.LoaderX86
@@ -140,6 +163,13 @@ func (inj *Injector) getLoaderX64() string {
 		return inj.opts.LoaderX64
 	}
 	return defaultLoaderX64
+}
+
+func (inj *Injector) assemble(src string) ([]byte, error) {
+	if strings.Contains(src, "<no value>") {
+		return nil, errors.New("invalid register in assembly source")
+	}
+	return inj.engine.Assemble(src, 0)
 }
 
 func (inj *Injector) buildRandomRegisterMap() map[string]string {
