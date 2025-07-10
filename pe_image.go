@@ -22,9 +22,9 @@ func (inj *Injector) loadImage(image []byte) {
 	var size uint32
 	switch inj.arch {
 	case "386":
-		size = inj.img.OptionalHeader.(*pe.OptionalHeader32).SizeOfImage
+		size = inj.hdr32.SizeOfImage
 	case "amd64":
-		size = inj.img.OptionalHeader.(*pe.OptionalHeader64).SizeOfImage
+		size = inj.hdr64.SizeOfImage
 	}
 	vm := make([]byte, size)
 	for _, section := range inj.img.Sections {
@@ -40,9 +40,9 @@ func (inj *Injector) processIAT() {
 	var dataDirectory [16]pe.DataDirectory
 	switch inj.arch {
 	case "386":
-		dataDirectory = inj.img.OptionalHeader.(*pe.OptionalHeader32).DataDirectory
+		dataDirectory = inj.hdr32.DataDirectory
 	case "amd64":
-		dataDirectory = inj.img.OptionalHeader.(*pe.OptionalHeader64).DataDirectory
+		dataDirectory = inj.hdr64.DataDirectory
 	}
 	dd := dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_IMPORT]
 	table := inj.vm[dd.VirtualAddress:]
@@ -97,6 +97,22 @@ func (inj *Injector) processIAT() {
 		table = table[20:]
 	}
 	inj.iat = list
+}
+
+func (inj *Injector) vaToRVA(va uint64) uint32 {
+	var base int64
+	switch inj.arch {
+	case "386":
+		base = int64(inj.hdr32.ImageBase)
+	case "amd64":
+		base = int64(inj.hdr64.ImageBase)
+	}
+	return uint32(int64(va) - base)
+}
+
+func (inj *Injector) rvaToOffset(section string, rva uint32) uint32 {
+	s := inj.img.Section(section)
+	return s.Offset + (rva - s.VirtualAddress)
 }
 
 func extractString(section []byte, start uint64) string {
