@@ -1,20 +1,15 @@
 package injector
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 
 	"golang.org/x/arch/x86/x86asm"
 )
 
-const nearJumperSize = 1 + 4
+const nearJumpSize = 1 + 4
 
-func (inj *Injector) hook(rva uint32, first *codeCave) error {
-	offset := int(inj.rvaToOffset(".text", rva))
-	if offset+32 > len(inj.dup) {
-		return errors.New("target offset is overflow")
-	}
+func (inj *Injector) disassemble(data []byte) ([]*x86asm.Inst, error) {
 	var mode int
 	switch inj.arch {
 	case "386":
@@ -22,39 +17,6 @@ func (inj *Injector) hook(rva uint32, first *codeCave) error {
 	case "amd64":
 		mode = 64
 	}
-	insts, err := disassemble(inj.dup[offset:offset+32], mode)
-	if err != nil {
-		return err
-	}
-	numInst, totalSize, err := calcInstNumAndSize(insts)
-	if err != nil {
-		return err
-	}
-	// backup original instruction that will be hooked
-	var off int
-	original := make([][]byte, numInst)
-	for i := 0; i < numInst; i++ {
-		original[i] = make([]byte, insts[i].Len)
-		copy(original[i], inj.dup[offset+off:])
-		off += insts[i].Len
-	}
-	inj.oriInst = original
-	// record the next instruction offset
-	inj.retRVA = rva + uint32(totalSize)
-	// build a patch for jump to the first code cave
-	jmp := make([]byte, 5)
-	jmp[0] = 0xE9
-	rel := int64(first.pointerToRaw) - int64(offset) - 5
-	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-	padding := bytes.Repeat([]byte{0xCC}, totalSize-nearJumperSize)
-	patch := make([]byte, 0, totalSize)
-	patch = append(patch, jmp...)
-	patch = append(patch, padding...)
-	copy(inj.dup[offset:], patch)
-	return nil
-}
-
-func disassemble(data []byte, mode int) ([]*x86asm.Inst, error) {
 	var insts []*x86asm.Inst
 	for len(data) > 0 {
 		inst, err := x86asm.Decode(data, mode)
@@ -80,7 +42,7 @@ func calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) {
 	for i := 0; i < len(insts); i++ {
 		num++
 		size += insts[i].Len
-		if size >= nearJumperSize {
+		if size >= nearJumpSize {
 			return num, size, nil
 		}
 	}
