@@ -24,11 +24,21 @@ type Injector struct {
 
 	// context arguments
 	opts *Options
-	img  *pe.File
-	dup  []byte
 	arch string
-	vm   []byte
-	iat  []*iat
+	dup  []byte
+
+	// about pe image
+	img   *pe.File
+	hdr32 *pe.OptionalHeader32
+	hdr64 *pe.OptionalHeader64
+
+	// about process IAT
+	vm  []byte
+	iat []*iat
+
+	// about hook function
+	oriInst [][]byte
+	retRVA  uint32
 
 	// for replace stub in loader
 	procCreateThread   *iat
@@ -48,11 +58,10 @@ type Injector struct {
 // Options contains options about inject shellcode.
 type Options struct {
 	// specify the target function address that will
-	// be hooked, if it is zero, use the entry point
+	// be hooked, it is an VA address, not a file offset
+	// or RVA, remember disable ASLR when debug image.
+	// if it is zero, use the entry point
 	Address uint64
-
-	// overwrite original entry point
-	OverwriteOEP bool
 
 	// specify a random seed for generate loader
 	RandSeed int64
@@ -101,7 +110,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 		inj.engine = nil
 	}()
 	// build shellcode loader
-	loader, err := inj.buildLoader()
+	loader, err := inj.buildShellcodeLoader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
 	}
@@ -115,6 +124,8 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 }
 
 // InjectSegment is used to inject shellcode segment to a PE image.
+// It is an advanced usage, you must ensure each instruction in
+// segment are position-independent.
 func (inj *Injector) InjectSegment(image []byte, shellcode [][]byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode segment")
@@ -139,17 +150,18 @@ func (inj *Injector) inject(shellcode [][]byte) error {
 	if len(shellcode) > len(inj.caves) {
 		return errors.New("not enough caves to inject shellcode")
 	}
-	var (
-		entryPoint  uint32
-		maxInstSize int
-	)
+	var entryPoint uint32
 	switch inj.arch {
 	case "386":
-		entryPoint = inj.img.OptionalHeader.(*pe.OptionalHeader32).AddressOfEntryPoint
-		maxInstSize = maxInstSizeX86
+		entryPoint = inj.hdr32.AddressOfEntryPoint
 	case "amd64":
-		entryPoint = inj.img.OptionalHeader.(*pe.OptionalHeader64).AddressOfEntryPoint
-		maxInstSize = maxInstSizeX64
+		entryPoint = inj.hdr64.AddressOfEntryPoint
+	}
+	var targetRVA uint32
+	if inj.opts.Address != 0 {
+		targetRVA = inj.vaToRVA(inj.opts.Address)
+	} else {
+		targetRVA = entryPoint
 	}
 	// search a cave near the entry point
 	var first *codeCave
@@ -167,11 +179,17 @@ func (inj *Injector) inject(shellcode [][]byte) error {
 		first = inj.caves[i]
 		inj.removeCodeCave(i)
 	}
+	// hook target function
+	err := inj.hook(targetRVA, first)
+	if err != nil {
+		return err
+	}
+
 	current := first
 	next := inj.selectCodeCave()
 	for i := 0; i < len(shellcode); i++ {
 		size := len(shellcode[i])
-		if size > maxInstSize {
+		if size+5 > current.size {
 			return errors.New("appear too large instruction in shellcode")
 		}
 		var rel int64
@@ -211,8 +229,10 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	switch peFile.Machine {
 	case pe.IMAGE_FILE_MACHINE_I386:
 		arch = "386"
+		inj.hdr32 = peFile.OptionalHeader.(*pe.OptionalHeader32)
 	case pe.IMAGE_FILE_MACHINE_AMD64:
 		arch = "amd64"
+		inj.hdr64 = peFile.OptionalHeader.(*pe.OptionalHeader64)
 	default:
 		return errors.New("unknown pe image architecture type")
 	}
