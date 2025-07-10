@@ -10,9 +10,10 @@ import (
 
 const nearJumperSize = 1 + 4
 
-func (inj *Injector) hook(address uint64, cave *codeCave) error {
-	if address+32 > uint64(len(inj.dup)) {
-		return errors.New("target address is overflow")
+func (inj *Injector) hook(rva uint32, first *codeCave) error {
+	offset := int(inj.rvaToOffset(".text", rva))
+	if offset+32 > len(inj.dup) {
+		return errors.New("target offset is overflow")
 	}
 	var mode int
 	switch inj.arch {
@@ -21,7 +22,7 @@ func (inj *Injector) hook(address uint64, cave *codeCave) error {
 	case "amd64":
 		mode = 64
 	}
-	insts, err := disassemble(inj.dup[address:address+32], mode)
+	insts, err := disassemble(inj.dup[offset:offset+32], mode)
 	if err != nil {
 		return err
 	}
@@ -29,27 +30,27 @@ func (inj *Injector) hook(address uint64, cave *codeCave) error {
 	if err != nil {
 		return err
 	}
-	// backup raw instruction that will be hooked
-	var offset uint64
-	rawInst := make([][]byte, numInst)
+	// backup original instruction that will be hooked
+	var off int
+	original := make([][]byte, numInst)
 	for i := 0; i < numInst; i++ {
-		rawInst[i] = make([]byte, insts[i].Len)
-		copy(rawInst[i], inj.dup[address+offset:])
-		offset += uint64(insts[i].Len)
+		original[i] = make([]byte, insts[i].Len)
+		copy(original[i], inj.dup[offset+off:])
+		off += insts[i].Len
 	}
-	inj.rawInst = rawInst
-	// record the next instruction address
-	inj.retAddr = address + uint64(totalSize)
+	inj.oriInst = original
+	// record the next instruction offset
+	inj.retRVA = rva + uint32(totalSize)
 	// build a patch for jump to the first code cave
-	patch := make([]byte, 0, totalSize)
 	jmp := make([]byte, 5)
 	jmp[0] = 0xE9
-	rel := int64(cave.pointerToRaw) - int64(address) - 5
+	rel := int64(first.pointerToRaw) - int64(offset) - 5
 	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 	padding := bytes.Repeat([]byte{0xCC}, totalSize-nearJumperSize)
+	patch := make([]byte, 0, totalSize)
 	patch = append(patch, jmp...)
 	patch = append(patch, padding...)
-	copy(inj.dup[address:], patch)
+	copy(inj.dup[offset:], patch)
 	return nil
 }
 
