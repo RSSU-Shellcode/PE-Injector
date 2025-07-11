@@ -36,10 +36,7 @@ type Injector struct {
 	iat []*iat
 
 	// about rebuild shellcode
-	scSeg [][]byte
-	scArg []byte
-
-	// save and restore context
+	segment    [][]byte
 	contextSeq []int
 
 	// about hook function
@@ -68,11 +65,6 @@ type Options struct {
 	// or RVA, remember disable ASLR when debug image.
 	// if it is zero, use the entry point
 	Address uint64
-
-	// some shellcode will append argument stub after
-	// the shellcode body, these stub data will not be
-	// written to the code cave
-	DataOffset uint64
 
 	// not append instruction about save context
 	NotSaveContext bool
@@ -105,7 +97,7 @@ func NewInjector() *Injector {
 	return &injector
 }
 
-// Inject is used to inject shellcode to a PE image.
+// Inject is used to inject shellcode to a PE image file.
 // It will inject a shellcode loader to code cave,
 // loader will decrypt and execute the input shellcode.
 func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, error) {
@@ -116,8 +108,6 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-
-	// build shellcode loader
 	loader, err := inj.buildShellcodeLoader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
@@ -132,6 +122,8 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 }
 
 // InjectRaw is used to inject shellcode to a PE image without loader.
+// It is an advanced usage, ensure the shellcode not contains behavior
+// like read data from the shellcode tail.
 func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode segment")
@@ -184,29 +176,49 @@ func (inj *Injector) inject(shellcode []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
-	err = inj.rebuildShellcode(shellcode, targetRVA)
+	err = inj.rebuildShellcode(shellcode)
 	if err != nil {
 		return err
 	}
-	// TODO calculate
-	// if len(inj.scInsts) > len(inj.caves) {
-	// 	return errors.New("not enough caves to inject shellcode")
-	// }
+	if len(inj.segment)+len(inj.oriInst)+1 > len(inj.caves) {
+		return errors.New("not enough caves to inject shellcode")
+	}
+	// insert shellcode segment to code cave
 	current := first
 	next := inj.selectCodeCave()
-	for i := 0; i < len(inj.scSeg); i++ {
-		size := len(inj.scSeg[i])
+	for i := 0; i < len(inj.segment); i++ {
+		size := len(inj.segment[i])
 		if size+5 > current.size {
 			return errors.New("appear too large instruction in shellcode")
 		}
-		inst := append([]byte{}, inj.scSeg[i]...)
-		if i != len(inj.scSeg)-1 {
-			rel := int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
-			jmp := make([]byte, 5)
-			jmp[0] = 0xE9
-			binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-			inst = append(inst, jmp...)
+		rel := int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
+		jmp := make([]byte, 5)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+		inst := append([]byte{}, inj.segment[i]...)
+		inst = append(inst, jmp...)
+		copy(inj.dup[current.pointerToRaw:], inst)
+		// update status
+		current = next
+		next = inj.selectCodeCave()
+	}
+	// insert original instruction about patch
+	for i := 0; i < len(inj.oriInst); i++ {
+		size := len(inj.oriInst[i])
+		if size+5 > current.size {
+			return errors.New("appear too large original instruction in patch")
 		}
+		var rel int64
+		if i != len(inj.oriInst)-1 {
+			rel = int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
+		} else {
+			rel = int64(inj.retRVA) - int64(current.virtualAddr+uint32(size)) - 5
+		}
+		jmp := make([]byte, 5)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+		inst := append([]byte{}, inj.oriInst[i]...)
+		inst = append(inst, jmp...)
 		copy(inj.dup[current.pointerToRaw:], inst)
 		// update status
 		current = next
@@ -297,17 +309,8 @@ func (inj *Injector) hook(rva uint32, first *codeCave) error {
 }
 
 // rebuildShellcode will append instructions about save context
-// around original shellcode, then append the instruction about
-// patch and a jmp for the instruction next the patch of hook.
-func (inj *Injector) rebuildShellcode(shellcode []byte, rva uint32) error {
-	var argStub []byte
-	offset := inj.opts.DataOffset
-	if offset > 0 {
-		shellcode = shellcode[:offset]
-		arg := shellcode[offset:]
-		argStub = make([]byte, len(arg))
-		copy(argStub, arg)
-	}
+// and restore context around original shellcode.
+func (inj *Injector) rebuildShellcode(shellcode []byte) error {
 	insts, err := inj.disassemble(shellcode)
 	if err != nil {
 		return fmt.Errorf("failed to disassemble shellcode: %s", err)
@@ -325,12 +328,7 @@ func (inj *Injector) rebuildShellcode(shellcode []byte, rva uint32) error {
 		segments = append(inj.saveContext(), segments...)
 		segments = append(segments, inj.restoreContext()...)
 	}
-	// append the patched instruction about the hook
-	segments = append(segments, inj.oriInst...)
-	// append the jmp to the next instruction about hook
-
-	inj.scSeg = segments
-	inj.scArg = argStub
+	inj.segment = segments
 	return nil
 }
 
@@ -348,6 +346,8 @@ func (inj *Injector) removeCodeCave(i int) {
 func (inj *Injector) cleanup() {
 	inj.img = nil
 	inj.dup = nil
+	inj.vm = nil
+	inj.segment = nil
 	inj.caves = nil
 }
 
