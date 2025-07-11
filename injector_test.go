@@ -1,8 +1,11 @@
 package injector
 
 import (
+	"bytes"
 	"os"
+	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -37,8 +40,7 @@ func testInjector(t *testing.T, injector *Injector, opts *Options) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			err = os.WriteFile("testdata/injected_x86.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -51,8 +53,7 @@ func testInjector(t *testing.T, injector *Injector, opts *Options) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			err = os.WriteFile("testdata/injected_x64.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
 		})
 	})
 
@@ -69,8 +70,7 @@ func testInjector(t *testing.T, injector *Injector, opts *Options) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			err = os.WriteFile("testdata/injected_x86.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -85,8 +85,7 @@ func testInjector(t *testing.T, injector *Injector, opts *Options) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			err = os.WriteFile("testdata/injected_x64.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
 		})
 	})
 }
@@ -109,8 +108,7 @@ func TestSpecificAddress(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			err = os.WriteFile("testdata/injected_x86.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -127,8 +125,7 @@ func TestSpecificAddress(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			err = os.WriteFile("testdata/injected_x64.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
 		})
 	})
 
@@ -149,8 +146,7 @@ func TestSpecificAddress(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			err = os.WriteFile("testdata/injected_x86.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -169,8 +165,7 @@ func TestSpecificAddress(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			err = os.WriteFile("testdata/injected_x64.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
 		})
 	})
 
@@ -178,12 +173,10 @@ func TestSpecificAddress(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TODO add more tests
 func TestSpecificSeed(t *testing.T) {
 	injector := NewInjector()
 
 	opts := &Options{
-		Address:  0x469D20,
 		RandSeed: 1234,
 	}
 
@@ -194,12 +187,15 @@ func TestSpecificSeed(t *testing.T) {
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
 
-			output, err := injector.Inject(image, shellcode, opts)
+			output1, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			require.NotEmpty(t, output1)
+			output2, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output2)
+			require.Equal(t, output1, output2)
 
-			err = os.WriteFile("testdata/injected_x86.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x86.exe", output1)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -208,12 +204,15 @@ func TestSpecificSeed(t *testing.T) {
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
 
-			output, err := injector.Inject(image, shellcode, opts)
+			output1, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			require.NotEmpty(t, output1)
+			output2, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output2)
+			require.Equal(t, output1, output2)
 
-			err = os.WriteFile("testdata/injected_x64.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x64.exe", output1)
 		})
 	})
 
@@ -226,12 +225,15 @@ func TestSpecificSeed(t *testing.T) {
 				0x66, 0x90,
 			}
 
-			output, err := injector.InjectRaw(image, shellcode, opts)
+			output1, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			require.NotEmpty(t, output1)
+			output2, err := injector.InjectRaw(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output2)
+			require.Equal(t, output1, output2)
 
-			err = os.WriteFile("testdata/injected_x86.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x86.exe", output1)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -242,15 +244,37 @@ func TestSpecificSeed(t *testing.T) {
 				0x66, 0x90,
 			}
 
-			output, err := injector.InjectRaw(image, shellcode, opts)
+			output1, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			require.NotEmpty(t, output1)
+			output2, err := injector.InjectRaw(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output2)
+			require.Equal(t, output1, output2)
 
-			err = os.WriteFile("testdata/injected_x64.exe", output, 0600)
-			require.NoError(t, err)
+			testExecuteImage(t, "testdata/injected_x64.exe", output1)
 		})
 	})
 
 	err := injector.Close()
 	require.NoError(t, err)
+}
+
+func testExecuteImage(t *testing.T, path string, image []byte) {
+	err := os.WriteFile(path, image, 0600)
+	require.NoError(t, err)
+
+	buf := bytes.NewBuffer(nil)
+	cmd := exec.Command(path)
+	cmd.Stdout = buf
+	cmd.Stderr = buf
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	time.Sleep(time.Second)
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+
+	require.Contains(t, buf.String(), "Hello World!")
 }
