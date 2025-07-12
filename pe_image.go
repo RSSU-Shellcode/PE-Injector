@@ -5,12 +5,7 @@ import (
 	"encoding/binary"
 )
 
-const (
-	imageDOSHeader      = 64
-	imageFileHeaderSize = 20
-	offsetToEntryPoint  = 2 + 1 + 1 + 4 + 4 + 4
-	importDirectorySize = 5 * 4
-)
+const importDirectorySize = 5 * 4
 
 type iat struct {
 	dll  string
@@ -99,6 +94,7 @@ func (inj *Injector) processIAT() {
 	inj.iat = list
 }
 
+// #nosec G115
 func (inj *Injector) vaToRVA(va uint64) uint32 {
 	var base int64
 	switch inj.arch {

@@ -124,17 +124,8 @@ func (inj *Injector) buildShellcodeLoader() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to build assembly source: %s", err)
 	}
-
 	fmt.Println(buf.String())
-
-	inst, err := inj.assemble(buf.String())
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println(len(inst))
-	fmt.Println(inst)
-	return nil, nil
+	return inj.assemble(buf.String())
 }
 
 func (inj *Injector) initAssembler() error {
