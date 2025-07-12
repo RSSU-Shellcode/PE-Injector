@@ -39,6 +39,7 @@ type Injector struct {
 	// about rebuild shellcode
 	segment    [][]byte
 	contextSeq []int
+	ccList     []*codeCave
 
 	// about hook function
 	oriInst [][]byte
@@ -319,6 +320,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		next    *codeCave
 	}
 	list := make([]*item, len(inj.segment))
+	ccLi := make([]*codeCave, len(inj.segment))
 	current := first
 	next := inj.selectCodeCave()
 	for i := 0; i < len(inj.segment); i++ {
@@ -326,28 +328,40 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			current: current,
 			next:    next,
 		}
+		ccLi[i] = current
+		// update status
 		current = next
 		next = inj.selectCodeCave()
 	}
+	inj.ccList = ccLi
 	// insert shellcode segment
 	for i := 0; i < len(inj.segment); i++ {
-		current := list[i].current
-		next := list[i].next
+		c := list[i].current
+		n := list[i].next
 		segment := inj.segment[i]
 		size := len(segment)
-		if size+5 > current.size {
+		if size+5 > c.size {
 			return errors.New("appear too large instruction in shellcode")
 		}
+		// check it is the tail of the shellcode
+		if bytes.Equal(segment, []byte{0xCC}) {
+			rel := int64(current.virtualAddr) - int64(c.virtualAddr) - 5
+			jmp := make([]byte, 5)
+			jmp[0] = 0xE9
+			binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+			copy(inj.dup[c.pointerToRaw:], jmp)
+			continue
+		}
 		// relocate instruction if it has PC-relative address
-		segment = inj.relocateSegment(segment, i)
+		segment = inj.relocateSegment(segment, i, c)
 		// build jmp instruction to next code cave
-		rel := int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
+		rel := int64(n.virtualAddr) - int64(c.virtualAddr+uint32(size)) - 5
 		jmp := make([]byte, 5)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 		rebuild := append([]byte{}, segment...)
 		rebuild = append(rebuild, jmp...)
-		copy(inj.dup[current.pointerToRaw:], rebuild)
+		copy(inj.dup[c.pointerToRaw:], rebuild)
 	}
 	// insert original instruction about patch
 	var offTarget uint32
@@ -381,16 +395,20 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 	return nil
 }
 
-func (inj *Injector) relocateSegment(segment []byte, idx int) []byte {
+func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave) []byte {
 	inst, err := inj.decodeInst(segment)
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println(inst.PCRel, inst)
 	if inst.PCRel == 0 {
 		return segment
 	}
 	switch inst.Args[0].(type) {
 	case x86asm.Rel:
+	//	fmt.Println(1)
+	// case x86asm.Reg:
+	// 	fmt.Println(2)
 
 	default:
 		return segment
@@ -401,12 +419,14 @@ func (inj *Injector) relocateSegment(segment []byte, idx int) []byte {
 	if rel >= 0 {
 		direction = true
 	}
-
-	var off int32
+	var (
+		off int32
+		dst int
+	)
 	if direction {
 		for j := idx; j < len(inj.segment); j++ {
 			if off == rel {
-
+				dst = j + 1
 				break
 			}
 			off += int32(len(inj.segment[idx]))
@@ -416,13 +436,12 @@ func (inj *Injector) relocateSegment(segment []byte, idx int) []byte {
 
 		}
 	}
-
-	// calculate the two code cave distance
-
+	// calculate the two code cave offset
+	vDst := int64(inj.ccList[dst].virtualAddr)
+	vSrc := int64(current.virtualAddr + uint32(len(segment)))
+	offset := vDst - vSrc
 	// calculate the last offset and relocate instruction
-	// offset := int64(current.virtualAddr) - int64(targetRVA+offTarget)
-	// segment = inj.relocateInstruction(segment, offset)
-	return nil
+	return inj.relocateInstruction(segment, offset)
 }
 
 func (inj *Injector) selectCodeCave() *codeCave {
