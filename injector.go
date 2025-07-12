@@ -142,7 +142,6 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 	return output, nil
 }
 
-// #nosec G115
 func (inj *Injector) inject(shellcode []byte) error {
 	var entryPoint uint32
 	switch inj.arch {
@@ -173,65 +172,15 @@ func (inj *Injector) inject(shellcode []byte) error {
 		first = inj.caves[i]
 		inj.removeCodeCave(i)
 	}
-	// hook target function for add a jmp to the first code cave
 	err := inj.hook(targetRVA, first)
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
-	err = inj.rebuildShellcode(shellcode)
+	err = inj.rebuild(shellcode)
 	if err != nil {
 		return err
 	}
-	if len(inj.segment)+len(inj.oriInst)+1 > len(inj.caves) {
-		return errors.New("not enough caves to inject shellcode")
-	}
-	// insert shellcode segment to code cave
-	current := first
-	next := inj.selectCodeCave()
-	for i := 0; i < len(inj.segment); i++ {
-		size := len(inj.segment[i])
-		if size+5 > current.size {
-			return errors.New("appear too large instruction in shellcode")
-		}
-		rel := int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
-		jmp := make([]byte, 5)
-		jmp[0] = 0xE9
-		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-		inst := append([]byte{}, inj.segment[i]...)
-		inst = append(inst, jmp...)
-		copy(inj.dup[current.pointerToRaw:], inst)
-		// update status
-		current = next
-		next = inj.selectCodeCave()
-	}
-	// insert original instruction about patch
-	var offTarget uint32
-	for i := 0; i < len(inj.oriInst); i++ {
-		inst := inj.oriInst[i]
-		size := len(inst)
-		if size+5 > current.size {
-			return errors.New("appear too large original instruction in patch")
-		}
-		offset := int64(current.virtualAddr) - int64(targetRVA+offTarget)
-		inst = inj.relocateInstruction(inst, offset)
-		var rel int64
-		if i != len(inj.oriInst)-1 {
-			rel = int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
-		} else {
-			rel = int64(inj.retRVA) - int64(current.virtualAddr+uint32(size)) - 5
-		}
-		jmp := make([]byte, 5)
-		jmp[0] = 0xE9
-		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-		rebuild := append([]byte{}, inst...)
-		rebuild = append(inst, jmp...)
-		copy(inj.dup[current.pointerToRaw:], rebuild)
-		// update status
-		current = next
-		next = inj.selectCodeCave()
-		offTarget += uint32(size)
-	}
-	return nil
+	return inj.insert(targetRVA, first)
 }
 
 func (inj *Injector) preprocess(image []byte, opts *Options) error {
@@ -278,6 +227,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	return nil
 }
 
+// hook target function for add a jmp to the first code cave
 // #nosec G115
 func (inj *Injector) hook(rva uint32, first *codeCave) error {
 	offset := int(inj.rvaToOffset(".text", rva))
@@ -333,9 +283,9 @@ func calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) {
 	return 0, 0, errors.New("unable to insert near jmp to this address")
 }
 
-// rebuildShellcode will append instructions about save context
+// rebuild will append instructions about save context
 // and restore context around original shellcode.
-func (inj *Injector) rebuildShellcode(shellcode []byte) error {
+func (inj *Injector) rebuild(shellcode []byte) error {
 	insts, err := inj.disassemble(shellcode)
 	if err != nil {
 		return fmt.Errorf("failed to disassemble shellcode: %s", err)
@@ -354,6 +304,63 @@ func (inj *Injector) rebuildShellcode(shellcode []byte) error {
 		segments = append(segments, inj.restoreContext()...)
 	}
 	inj.segment = segments
+	return nil
+}
+
+// insert shellcode segment and the patched instruction to code caves.
+// #nosec G115
+func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
+	if len(inj.segment)+len(inj.oriInst)+1 > len(inj.caves) {
+		return errors.New("not enough caves to inject shellcode")
+	}
+	// insert shellcode segment to code cave
+	current := first
+	next := inj.selectCodeCave()
+	for i := 0; i < len(inj.segment); i++ {
+		size := len(inj.segment[i])
+		if size+5 > current.size {
+			return errors.New("appear too large instruction in shellcode")
+		}
+		rel := int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
+		jmp := make([]byte, 5)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+		inst := append([]byte{}, inj.segment[i]...)
+		inst = append(inst, jmp...)
+		copy(inj.dup[current.pointerToRaw:], inst)
+		// update status
+		current = next
+		next = inj.selectCodeCave()
+	}
+	// insert original instruction about patch
+	var offTarget uint32
+	for i := 0; i < len(inj.oriInst); i++ {
+		inst := inj.oriInst[i]
+		size := len(inst)
+		if size+5 > current.size {
+			return errors.New("appear too large original instruction in patch")
+		}
+		// relocate instruction
+		offset := int64(current.virtualAddr) - int64(targetRVA+offTarget)
+		inst = inj.relocateInstruction(inst, offset)
+		// build jmp instruction to next code cave or original instruction
+		var rel int64
+		if i != len(inj.oriInst)-1 {
+			rel = int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
+		} else {
+			rel = int64(inj.retRVA) - int64(current.virtualAddr+uint32(size)) - 5
+		}
+		jmp := make([]byte, 5)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+		rebuild := append([]byte{}, inst...)
+		rebuild = append(rebuild, jmp...)
+		copy(inj.dup[current.pointerToRaw:], rebuild)
+		// update status
+		current = next
+		next = inj.selectCodeCave()
+		offTarget += uint32(size)
+	}
 	return nil
 }
 
