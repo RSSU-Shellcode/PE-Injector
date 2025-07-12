@@ -20,9 +20,10 @@ func TestLoadImage(t *testing.T) {
 		require.NoError(t, err)
 		injector.img = peFile
 		injector.arch = "386"
+		err = injector.preprocess(image, nil)
+		require.NoError(t, err)
 
 		injector.loadImage(image)
-
 		for _, iat := range injector.iat {
 			fmt.Println(iat.dll, iat.proc, iat.addr)
 		}
@@ -35,9 +36,10 @@ func TestLoadImage(t *testing.T) {
 		require.NoError(t, err)
 		injector.img = peFile
 		injector.arch = "amd64"
+		err = injector.preprocess(image, nil)
+		require.NoError(t, err)
 
 		injector.loadImage(image)
-
 		for _, iat := range injector.iat {
 			fmt.Println(iat.dll, iat.proc, iat.addr)
 		}
