@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/For-ACGN/go-keystone"
+	"golang.org/x/arch/x86/x86asm"
 )
 
 // Injector is a simple PE injector for inject shellcode.
@@ -141,6 +142,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 	return output, nil
 }
 
+// #nosec G115
 func (inj *Injector) inject(shellcode []byte) error {
 	var entryPoint uint32
 	switch inj.arch {
@@ -203,11 +205,15 @@ func (inj *Injector) inject(shellcode []byte) error {
 		next = inj.selectCodeCave()
 	}
 	// insert original instruction about patch
+	var offTarget uint32
 	for i := 0; i < len(inj.oriInst); i++ {
-		size := len(inj.oriInst[i])
+		inst := inj.oriInst[i]
+		size := len(inst)
 		if size+5 > current.size {
 			return errors.New("appear too large original instruction in patch")
 		}
+		offset := int64(current.virtualAddr) - int64(targetRVA+offTarget)
+		inst = inj.relocateInstruction(inst, offset)
 		var rel int64
 		if i != len(inj.oriInst)-1 {
 			rel = int64(next.virtualAddr) - int64(current.virtualAddr+uint32(size)) - 5
@@ -217,12 +223,13 @@ func (inj *Injector) inject(shellcode []byte) error {
 		jmp := make([]byte, 5)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-		inst := append([]byte{}, inj.oriInst[i]...)
-		inst = append(inst, jmp...)
-		copy(inj.dup[current.pointerToRaw:], inst)
+		rebuild := append([]byte{}, inst...)
+		rebuild = append(inst, jmp...)
+		copy(inj.dup[current.pointerToRaw:], rebuild)
 		// update status
 		current = next
 		next = inj.selectCodeCave()
+		offTarget += uint32(size)
 	}
 	return nil
 }
@@ -271,6 +278,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	return nil
 }
 
+// #nosec G115
 func (inj *Injector) hook(rva uint32, first *codeCave) error {
 	offset := int(inj.rvaToOffset(".text", rva))
 	if offset+32 > len(inj.dup) {
@@ -306,6 +314,23 @@ func (inj *Injector) hook(rva uint32, first *codeCave) error {
 	patch = append(patch, padding...)
 	copy(inj.dup[offset:], patch)
 	return nil
+}
+
+// calcInstNumAndSize is used to calculate the instruction number
+// and the total size that will be overwritten.
+func calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) {
+	var (
+		num  int
+		size int
+	)
+	for i := 0; i < len(insts); i++ {
+		num++
+		size += insts[i].Len
+		if size >= nearJumpSize {
+			return num, size, nil
+		}
+	}
+	return 0, 0, errors.New("unable to insert near jmp to this address")
 }
 
 // rebuildShellcode will append instructions about save context
