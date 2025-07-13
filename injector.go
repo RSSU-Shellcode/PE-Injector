@@ -406,13 +406,11 @@ func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave)
 	}
 	switch inst.Args[0].(type) {
 	case x86asm.Rel:
-	//	fmt.Println(1)
 	// case x86asm.Reg:
-	// 	fmt.Println(2)
-
 	default:
 		return segment
 	}
+	segment = inj.extendInstruction(inst, segment)
 	// calculate the target instruction in original
 	var direction bool // true is after PC
 	rel := int32(inst.Args[0].(x86asm.Rel))
@@ -424,22 +422,27 @@ func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave)
 		dst int
 	)
 	if direction {
-		for j := idx; j < len(inj.segment); j++ {
+		for j := idx + 1; j < len(inj.segment); j++ {
 			if off == rel {
-				dst = j + 1
+				dst = j
 				break
 			}
-			off += int32(len(inj.segment[idx]))
+			off += int32(len(inj.segment[j]))
 		}
 	} else {
+		off += int32(inst.Len)
 		for j := idx; j >= 0; j-- {
-
+			if -off == rel {
+				dst = j
+				break
+			}
+			off += int32(len(inj.segment[j-1]))
 		}
 	}
 	// calculate the two code cave offset
 	vDst := int64(inj.ccList[dst].virtualAddr)
-	vSrc := int64(current.virtualAddr + uint32(len(segment)))
-	offset := vDst - vSrc
+	vSrc := int64(current.virtualAddr + uint32(inst.Len))
+	offset := vSrc - vDst + int64(rel)
 	// calculate the last offset and relocate instruction
 	return inj.relocateInstruction(segment, offset)
 }
