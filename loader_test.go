@@ -1,10 +1,49 @@
 package injector
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestLoader(t *testing.T) {
+	injector := NewInjector()
+
+	opts := &Options{
+		RandSeed:       1234,
+		NotSaveContext: true,
+	}
+
+	t.Run("x86", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x86.dat")
+		require.NoError(t, err)
+		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
+		require.NoError(t, err)
+
+		output, err := injector.Inject(image, shellcode, opts)
+		require.NoError(t, err)
+		require.NotEmpty(t, output)
+
+		testExecuteImage(t, "testdata/injected_x86.exe", output)
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x64.dat")
+		require.NoError(t, err)
+		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+		require.NoError(t, err)
+
+		output, err := injector.Inject(image, shellcode, opts)
+		require.NoError(t, err)
+		require.NotEmpty(t, output)
+
+		testExecuteImage(t, "testdata/injected_x64.exe", output)
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
+}
 
 func TestToDB(t *testing.T) {
 	t.Run("common", func(t *testing.T) {
