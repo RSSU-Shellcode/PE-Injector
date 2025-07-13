@@ -2,7 +2,6 @@ package injector
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"golang.org/x/arch/x86/x86asm"
 )
@@ -37,6 +36,26 @@ func (inj *Injector) disassemble(src []byte) ([]*x86asm.Inst, error) {
 	return insts, nil
 }
 
+// extendInstruction is used to extend instruction when rel is 1 byte,
+// replace it to 4 bytes version, for instruction like jmp.
+// [Warning]: it is only partially done.
+// #nosec G115
+func (inj *Injector) extendInstruction(inst *x86asm.Inst, src []byte) []byte {
+	if inst.PCRel >= 4 {
+		return src
+	}
+	switch inst.Op {
+	case x86asm.JMP:
+		jmp := make([]byte, 5)
+		jmp[0] = 0xE9
+		rel := uint32(inst.Args[0].(x86asm.Rel))
+		binary.LittleEndian.PutUint32(jmp[inst.PCRelOff:], rel)
+		return jmp
+	default:
+		return src
+	}
+}
+
 // relocateInstruction is used to relocate instruction like jmp, call...
 // [Warning]: it is only partially done.
 // #nosec G115
@@ -45,21 +64,19 @@ func (inj *Injector) relocateInstruction(src []byte, offset int64) []byte {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(inst.AddrSize, inst.DataSize, inst.MemBytes, len(src), inst.PCRel, inst.PCRelOff)
-
 	output := make([]byte, len(src))
 	copy(output, src)
 	switch inst.PCRel {
 	case 0:
 	case 1:
 		rel := int64(inst.Args[0].(x86asm.Rel))
-		output[1] = uint8(rel - offset)
+		output[inst.PCRelOff] = uint8(rel - offset)
 	case 2:
 		rel := int64(inst.Args[0].(x86asm.Rel))
-		binary.LittleEndian.PutUint16(output[1:], uint16(rel-offset))
+		binary.LittleEndian.PutUint16(output[inst.PCRelOff:], uint16(rel-offset))
 	case 4:
 		rel := int64(inst.Args[0].(x86asm.Rel))
-		binary.LittleEndian.PutUint32(output[1:], uint32(rel-offset))
+		binary.LittleEndian.PutUint32(output[inst.PCRelOff:], uint32(rel-offset))
 	}
 	return output
 
