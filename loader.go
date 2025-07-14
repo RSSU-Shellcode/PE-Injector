@@ -31,25 +31,33 @@ var (
 
 var (
 	registerX86 = []string{
-		"eax", "ebx", "ecx",
-		"edx", "esi", "edi",
+		"eax", "ebx", "ecx", "edx",
+		"ebp", "edi", "esi",
+	}
+
+	regVolatileX86 = []string{
+		"eax", "ecx", "edx",
+	}
+
+	regNonvolatileX86 = []string{
+		"ebx", "ebp", "edi", "esi",
 	}
 
 	registerX64 = []string{
-		"rax", "rbx", "rcx",
-		"rdx", "rsi", "rdi",
+		"rax", "rbx", "rcx", "rdx",
+		"rbp", "rdi", "rsi",
 		"r8", "r9", "r10", "r11",
 		"r12", "r13", "r14", "r15",
 	}
 
-	regVolatile = []string{
+	regVolatileX64 = []string{
 		"rax", "rcx", "rdx",
-		"r8", "r9",
+		"r8", "r9", "r10", "r11",
 	}
 
-	regStable = []string{
-		"rbx", "rsi", "rdi",
-		"r10", "r11", "r12", "r13", "r14", "r15",
+	regNonvolatileX64 = []string{
+		"rbx", "rbp", "rdi", "rsi",
+		"r12", "r13", "r14", "r15",
 	}
 )
 
@@ -62,7 +70,7 @@ type loaderCtx struct {
 	// for replace registers
 	Reg  map[string]string
 	RegV map[string]string
-	RegS map[string]string
+	RegN map[string]string
 
 	// store procedure status
 	LackProcedure      bool
@@ -71,7 +79,7 @@ type loaderCtx struct {
 	LackVirtualProtect bool
 	LoadLibraryWOnly   bool
 
-	// encrypt the data in segments using xor
+	// encrypt procedure name with xor
 	Kernel32DLLDB     []int64
 	Kernel32DLLKey    []int64
 	CreateThreadDB    []int64
@@ -81,7 +89,7 @@ type loaderCtx struct {
 	VirtualProtectDB  []int64
 	VirtualProtectKey []int64
 
-	// for replace stub in loader
+	// store procedure IAT offset
 	LoadLibrary    uint64
 	GetProcAddress uint64
 	CreateThread   uint64
@@ -119,7 +127,7 @@ func (inj *Injector) buildLoader() ([]byte, error) {
 	ctx := &loaderCtx{
 		Reg:  inj.buildRandomRegisterMap(),
 		RegV: inj.buildVolatileRegisterMap(),
-		RegS: inj.buildStableRegisterMap(),
+		RegN: inj.buildNonvolatileRegisterMap(),
 	}
 	err = inj.findProcFromIAT(ctx)
 	if err != nil {
@@ -185,7 +193,7 @@ func (inj *Injector) buildRandomRegisterMap() map[string]string {
 		copy(reg, registerX64)
 	}
 	inj.regBox = reg
-	register := make(map[string]string, 16)
+	register := make(map[string]string, len(reg))
 	switch inj.arch {
 	case "386":
 		for _, reg := range registerX86 {
@@ -200,23 +208,51 @@ func (inj *Injector) buildRandomRegisterMap() map[string]string {
 }
 
 func (inj *Injector) buildVolatileRegisterMap() map[string]string {
-	reg := make([]string, len(regVolatile))
-	copy(reg, regVolatile)
+	var reg []string
+	switch inj.arch {
+	case "386":
+		reg = make([]string, len(regVolatileX86))
+		copy(reg, regVolatileX86)
+	case "amd64":
+		reg = make([]string, len(regVolatileX64))
+		copy(reg, regVolatileX64)
+	}
 	inj.regBox = reg
-	register := make(map[string]string, len(regVolatile))
-	for _, reg := range regVolatile {
-		register[reg] = inj.selectRegister()
+	register := make(map[string]string, len(reg))
+	switch inj.arch {
+	case "386":
+		for _, reg := range regVolatileX86 {
+			register[reg] = inj.selectRegister()
+		}
+	case "amd64":
+		for _, reg := range regVolatileX64 {
+			register[reg] = inj.selectRegister()
+		}
 	}
 	return register
 }
 
-func (inj *Injector) buildStableRegisterMap() map[string]string {
-	reg := make([]string, len(regStable))
-	copy(reg, regStable)
+func (inj *Injector) buildNonvolatileRegisterMap() map[string]string {
+	var reg []string
+	switch inj.arch {
+	case "386":
+		reg = make([]string, len(regNonvolatileX86))
+		copy(reg, regNonvolatileX86)
+	case "amd64":
+		reg = make([]string, len(regNonvolatileX64))
+		copy(reg, regNonvolatileX64)
+	}
 	inj.regBox = reg
-	register := make(map[string]string, len(regStable))
-	for _, reg := range regStable {
-		register[reg] = inj.selectRegister()
+	register := make(map[string]string, len(reg))
+	switch inj.arch {
+	case "386":
+		for _, reg := range regNonvolatileX86 {
+			register[reg] = inj.selectRegister()
+		}
+	case "amd64":
+		for _, reg := range regNonvolatileX64 {
+			register[reg] = inj.selectRegister()
+		}
 	}
 	return register
 }
