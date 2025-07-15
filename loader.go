@@ -61,10 +61,6 @@ var (
 	}
 )
 
-var (
-	separator = []byte{0x8F, 0x17, 0x97, 0x3C} // split each instruction
-)
-
 type loaderCtx struct {
 	// for replace registers
 	Reg  map[string]string
@@ -77,7 +73,7 @@ type loaderCtx struct {
 	LackVirtualProtect bool
 	LackCreateThread   bool
 	LoadLibraryWOnly   bool
-	NotCreateThread    bool
+	NeedCreateThread   bool
 
 	// encrypt procedure name with xor
 	Kernel32DLLDB     []int64
@@ -119,7 +115,6 @@ func (inj *Injector) buildLoader() ([]byte, error) {
 		"db":  toDB,
 		"hex": toHex,
 		"dr":  toRegDWORD,
-		"is":  insertSeparator,
 	}).Parse(src)
 	if err != nil {
 		return nil, fmt.Errorf("invalid assembly source template: %s", err)
@@ -142,7 +137,6 @@ func (inj *Injector) buildLoader() ([]byte, error) {
 	}
 	fmt.Println(buf.String())
 	inst, err := inj.assemble(buf.String())
-	inst = bytes.ReplaceAll(inst, separator, nil)
 	os.WriteFile("testdata/loader.exe", inst, 0600)
 	return inst, err
 }
@@ -290,8 +284,8 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 			ctx.LackCreateThread = true
 			lackProcedure = true
 		}
+		ctx.NeedCreateThread = true
 	}
-	ctx.NotCreateThread = inj.opts.NotCreateThread
 	ctx.LackProcedure = lackProcedure
 	if !lackProcedure {
 		return nil
@@ -408,9 +402,4 @@ func toRegDWORD(reg string) string {
 		return reg + "d"
 	}
 	return strings.ReplaceAll(reg, "r", "e")
-}
-
-// for split each instruction
-func insertSeparator() string {
-	return ";" + toDB(separator) + ";"
 }
