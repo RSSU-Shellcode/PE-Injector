@@ -118,29 +118,31 @@ entry:
   {{end}}
 
   // get procedure address of CreateThread
-  {{if .LackCreateThread}}
-    // push procedure name to stack
-    mov {{.RegV.rax}}, {{index .CreateThreadDB 0}}
-    mov {{.RegV.r8}},  {{index .CreateThreadKey 0}}
-    xor {{.RegV.rax}}, {{.RegV.r8}}
-    push {{.RegV.rax}}
-    mov {{.RegV.rcx}}, {{index .CreateThreadDB 1}}
-    mov {{.RegV.r9}},  {{index .CreateThreadKey 1}}
-    xor {{.RegV.rcx}}, {{.RegV.r9}}
-    push {{.RegV.rcx}}
-    // call GetProcAddress
-    mov rcx, {{.RegN.rsi}}
-    mov rdx, rsp
-    sub rsp, 0x20
-    call {{.RegN.r12}}
-    add rsp, 0x20
-    mov {{.RegN.r15}}, rax
-    // restore stack for procedure name
-    add rsp, 2*8
-  {{else}}
-    mov {{.RegV.r8}}, {{.RegN.rdi}}
-    add {{.RegV.r8}}, {{hex .CreateThread}}
-    mov {{.RegN.r15}}, [{{.RegV.r8}}]
+  {{if .NeedCreateThread}}
+    {{if .LackCreateThread}}
+      // push procedure name to stack
+      mov {{.RegV.rax}}, {{index .CreateThreadDB 0}}
+      mov {{.RegV.r8}},  {{index .CreateThreadKey 0}}
+      xor {{.RegV.rax}}, {{.RegV.r8}}
+      push {{.RegV.rax}}
+      mov {{.RegV.rcx}}, {{index .CreateThreadDB 1}}
+      mov {{.RegV.r9}},  {{index .CreateThreadKey 1}}
+      xor {{.RegV.rcx}}, {{.RegV.r9}}
+      push {{.RegV.rcx}}
+      // call GetProcAddress
+      mov rcx, {{.RegN.rsi}}
+      mov rdx, rsp
+      sub rsp, 0x20
+      call {{.RegN.r12}}
+      add rsp, 0x20
+      mov {{.RegN.r15}}, rax
+      // restore stack for procedure name
+      add rsp, 2*8
+    {{else}}
+      mov {{.RegV.r8}}, {{.RegN.rdi}}
+      add {{.RegV.r8}}, {{hex .CreateThread}}
+      mov {{.RegN.r15}}, [{{.RegV.r8}}]
+    {{end}}
   {{end}}
 
 {{else}}
@@ -161,9 +163,11 @@ entry:
   add {{.RegV.rdx}}, {{hex .VirtualProtect}}
   mov {{.RegN.r14}}, [{{.RegV.rdx}}]
   // get procedure address of CreateThread
-  mov {{.RegV.r8}}, {{.RegN.rdi}}
-  add {{.RegV.r8}}, {{hex .CreateThread}}
-  mov {{.RegN.r15}}, [{{.RegV.r8}}]
+  {{if .NeedCreateThread}}
+    mov {{.RegV.r8}}, {{.RegN.rdi}}
+    add {{.RegV.r8}}, {{hex .CreateThread}}
+    mov {{.RegN.r15}}, [{{.RegV.r8}}]
+  {{end}}
 
 {{end}}
 
