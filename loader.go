@@ -73,27 +73,28 @@ type loaderCtx struct {
 
 	// store procedure status
 	LackProcedure      bool
-	LackCreateThread   bool
 	LackVirtualAlloc   bool
 	LackVirtualProtect bool
+	LackCreateThread   bool
 	LoadLibraryWOnly   bool
+	NotCreateThread    bool
 
 	// encrypt procedure name with xor
 	Kernel32DLLDB     []int64
 	Kernel32DLLKey    []int64
-	CreateThreadDB    []int64
-	CreateThreadKey   []int64
 	VirtualAllocDB    []int64
 	VirtualAllocKey   []int64
 	VirtualProtectDB  []int64
 	VirtualProtectKey []int64
+	CreateThreadDB    []int64
+	CreateThreadKey   []int64
 
 	// store procedure IAT offset
 	LoadLibrary    uint64
 	GetProcAddress uint64
-	CreateThread   uint64
 	VirtualAlloc   uint64
 	VirtualProtect uint64
+	CreateThread   uint64
 }
 
 func (inj *Injector) buildLoader() ([]byte, error) {
@@ -266,16 +267,10 @@ func (inj *Injector) selectRegister() string {
 }
 
 func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
-	CreateThread := inj.getProcFromIAT("CreateThread")
 	VirtualAlloc := inj.getProcFromIAT("VirtualAlloc")
 	VirtualProtect := inj.getProcFromIAT("VirtualProtect")
+	CreateThread := inj.getProcFromIAT("CreateThread")
 	var lackProcedure bool
-	if CreateThread != nil {
-		ctx.CreateThread = CreateThread.addr
-	} else {
-		ctx.LackCreateThread = true
-		lackProcedure = true
-	}
 	if VirtualAlloc != nil {
 		ctx.VirtualAlloc = VirtualAlloc.addr
 	} else {
@@ -288,6 +283,15 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 		ctx.LackVirtualProtect = true
 		lackProcedure = true
 	}
+	if !inj.opts.NotCreateThread {
+		if CreateThread != nil {
+			ctx.CreateThread = CreateThread.addr
+		} else {
+			ctx.LackCreateThread = true
+			lackProcedure = true
+		}
+	}
+	ctx.NotCreateThread = inj.opts.NotCreateThread
 	ctx.LackProcedure = lackProcedure
 	if !lackProcedure {
 		return nil
@@ -323,9 +327,9 @@ func (inj *Injector) getProcFromIAT(proc string) *iat {
 func (inj *Injector) encryptStrings(ctx *loaderCtx) {
 	isUTF16 := ctx.LoadLibraryWOnly
 	ctx.Kernel32DLLDB, ctx.Kernel32DLLKey = inj.encryptString("kernel32.dll", isUTF16)
-	ctx.CreateThreadDB, ctx.CreateThreadKey = inj.encryptString("CreateThread", false)
 	ctx.VirtualAllocDB, ctx.VirtualAllocKey = inj.encryptString("VirtualAlloc", false)
 	ctx.VirtualProtectDB, ctx.VirtualProtectKey = inj.encryptString("VirtualProtect", false)
+	ctx.CreateThreadDB, ctx.CreateThreadKey = inj.encryptString("CreateThread", false)
 }
 
 func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) {
