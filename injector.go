@@ -45,14 +45,6 @@ type Injector struct {
 	oriInst [][]byte
 	retRVA  uint32
 
-	// for replace stub in loader
-	procCreateThread   *iat
-	procVirtualAlloc   *iat
-	procVirtualProtect *iat
-	procLoadLibraryA   *iat
-	procLoadLibraryW   *iat
-	procGetProcAddress *iat
-
 	// for write shellcode loader
 	caves []*codeCave
 
@@ -65,19 +57,31 @@ type Options struct {
 	// specify the target function address that will
 	// be hooked, it is an VA address, not a file offset
 	// or RVA, remember disable ASLR when debug image.
-	// if it is zero, use the entry point
+	// if it is zero, use the entry point.
 	Address uint64
 
-	// not append instruction about save context
+	// not append instruction about save and restore context
+	// if your shellcode need hijack function argument or
+	// register, you need set it with true.
 	NotSaveContext bool
 
-	// specify a random seed for generate loader
+	// not create thread at the shellcode,
+	// ensure the shellcode can be called as a function.
+	// on x86, the calling convention is stdcall.
+	NotCreateThread bool
+
+	// not extend the last section if the number of
+	// code caves is not enough for write shellcode,
+	// if not enough, it will return an error.
+	DisableExtendSection bool
+
+	// specify a random seed for generate loader.
 	RandSeed int64
 
-	// specify the x86 loader template
+	// specify the x86 loader template.
 	LoaderX86 string
 
-	// specify the x64 loader template
+	// specify the x64 loader template.
 	LoaderX64 string
 }
 
@@ -395,6 +399,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 	return nil
 }
 
+// #nosec G115
 func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave) []byte {
 	inst, err := inj.decodeInst(segment)
 	if err != nil {
