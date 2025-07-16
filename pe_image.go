@@ -1,11 +1,18 @@
 package injector
 
 import (
+	"bytes"
 	"debug/pe"
 	"encoding/binary"
 )
 
-const importDirectorySize = 5 * 4
+const (
+	imageDOSHeader         = 64
+	imageFileHeaderSize    = 20
+	imageSectionHeaderSize = 40
+	importDirectorySize    = 5 * 4
+	reserveSectionSize     = 8
+)
 
 type iat struct {
 	dll  string
@@ -92,6 +99,47 @@ func (inj *Injector) processIAT() {
 		table = table[20:]
 	}
 	inj.iat = list
+}
+
+// extendSection is used to extend the last section for write data.
+// It will return the RVA about the start of written data.
+func (inj *Injector) extendSection(data []byte) uint32 {
+	// calculate the offset of target data
+	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
+	hdrOffset := peOffset + 4 + imageFileHeaderSize
+	sctOffset := hdrOffset + uint32(inj.img.SizeOfOptionalHeader)
+	shOffset := sctOffset + uint32((inj.img.NumberOfSections-1)*imageSectionHeaderSize)
+	// adjust the last section header data
+	last := new(pe.SectionHeader32)
+	_ = binary.Read(bytes.NewReader(inj.dup[shOffset:]), binary.LittleEndian, last)
+	size := uint32(reserveSectionSize + len(data))
+	last.VirtualSize += size
+	// make sure the SizeOfRawData > VirtualSize
+	newSize := (last.VirtualSize/0x200 + 1) * 0x200
+	padSize := int64(newSize) - int64(last.SizeOfRawData)
+	if padSize > 0 {
+		last.SizeOfRawData = newSize
+		pad := make([]byte, padSize)
+		inj.dup = append(inj.dup, pad...)
+	} else {
+		padSize = 0
+	}
+	_ = binary.Write(bytes.NewBuffer(inj.dup[shOffset:]), binary.LittleEndian, last)
+	// adjust the size of image in optional header
+	switch inj.arch {
+	case "386":
+		hdr := *inj.hdr32
+		hdr.SizeOfImage += uint32(padSize)
+		_ = binary.Write(bytes.NewBuffer(inj.dup[hdrOffset:]), binary.LittleEndian, &hdr)
+	case "amd64":
+		hdr := *inj.hdr64
+		hdr.SizeOfImage += uint32(padSize)
+		_ = binary.Write(bytes.NewBuffer(inj.dup[hdrOffset:]), binary.LittleEndian, &hdr)
+	}
+	// copy data to the extended section
+	dst := last.PointerToRawData + last.VirtualSize + reserveSectionSize
+	copy(inj.dup[dst:], data)
+	return last.VirtualAddress + last.VirtualSize + reserveSectionSize
 }
 
 // #nosec G115
