@@ -109,9 +109,10 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 	hdrOffset := peOffset + 4 + imageFileHeaderSize
 	sctOffset := hdrOffset + uint32(inj.img.SizeOfOptionalHeader)
 	shOffset := sctOffset + uint32((inj.img.NumberOfSections-1)*imageSectionHeaderSize)
-	// adjust the last section header data
+	// adjust the last section header
 	last := new(pe.SectionHeader32)
 	_ = binary.Read(bytes.NewReader(inj.dup[shOffset:]), binary.LittleEndian, last)
+	oldVirtualSize := last.VirtualSize
 	size := uint32(reserveSectionSize + len(data))
 	last.VirtualSize += size
 	// make sure the SizeOfRawData > VirtualSize
@@ -137,9 +138,9 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 		_ = binary.Write(bytes.NewBuffer(inj.dup[hdrOffset:]), binary.LittleEndian, &hdr)
 	}
 	// copy data to the extended section
-	dst := last.PointerToRawData + last.VirtualSize + reserveSectionSize
+	dst := last.PointerToRawData + oldVirtualSize + reserveSectionSize
 	copy(inj.dup[dst:], data)
-	return last.VirtualAddress + last.VirtualSize + reserveSectionSize
+	return last.VirtualAddress + oldVirtualSize + reserveSectionSize
 }
 
 // #nosec G115
