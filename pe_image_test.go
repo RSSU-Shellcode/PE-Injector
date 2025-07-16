@@ -48,3 +48,46 @@ func TestLoadImage(t *testing.T) {
 	err := injector.Close()
 	require.NoError(t, err)
 }
+
+func TestExtendSection(t *testing.T) {
+	injector := NewInjector()
+
+	t.Run("x86", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x86.dat")
+		require.NoError(t, err)
+		peFile, err := pe.NewFile(bytes.NewReader(image))
+		require.NoError(t, err)
+		injector.img = peFile
+		injector.arch = "386"
+		err = injector.preprocess(image, nil)
+		require.NoError(t, err)
+
+		data := []byte("Hello Injector!")
+		rva := injector.extendSection(data)
+		fmt.Printf("rva: 0x%X\n", rva)
+
+		output := injector.dup
+		testExecuteImage(t, "testdata/injected_x86.exe", output)
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x64.dat")
+		require.NoError(t, err)
+		peFile, err := pe.NewFile(bytes.NewReader(image))
+		require.NoError(t, err)
+		injector.img = peFile
+		injector.arch = "amd64"
+		err = injector.preprocess(image, nil)
+		require.NoError(t, err)
+
+		data := []byte("Hello Injector!")
+		rva := injector.extendSection(data)
+		fmt.Printf("rva: 0x%X\n", rva)
+
+		output := injector.dup
+		testExecuteImage(t, "testdata/injected_x64.exe", output)
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
+}
