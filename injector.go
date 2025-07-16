@@ -68,14 +68,22 @@ type Options struct {
 	// not create thread at the shellcode,
 	// ensure the shellcode can be called as a function.
 	// on x86, the calling convention is stdcall.
+	// it is useless for method InjectRaw.
 	NotCreateThread bool
+
+	// not erase shellcode after execute finish.
+	// when you need run shellcode as a background
+	// program, you need set it with true.
+	// it is useless for method InjectRaw.
+	NotEraseShellcode bool
 
 	// not extend the last section if the number of
 	// code caves is not enough for write shellcode,
 	// if not enough, it will return an error.
+	// it is useless for method InjectRaw.
 	DisableExtendSection bool
 
-	// specify a random seed for generate loader.
+	// specify a random seed for test and debug.
 	RandSeed int64
 
 	// specify the x86 loader template.
@@ -114,7 +122,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	loader, err := inj.buildLoader()
+	loader, err := inj.buildLoader(shellcode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
 	}
@@ -130,6 +138,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 // InjectRaw is used to inject shellcode to a PE image without loader.
 // It is an advanced usage, ensure the shellcode not contains behavior
 // like read data from the shellcode tail.
+// Must use int3(0xCC) for set a flag that define the end of shellcode.
 func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode segment")
