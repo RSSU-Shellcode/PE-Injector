@@ -103,6 +103,7 @@ func (inj *Injector) processIAT() {
 
 // extendSection is used to extend the last section for write data.
 // It will return the RVA about the start of written data.
+// #nosec G115
 func (inj *Injector) extendSection(data []byte) uint32 {
 	// calculate the offset of target data
 	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
@@ -125,18 +126,24 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 	} else {
 		padSize = 0
 	}
-	_ = binary.Write(bytes.NewBuffer(inj.dup[shOffset:]), binary.LittleEndian, last)
+	// overwrite the last section
+	buffer := bytes.NewBuffer(nil)
+	_ = binary.Write(buffer, binary.LittleEndian, last)
+	copy(inj.dup[shOffset:], buffer.Bytes())
+	buffer.Reset()
 	// adjust the size of image in optional header
 	switch inj.arch {
 	case "386":
 		hdr := *inj.hdr32
 		hdr.SizeOfImage += uint32(padSize)
-		_ = binary.Write(bytes.NewBuffer(inj.dup[hdrOffset:]), binary.LittleEndian, &hdr)
+		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 	case "amd64":
 		hdr := *inj.hdr64
 		hdr.SizeOfImage += uint32(padSize)
-		_ = binary.Write(bytes.NewBuffer(inj.dup[hdrOffset:]), binary.LittleEndian, &hdr)
+		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 	}
+	// overwrite the optional header
+	copy(inj.dup[hdrOffset:], buffer.Bytes())
 	// copy data to the extended section
 	dst := last.PointerToRawData + oldVirtualSize + reserveSectionSize
 	copy(inj.dup[dst:], data)
