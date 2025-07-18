@@ -15,30 +15,91 @@ func TestLoader(t *testing.T) {
 		NotSaveContext: true,
 	}
 
-	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x86.dat")
-		require.NoError(t, err)
-		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
-		require.NoError(t, err)
+	t.Run("auto mode", func(t *testing.T) {
+		t.Run("x86", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_x86.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
+			require.NoError(t, err)
 
-		output, err := injector.Inject(image, shellcode, opts)
-		require.NoError(t, err)
-		require.NotEmpty(t, output)
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
 
-		testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
+		})
+
+		t.Run("x64", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_x64.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
+		})
 	})
 
-	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x64.dat")
-		require.NoError(t, err)
-		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
-		require.NoError(t, err)
+	t.Run("code cave mode", func(t *testing.T) {
+		opts.ForceCodeCave = true
 
-		output, err := injector.Inject(image, shellcode, opts)
-		require.NoError(t, err)
-		require.NotEmpty(t, output)
+		t.Run("x86", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_x86.dat")
+			require.NoError(t, err)
+			shellcode := []byte{0x90}
 
-		testExecuteImage(t, "testdata/injected_x64.exe", output)
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
+		})
+
+		t.Run("x64", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_x64.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
+		})
+	})
+
+	t.Run("extend section mode", func(t *testing.T) {
+		opts.ForceExtendSection = true
+
+		t.Run("x86", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_x86.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
+		})
+
+		t.Run("x64", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_x64.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
+		})
 	})
 
 	err := injector.Close()
