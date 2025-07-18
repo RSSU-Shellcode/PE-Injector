@@ -67,6 +67,10 @@ var (
 	}
 )
 
+var (
+	codeCaveModeStub = []byte{0x20, 0x25, 0x07, 0x18}
+)
+
 type loaderCtx struct {
 	// for replace registers
 	Reg  map[string]string
@@ -101,8 +105,11 @@ type loaderCtx struct {
 	// information of write shellcode
 	SectionMode   bool
 	SectionOffset uint32
+	EntryOffset   int
 	MemRegionSize int
 	ShellcodeSize int
+
+	CodeCaveStub []byte
 }
 
 func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
@@ -132,14 +139,18 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		return nil, fmt.Errorf("invalid loader template: %s", err)
 	}
 	// prepare loader context for build source
-	memRegionSize := (len(shellcode)/4096 + 1 + inj.rand.Intn(16)) * 4096
+	entryOffset := 16 + inj.rand.Intn(512)
+	memRegionSize := ((entryOffset+len(shellcode))/4096 + 1 + inj.rand.Intn(16)) * 4096
 	ctx := &loaderCtx{
 		Reg:  inj.buildRandomRegisterMap(),
 		RegV: inj.buildVolatileRegisterMap(),
 		RegN: inj.buildNonvolatileRegisterMap(),
 
+		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
 		ShellcodeSize: len(shellcode),
+
+		CodeCaveStub: codeCaveModeStub,
 	}
 	err = inj.findProcFromIAT(ctx)
 	if err != nil {
@@ -396,15 +407,18 @@ func (inj *Injector) selectMode(ctx *loaderCtx, shellcode []byte) error {
 	case "amd64":
 		numCaves = (len(shellcode)/8 + 1) * numInstForCopyShellcode
 	}
-	if minNumCaves+numCaves < len(inj.caves) {
-		// TODO finish cove cave mode
-		// ctx.SectionMode
-	}
+
 	if inj.opts.DisableExtendSection {
 		return errors.New("shellcode is too large and extend section is disabled")
 	}
 	ctx.SectionMode = true
 	ctx.SectionOffset = inj.extendSection(shellcode)
+
+	if minNumCaves+numCaves > len(inj.caves) {
+
+		return nil
+	}
+
 	return nil
 }
 
