@@ -71,17 +71,25 @@ type Options struct {
 	// it is useless for method InjectRaw.
 	NotCreateThread bool
 
+	// not wait created thread at the shellcode,
+	// it will not erase shellcode after execute finish.
+	NotWaitThread bool
+
 	// not erase shellcode after execute finish.
 	// when you need run shellcode as a background
 	// program, you need set it with true.
 	// it is useless for method InjectRaw.
 	NotEraseShellcode bool
 
-	// not extend the last section if the number of
-	// code caves is not enough for write shellcode,
-	// if not enough, it will return an error.
+	// force use code cave mode for write shellcode.
+	// if code cave is not enough, it will return an error.
 	// it is useless for method InjectRaw.
-	DisableExtendSection bool
+	ForceCodeCave bool
+
+	// force extend the last section even if the number
+	// of code cave is enough for write shellcode.
+	// it is useless for method InjectRaw.
+	ForceExtendSection bool
 
 	// specify a random seed for test and debug.
 	RandSeed int64
