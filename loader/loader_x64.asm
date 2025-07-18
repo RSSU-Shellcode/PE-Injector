@@ -198,18 +198,24 @@ add rsp, 0x08 // restore stack
   mov rsi, {{.RegN.rdi}}
   add rsi, {{hex .SectionOffset}}
   mov rdi, [rsp]
+  add rdi, {{hex .EntryOffset}}
   mov rcx, {{hex .ShellcodeSize}}
   cld
   rep movsb
 {{else}}
-
+  {{db .CodeCaveStub}}
 {{end}}
 
+// get the shellcode entry point
+mov {{.RegV.rax}}, [rsp]
+add {{.RegV.rax}}, {{hex .EntryOffset}}
+
+// restore stack about allocated memory address
+add rsp, 0x08
+
 // call the shellcode
-mov rax, [rsp] // allocated memory address
-add rsp, 0x08  // restore stack
 sub rsp, 0x20
-call rax
+call {{.RegV.rax}}
 add rsp, 0x20
 
 int3
