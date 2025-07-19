@@ -41,6 +41,13 @@ func (inj *Injector) disassemble(src []byte) ([]*x86asm.Inst, error) {
 // [Warning]: it is only partially done.
 // #nosec G115
 func (inj *Injector) extendInstruction(inst *x86asm.Inst, src []byte) []byte {
+	if inst == nil {
+		var err error
+		inst, err = inj.decodeInst(src)
+		if err != nil {
+			panic(err)
+		}
+	}
 	if inst.PCRel >= 4 {
 		return src
 	}
