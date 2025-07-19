@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRelocateWithCodeCave(t *testing.T) {
+func TestRelocateInstructionSegment(t *testing.T) {
 	injector := NewInjector()
 
 	opts := &Options{
