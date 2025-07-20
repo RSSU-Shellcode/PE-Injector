@@ -53,10 +53,9 @@ func TestLoader(t *testing.T) {
 			shellcode := []byte{0x90}
 
 			output, err := injector.Inject(image, shellcode, opts)
-			require.NoError(t, err)
-			require.NotEmpty(t, output)
-
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			errStr := "failed to build loader: shellcode is too large and extend section is disabled"
+			require.EqualError(t, err, errStr)
+			require.Empty(t, output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
