@@ -45,6 +45,7 @@ func TestLoader(t *testing.T) {
 
 	t.Run("code cave mode", func(t *testing.T) {
 		opts.ForceCodeCave = true
+		opts.ForceExtendSection = false
 
 		t.Run("x86", func(t *testing.T) {
 			image, err := os.ReadFile("testdata/image_x86.dat")
@@ -73,6 +74,7 @@ func TestLoader(t *testing.T) {
 	})
 
 	t.Run("extend section mode", func(t *testing.T) {
+		opts.ForceCodeCave = false
 		opts.ForceExtendSection = true
 
 		t.Run("x86", func(t *testing.T) {
