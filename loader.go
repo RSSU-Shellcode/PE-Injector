@@ -117,6 +117,22 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		_ = inj.engine.Close()
 		inj.engine = nil
 	}()
+	// make sure shellcode is 4 or 8 bytes alignment
+	var numPad int
+	switch inj.arch {
+	case "386":
+		numPad = len(shellcode) % 4
+		if numPad != 0 {
+			numPad = 4 - numPad
+		}
+	case "amd64":
+		numPad = len(shellcode) % 8
+		if numPad != 0 {
+			numPad = 8 - numPad
+		}
+	}
+	shellcode = bytes.Clone(shellcode)
+	shellcode = append(shellcode, bytes.Repeat([]byte{0x00}, numPad)...)
 	// prepare loader context for build source
 	entryOffset := 16 + inj.rand.Intn(512)
 	memRegionSize := ((entryOffset+len(shellcode))/4096 + 1 + inj.rand.Intn(16)) * 4096
@@ -395,24 +411,8 @@ func (inj *Injector) selectReadMode(ctx *loaderCtx, sc []byte, src string) (stri
 	if inj.opts.ForceExtendSection && inj.opts.ForceCodeCave {
 		return "", errors.New("invalid read shellcode mode")
 	}
-	// make sure shellcode is 4 or 8 bytes alignment
-	switch inj.arch {
-	case "386":
-		l := len(sc)
-		p := l % 4
-		if p != 0 {
-			sc = append(sc, bytes.Repeat([]byte{0x00}, 4-p)...)
-		}
-	case "amd64":
-		l := len(sc)
-		p := l % 8
-		if p != 0 {
-			sc = append(sc, bytes.Repeat([]byte{0x00}, 8-p)...)
-		}
-	}
 	if inj.opts.ForceExtendSection {
-		inj.useExtendSectionMode(ctx, sc)
-		return src, nil
+		return inj.useExtendSectionMode(ctx, sc, src), nil
 	}
 	// check need use extend section mode
 	var numCaves int
@@ -426,13 +426,12 @@ func (inj *Injector) selectReadMode(ctx *loaderCtx, sc []byte, src string) (stri
 		if inj.opts.ForceCodeCave {
 			return "", errors.New("shellcode is too large and extend section is disabled")
 		}
-		inj.useExtendSectionMode(ctx, sc)
-		return src, nil
+		return inj.useExtendSectionMode(ctx, sc, src), nil
 	}
-	return inj.useCodeCaveMode(ctx, sc, src)
+	return inj.useCodeCaveMode(ctx, sc, src), nil
 }
 
-func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
+func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) string {
 	// generate assembly source
 	var stub string
 	switch inj.arch {
@@ -464,11 +463,10 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) (str
 		}
 	}
 	// replace the flag to assembly source
-	src = strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", stub)
-	return src, nil
+	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", stub)
 }
 
-func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte) {
+func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string) string {
 	// encrypt shellcode
 	encrypted := make([]byte, len(sc))
 	switch inj.arch {
@@ -516,6 +514,8 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte) {
 	}
 	ctx.SectionMode = true
 	ctx.SectionOffset = inj.extendSection(section.Bytes())
+	// remove the flag in assembly source
+	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
 }
 
 func toUTF16(s string) string {
