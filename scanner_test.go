@@ -21,13 +21,15 @@ func TestScanCodeCave(t *testing.T) {
 		injector.img = peFile
 		injector.arch = "386"
 
-		err = injector.scanCodeCave()
+		caves, err := injector.scanCodeCave()
 		require.NoError(t, err)
 
-		fmt.Println(len(injector.caves))
-		for _, cave := range injector.caves {
+		fmt.Println(len(caves))
+		for _, cave := range caves {
 			fmt.Println(cave.virtualAddr, cave.pointerToRaw, cave.size)
 		}
+
+		require.Equal(t, 207, len(caves))
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -38,13 +40,15 @@ func TestScanCodeCave(t *testing.T) {
 		injector.img = peFile
 		injector.arch = "amd64"
 
-		err = injector.scanCodeCave()
+		caves, err := injector.scanCodeCave()
 		require.NoError(t, err)
 
-		fmt.Println(len(injector.caves))
-		for _, cave := range injector.caves {
+		fmt.Println(len(caves))
+		for _, cave := range caves {
 			fmt.Println(cave.virtualAddr, cave.pointerToRaw, cave.size)
 		}
+
+		require.Equal(t, 749, len(caves))
 	})
 
 	err := injector.Close()
