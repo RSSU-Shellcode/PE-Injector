@@ -73,6 +73,7 @@ type Options struct {
 
 	// not wait created thread at the shellcode,
 	// it will not erase shellcode after execute finish.
+	// it is useless for method InjectRaw.
 	NotWaitThread bool
 
 	// not erase shellcode after execute finish.
@@ -230,10 +231,11 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.arch = arch
 	inj.loadImage(image)
 	// scan code cave in image text section
-	err = inj.scanCodeCave()
+	caves, err := inj.scanCodeCave()
 	if err != nil {
 		return fmt.Errorf("failed to scan code cave: %s", err)
 	}
+	inj.caves = caves
 	// set random seed
 	seed := opts.RandSeed
 	if seed == 0 {
