@@ -4,16 +4,12 @@ import (
 	"errors"
 )
 
-// 0xCC, 0xCC, [n * 0xCC]
-
 const (
-	reserveSize    = 2
 	jmpInstSize    = 5
-	maxInstSizeX86 = 7
-	maxInstSizeX64 = 12
-	minCaveSizeX86 = reserveSize + (maxInstSizeX86 + jmpInstSize)
-	minCaveSizeX64 = reserveSize + (maxInstSizeX64 + jmpInstSize)
-	minNumCaves    = 128
+	expInstSizeX86 = 7
+	expInstSizeX64 = 12
+	expCaveSizeX86 = expInstSizeX86 + jmpInstSize
+	expCaveSizeX64 = expInstSizeX64 + jmpInstSize
 )
 
 type codeCave struct {
@@ -22,10 +18,10 @@ type codeCave struct {
 	size         int
 }
 
-func (inj *Injector) scanCodeCave() error {
+func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 	text := inj.img.Section(".text")
 	if text == nil {
-		return errors.New("cannot find .text section in image")
+		return nil, errors.New("cannot find .text section in image")
 	}
 	// record offset and calculate scan range
 	size := text.Size
@@ -33,54 +29,62 @@ func (inj *Injector) scanCodeCave() error {
 		size = text.VirtualSize
 	}
 	if size < 32*1024 {
-		return errors.New(".text section too small")
+		return nil, errors.New(".text section too small")
 	}
 	section, err := text.Data()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	section = section[:size-32]
 	// scan code caves
 	caves := inj.scanSection(section, text.VirtualAddress, text.Offset)
-	if len(caves) < minNumCaves {
-		return errors.New("too little code caves")
-	}
-	inj.caves = caves
-	return nil
+	return caves, nil
 }
 
 // #nosec G115
 func (inj *Injector) scanSection(section []byte, va, raw uint32) []*codeCave {
-	var caves []*codeCave
-	for addr := 0; addr < len(section); addr++ {
-		if section[addr] != 0xCC {
+	var expCaveSize int
+	switch inj.arch {
+	case "386":
+		expCaveSize = expCaveSizeX86
+	case "amd64":
+		expCaveSize = expCaveSizeX64
+	}
+	var (
+		address int
+		reserve int
+		caves   []*codeCave
+	)
+	for address < len(section) {
+		b := section[address]
+		switch b {
+		case 0x00:
+			address++
 			continue
+		case 0xCC:
+			reserve = 2
+		default:
+			reserve = 5
 		}
+		expSize := reserve + expCaveSize
 		caveSize := 1
-		for j := addr + 1; j < len(section); j++ {
-			if section[j] != 0xCC {
+		for j := address + 1; j < len(section); j++ {
+			if section[j] != b {
 				break
 			}
 			caveSize++
+			if caveSize == expSize {
+				break
+			}
 		}
-		// check the cave size is enough
-		var minCaveSize int
-		switch inj.arch {
-		case "386":
-			minCaveSize = minCaveSizeX86
-		case "amd64":
-			minCaveSize = minCaveSizeX64
+		if caveSize == expSize {
+			caves = append(caves, &codeCave{
+				virtualAddr:  va + uint32(address+reserve),
+				pointerToRaw: raw + uint32(address+reserve),
+				size:         caveSize - reserve,
+			})
 		}
-		if caveSize < minCaveSize {
-			addr += caveSize
-			continue
-		}
-		caves = append(caves, &codeCave{
-			virtualAddr:  va + uint32(addr+reserveSize),
-			pointerToRaw: raw + uint32(addr+reserveSize),
-			size:         caveSize - reserveSize,
-		})
-		addr += caveSize
+		address += caveSize
 	}
 	return caves
 }
