@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -181,10 +180,7 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to build assembly source: %s", err)
 	}
-	fmt.Println(buf.String())
-	inst, err := inj.assemble(buf.String())
-	os.WriteFile("testdata/loader.exe", inst, 0600)
-	return inst, err
+	return inj.assemble(buf.String())
 }
 
 func (inj *Injector) initAssembler() error {
@@ -496,7 +492,7 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 	}
 	// build a fake relocate section data
 	section := bytes.NewBuffer(make([]byte, 0, len(encrypted)*2))
-	begin := uint8(160 + inj.rand.Intn(32))
+	begin := uint8(160 + inj.rand.Intn(32)) // #nosec G115
 	var counter int
 	for i := 0; i < len(encrypted); i++ {
 		section.WriteByte(encrypted[i])
