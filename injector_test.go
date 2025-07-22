@@ -277,7 +277,7 @@ func TestInjectorFuzz(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImageFast(t, "testdata/injected_x86.exe", output)
 		}
 	})
 
@@ -292,7 +292,7 @@ func TestInjectorFuzz(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteImageFast(t, "testdata/injected_x64.exe", output)
 		}
 	})
 
@@ -301,6 +301,14 @@ func TestInjectorFuzz(t *testing.T) {
 }
 
 func testExecuteImage(t *testing.T, path string, image []byte) {
+	testExecuteImageWait(t, path, image, 500*time.Millisecond)
+}
+
+func testExecuteImageFast(t *testing.T, path string, image []byte) {
+	testExecuteImageWait(t, path, image, 250*time.Millisecond)
+}
+
+func testExecuteImageWait(t *testing.T, path string, image []byte, wait time.Duration) {
 	err := os.WriteFile(path, image, 0600)
 	require.NoError(t, err)
 
@@ -312,7 +320,7 @@ func testExecuteImage(t *testing.T, path string, image []byte) {
 	err = cmd.Start()
 	require.NoError(t, err)
 
-	time.Sleep(time.Second)
+	time.Sleep(wait)
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
 
