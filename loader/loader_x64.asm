@@ -198,8 +198,10 @@ entry:
   add {{.RegV.rax}}, {{.Reg.r11}}
   next1:
   call xor_shift
+  push rax
   mov rax, {{.RegV.rax}}
   mov [{{.RegV.rdx}}], al
+  pop rax
   // check padding garbage is finish
   inc {{.RegV.rdx}}
   dec {{.RegV.rcx}}
