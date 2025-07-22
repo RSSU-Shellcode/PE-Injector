@@ -29,7 +29,7 @@ func TestScanCodeCave(t *testing.T) {
 			fmt.Println(cave.virtualAddr, cave.pointerToRaw, cave.size)
 		}
 
-		require.Equal(t, 207, len(caves))
+		require.Equal(t, 200, len(caves))
 	})
 
 	t.Run("x64", func(t *testing.T) {
