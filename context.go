@@ -12,9 +12,8 @@ var (
 	}
 
 	restoreContextFPX86 = [][]byte{
-		{0x8B, 0xE5},                         //         mov esp, ebp
-		{0x81, 0xC4, 0x00, 0x02, 0x00, 0x00}, //         add esp, 0x200
-		{0x0F, 0xAE, 0x0C, 0x24},             //         fxrstor [esp]
+		{0x8B, 0xE5},             //                     mov esp, ebp
+		{0x0F, 0xAE, 0x0C, 0x24}, //                     fxrstor [esp]
 	}
 
 	saveContextX64 = [][]byte{
