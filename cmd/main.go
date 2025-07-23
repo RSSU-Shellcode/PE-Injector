@@ -11,21 +11,31 @@ import (
 )
 
 var (
-	opts  injector.Options
 	img   string
 	sc    string
 	hexSC bool
 	out   string
+	aye   bool
+	opts  injector.Options
 )
 
 func init() {
-	flag.Int64Var(&opts.RandSeed, "seed", 0, "specify a random seed for generate loader")
-	flag.StringVar(&opts.LoaderX86, "ldr-x86", "", "specify the x86 loader template file path")
-	flag.StringVar(&opts.LoaderX64, "ldr-x64", "", "specify the x64 loader template file path")
 	flag.StringVar(&img, "img", "", "set input pe image file path")
 	flag.StringVar(&sc, "sc", "", "set input shellcode file path")
 	flag.BoolVar(&hexSC, "hex", false, "input shellcode with hex format")
 	flag.StringVar(&out, "o", "", "set output pe image file path")
+	flag.BoolVar(&aye, "a", false, "analyze the pe image for inject")
+
+	flag.Uint64Var(&opts.Address, "addr", 0, "specify the target function address that will be hooked")
+	flag.BoolVar(&opts.NotSaveContext, "nsc", false, "not append instruction about save and restore context")
+	flag.BoolVar(&opts.NotCreateThread, "nct", false, "not create thread at the shellcode")
+	flag.BoolVar(&opts.NotWaitThread, "nwt", false, "not wait created thread at the shellcode")
+	flag.BoolVar(&opts.NotEraseShellcode, "nes", false, "not erase shellcode after execute finish")
+	flag.BoolVar(&opts.ForceCodeCave, "fcc", false, "force use code cave mode for write shellcode")
+	flag.BoolVar(&opts.ForceExtendSection, "fes", false, "force extend the last section for write shellcode")
+	flag.Int64Var(&opts.RandSeed, "seed", 0, "specify a random seed for generate loader")
+	flag.StringVar(&opts.LoaderX86, "ldr-x86", "", "specify the x86 loader template file path")
+	flag.StringVar(&opts.LoaderX64, "ldr-x64", "", "specify the x64 loader template file path")
 	flag.Parse()
 }
 
@@ -34,6 +44,17 @@ func main() {
 		flag.Usage()
 		return
 	}
+
+	if aye {
+		// image, err := os.ReadFile(img) // #nosec
+		// checkError(err)
+		// info, err := injector.Analyze(image)
+		// checkError(err)
+		//
+		//
+		// fmt.Println()
+	}
+
 	if out == "" {
 		err := os.Mkdir("output", 0700)
 		checkError(err)
