@@ -25,7 +25,6 @@ func init() {
 	flag.BoolVar(&hexSC, "hex", false, "input shellcode with hex format")
 	flag.StringVar(&out, "o", "", "set output pe image file path")
 	flag.BoolVar(&aye, "a", false, "analyze the pe image for inject")
-
 	flag.Uint64Var(&opts.Address, "addr", 0, "specify the target function address that will be hooked")
 	flag.BoolVar(&opts.NotSaveContext, "nsc", false, "not append instruction about save and restore context")
 	flag.BoolVar(&opts.NotCreateThread, "nct", false, "not create thread at the shellcode")
@@ -44,23 +43,15 @@ func main() {
 		flag.Usage()
 		return
 	}
-
 	if aye {
-		// image, err := os.ReadFile(img) // #nosec
-		// checkError(err)
-		// info, err := injector.Analyze(image)
-		// checkError(err)
-		//
-		//
-		// fmt.Println()
+		analyzeImage()
+		return
 	}
-
 	if out == "" {
 		err := os.Mkdir("output", 0700)
 		checkError(err)
 		out = filepath.Join("output", filepath.Base(img))
 	}
-
 	opts.LoaderX86 = loadSourceTemplate(opts.LoaderX86)
 	opts.LoaderX64 = loadSourceTemplate(opts.LoaderX64)
 
@@ -94,6 +85,31 @@ func main() {
 
 	err = inj.Close()
 	checkError(err)
+}
+
+func analyzeImage() {
+	image, err := os.ReadFile(img) // #nosec
+	checkError(err)
+	info, err := injector.Analyze(image)
+	checkError(err)
+	fmt.Println("================PE image================")
+	fmt.Println("Architecture:", info.Architecture)
+	fmt.Println("ImageSize: ", info.ImageSize)
+	fmt.Printf("ImageBase:  0x%X\n", info.ImageBase)
+	fmt.Printf("EntryPoint: 0x%X\n", info.EntryPoint)
+	fmt.Println("===============Procedures===============")
+	fmt.Println("Entirety:      ", info.HasAllProcedures)
+	fmt.Println("VirtualAlloc:  ", info.HasVirtualAlloc)
+	fmt.Println("VirtualProtect:", info.HasVirtualProtect)
+	fmt.Println("CreateThread:  ", info.HasCreateThread)
+	fmt.Println("LoadLibraryA:  ", info.HasLoadLibraryA)
+	fmt.Println("LoadLibraryW:  ", info.HasLoadLibraryW)
+	fmt.Println("GetProcAddress:", info.HasGetProcAddress)
+	fmt.Println("================Injector================")
+	fmt.Println("NumCodeCaves:    ", info.NumCodeCaves)
+	fmt.Println("CanInjectLoader: ", info.CanInjectLoader)
+	fmt.Println("InjectLoaderRank:", info.InjectLoaderRank)
+	fmt.Println("========================================")
 }
 
 func loadSourceTemplate(path string) string {
