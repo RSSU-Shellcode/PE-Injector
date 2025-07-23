@@ -1,16 +1,12 @@
 package injector
 
-import (
-	"debug/pe"
-)
-
 // Info contains the image analyze result.
 type Info struct {
 	Architecture string
 	ImageSize    uint32
 	ImageBase    uint64
 	EntryPoint   uint32
-	Sections     []*pe.SectionHeader
+	Sections     []*Section
 
 	HasAllProcedures  bool
 	HasVirtualAlloc   bool
@@ -52,9 +48,16 @@ func Analyze(image []byte) (*Info, error) {
 		entryPoint = injector.hdr64.AddressOfEntryPoint
 	}
 	l := len(injector.img.Sections)
-	sections := make([]*pe.SectionHeader, l)
+	sections := make([]*Section, l)
 	for i := 0; i < l; i++ {
-		sections[i] = &injector.img.Sections[i].SectionHeader
+		sh := injector.img.Sections[i].SectionHeader
+		sections[i] = &Section{
+			Name:            sh.Name,
+			VirtualSize:     sh.VirtualSize,
+			VirtualAddress:  sh.VirtualAddress,
+			SizeOfRawData:   sh.Size,
+			OffsetToRawData: sh.Offset,
+		}
 	}
 	// check the procedure in IAT
 	hasLoadLibraryA := injector.getProcFromIAT("LoadLibraryA") != nil
