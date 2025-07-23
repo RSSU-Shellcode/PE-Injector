@@ -12,17 +12,17 @@ type Info struct {
 	EntryPoint   uint32
 	Sections     []*pe.SectionHeader
 
-	LackProcedure      bool
-	LackVirtualAlloc   bool
-	LackVirtualProtect bool
-	LackCreateThread   bool
-	LackLoadLibraryA   bool
-	LackLoadLibraryW   bool
-	LackGetProcAddress bool
+	HasAllProcedures  bool
+	HasVirtualAlloc   bool
+	HasVirtualProtect bool
+	HasCreateThread   bool
+	HasLoadLibraryA   bool
+	HasLoadLibraryW   bool
+	HasGetProcAddress bool
 
-	NumCodeCaves    int
-	CanInjectLoader bool
-	Rank            int
+	NumCodeCaves     int
+	CanInjectLoader  bool
+	InjectLoaderRank int
 }
 
 // Analyze is used to analyze the target pe image file that can be injected.
@@ -57,12 +57,12 @@ func Analyze(image []byte) (*Info, error) {
 		sections[i] = &injector.img.Sections[i].SectionHeader
 	}
 	// check the procedure in IAT
-	lackLoadLibraryA := injector.getProcFromIAT("LoadLibraryA") == nil
-	lackLoadLibraryW := injector.getProcFromIAT("LoadLibraryW") == nil
-	lackGetProcAddress := injector.getProcFromIAT("GetProcAddress") == nil
+	hasLoadLibraryA := injector.getProcFromIAT("LoadLibraryA") != nil
+	hasLoadLibraryW := injector.getProcFromIAT("LoadLibraryW") != nil
+	hasGetProcAddress := injector.getProcFromIAT("GetProcAddress") != nil
 	ctx := &loaderCtx{}
 	hasCoreProc := injector.findProcFromIAT(ctx) == nil
-	// process rank
+	// process total rank
 	numCaves := len(injector.caves)
 	canInjectLoader := true
 	if !hasCoreProc {
@@ -78,26 +78,26 @@ func Analyze(image []byte) (*Info, error) {
 	if numLoaderInst+8 > numCaves {
 		canInjectLoader = false
 	}
-	var rank int
+	var injectLoaderRank int
 	if canInjectLoader {
-		rank = calculateRank(ctx)
+		injectLoaderRank = calcInjectLoaderRank(ctx)
 	}
 	info := Info{
-		Architecture:       arch,
-		ImageSize:          imageSize,
-		ImageBase:          imageBase,
-		EntryPoint:         entryPoint,
-		Sections:           sections,
-		LackProcedure:      ctx.LackProcedure,
-		LackVirtualAlloc:   ctx.LackVirtualAlloc,
-		LackVirtualProtect: ctx.LackVirtualProtect,
-		LackCreateThread:   ctx.LackCreateThread,
-		LackLoadLibraryA:   lackLoadLibraryA,
-		LackLoadLibraryW:   lackLoadLibraryW,
-		LackGetProcAddress: lackGetProcAddress,
-		NumCodeCaves:       numCaves,
-		CanInjectLoader:    canInjectLoader,
-		Rank:               rank,
+		Architecture:      arch,
+		ImageSize:         imageSize,
+		ImageBase:         imageBase,
+		EntryPoint:        entryPoint,
+		Sections:          sections,
+		HasAllProcedures:  !ctx.LackProcedure,
+		HasVirtualAlloc:   !ctx.LackVirtualAlloc,
+		HasVirtualProtect: !ctx.LackVirtualProtect,
+		HasCreateThread:   !ctx.LackCreateThread,
+		HasLoadLibraryA:   hasLoadLibraryA,
+		HasLoadLibraryW:   hasLoadLibraryW,
+		HasGetProcAddress: hasGetProcAddress,
+		NumCodeCaves:      numCaves,
+		CanInjectLoader:   canInjectLoader,
+		InjectLoaderRank:  injectLoaderRank,
 	}
 	err = injector.Close()
 	if err != nil {
@@ -106,7 +106,7 @@ func Analyze(image []byte) (*Info, error) {
 	return &info, nil
 }
 
-func calculateRank(ctx *loaderCtx) int {
+func calcInjectLoaderRank(ctx *loaderCtx) int {
 	var rank int
 	if !ctx.LackProcedure {
 		rank = 100
