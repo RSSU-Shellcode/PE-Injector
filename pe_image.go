@@ -14,6 +14,15 @@ const (
 	reserveSectionSize     = 8
 )
 
+// Section contains the basic info of section.
+type Section struct {
+	Name            string
+	VirtualSize     uint32
+	VirtualAddress  uint32
+	SizeOfRawData   uint32
+	OffsetToRawData uint32
+}
+
 type iat struct {
 	dll  string
 	proc string
