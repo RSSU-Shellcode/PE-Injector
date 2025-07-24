@@ -36,16 +36,16 @@ type Injector struct {
 	vm  []byte
 	iat []*iat
 
-	// about rebuild shellcode
-	segment    [][]byte
-	contextSeq []int
-	ccList     []*codeCave
-
 	// about hook function
 	oriInst [][]byte
 	retRVA  uint32
 
-	// for write shellcode loader
+	// about relocated shellcode
+	segment    [][]byte
+	contextSeq []int
+	ccList     []*codeCave
+
+	// for write shellcode segment
 	caves []*codeCave
 
 	// for select random register
@@ -199,7 +199,7 @@ func (inj *Injector) inject(shellcode []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
-	err = inj.rebuild(shellcode)
+	err = inj.slice(shellcode)
 	if err != nil {
 		return err
 	}
@@ -307,9 +307,8 @@ func calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) {
 	return 0, 0, errors.New("unable to insert near jmp to this address")
 }
 
-// rebuild will append instructions about save context
-// and restore context around original shellcode.
-func (inj *Injector) rebuild(shellcode []byte) error {
+// slice will disassemble shellcode and return a slice of instruction segment.
+func (inj *Injector) slice(shellcode []byte) error {
 	insts, err := inj.disassemble(shellcode)
 	if err != nil {
 		return fmt.Errorf("failed to disassemble shellcode: %s", err)
@@ -322,11 +321,6 @@ func (inj *Injector) rebuild(shellcode []byte) error {
 		copy(segments[i], shellcode[off:])
 		off += l
 	}
-	// append instruction about save and restore context
-	if !inj.opts.NotSaveContext {
-		segments = append(inj.saveContext(), segments...)
-		segments = append(segments, inj.restoreContext()...)
-	}
 	inj.segment = segments
 	return nil
 }
@@ -334,8 +328,35 @@ func (inj *Injector) rebuild(shellcode []byte) error {
 // insert shellcode segment and the patched instruction to code caves.
 // #nosec G115
 func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
-	if len(inj.segment)+len(inj.oriInst)+1 > len(inj.caves) {
+	var (
+		saveContext    [][]byte
+		restoreContext [][]byte
+	)
+	if !inj.opts.NotSaveContext {
+		saveContext = inj.saveContext()
+		restoreContext = inj.restoreContext()
+	}
+	num := len(saveContext) + len(restoreContext) + len(inj.segment) + len(inj.oriInst) + 4
+	if num > len(inj.caves) {
 		return errors.New("not enough caves to inject shellcode")
+	}
+	current := first
+	next := inj.selectCodeCave()
+	// insert instruction about save context
+	for i := 0; i < len(saveContext); i++ {
+		inst := saveContext[i]
+		size := uint32(len(inst))
+		// build jmp instruction to next code cave
+		rel := int64(next.virtualAddr) - int64(current.virtualAddr+size) - nearJumpSize
+		jmp := make([]byte, nearJumpSize)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+		rebuild := append([]byte{}, inst...)
+		rebuild = append(rebuild, jmp...)
+		copy(inj.dup[current.pointerToRaw:], rebuild)
+		// update status
+		current = next
+		next = inj.selectCodeCave()
 	}
 	// generate code cave list before insert for relocate instruction
 	type item struct {
@@ -344,8 +365,6 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 	}
 	list := make([]*item, len(inj.segment))
 	ccLi := make([]*codeCave, len(inj.segment))
-	current := first
-	next := inj.selectCodeCave()
 	for i := 0; i < len(inj.segment); i++ {
 		list[i] = &item{
 			current: current,
@@ -383,6 +402,22 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		rebuild := append([]byte{}, segment...)
 		rebuild = append(rebuild, jmp...)
 		copy(inj.dup[c.pointerToRaw:], rebuild)
+	}
+	// insert instruction about restore context
+	for i := 0; i < len(restoreContext); i++ {
+		inst := restoreContext[i]
+		size := uint32(len(inst))
+		// build jmp instruction to next code cave
+		rel := int64(next.virtualAddr) - int64(current.virtualAddr+size) - nearJumpSize
+		jmp := make([]byte, nearJumpSize)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+		rebuild := append([]byte{}, inst...)
+		rebuild = append(rebuild, jmp...)
+		copy(inj.dup[current.pointerToRaw:], rebuild)
+		// update status
+		current = next
+		next = inj.selectCodeCave()
 	}
 	// insert original instruction about patch
 	var offTarget uint32
