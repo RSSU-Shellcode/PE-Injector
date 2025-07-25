@@ -98,7 +98,7 @@ func TestSpecificAddress(t *testing.T) {
 	t.Run("loader", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x46A590,
+				Address: 0x46A6F1,
 			}
 
 			image, err := os.ReadFile("testdata/image_x86.dat")
@@ -115,7 +115,7 @@ func TestSpecificAddress(t *testing.T) {
 
 		t.Run("x64", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x469D20,
+				Address: 0x469E4F,
 			}
 
 			image, err := os.ReadFile("testdata/image_x64.dat")
@@ -134,7 +134,7 @@ func TestSpecificAddress(t *testing.T) {
 	t.Run("raw", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x46A590,
+				Address: 0x46A6F1,
 			}
 
 			image, err := os.ReadFile("testdata/image_x86.dat")
@@ -153,7 +153,7 @@ func TestSpecificAddress(t *testing.T) {
 
 		t.Run("x64", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x469D20,
+				Address: 0x469E4F,
 			}
 
 			image, err := os.ReadFile("testdata/image_x64.dat")
