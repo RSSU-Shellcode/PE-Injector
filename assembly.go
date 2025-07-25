@@ -65,6 +65,20 @@ func (inj *Injector) extendInstruction(inst *x86asm.Inst, src []byte) []byte {
 		rel := uint32(inst.Args[0].(x86asm.Rel))
 		binary.LittleEndian.PutUint32(je[2:], rel)
 		return je
+	case x86asm.JNE:
+		jne := make([]byte, 6)
+		jne[0] = 0x0F
+		jne[1] = 0x85
+		rel := uint32(inst.Args[0].(x86asm.Rel))
+		binary.LittleEndian.PutUint32(jne[2:], rel)
+		return jne
+	case x86asm.JBE:
+		jbe := make([]byte, 6)
+		jbe[0] = 0x0F
+		jbe[1] = 0x86
+		rel := uint32(inst.Args[0].(x86asm.Rel))
+		binary.LittleEndian.PutUint32(jbe[2:], rel)
+		return jbe
 	default:
 		return src
 	}
@@ -80,6 +94,11 @@ func (inj *Injector) relocateInstruction(src []byte, offset int64) []byte {
 	}
 	output := make([]byte, len(src))
 	copy(output, src)
+	switch inst.Args[0].(type) {
+	case x86asm.Rel:
+	default:
+		return output
+	}
 	switch inst.PCRel {
 	case 0:
 	case 1:
