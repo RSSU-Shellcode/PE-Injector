@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"debug/pe"
 	"encoding/binary"
+	"errors"
 )
 
 const (
@@ -116,7 +117,8 @@ func (inj *Injector) processIAT() {
 func (inj *Injector) extendSection(data []byte) uint32 {
 	// calculate the offset of target data
 	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
-	hdrOffset := peOffset + 4 + imageFileHeaderSize
+	fhOffset := peOffset + 4
+	hdrOffset := fhOffset + imageFileHeaderSize
 	sctOffset := hdrOffset + uint32(inj.img.SizeOfOptionalHeader)
 	shOffset := sctOffset + uint32((inj.img.NumberOfSections-1)*imageSectionHeaderSize)
 	// adjust the last section header
@@ -126,7 +128,7 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 	size := uint32(reserveSectionSize + len(data))
 	last.VirtualSize += size
 	// make sure the SizeOfRawData > VirtualSize
-	newSize := (last.VirtualSize/0x200 + 1) * 0x200
+	newSize := alignFileOffset(last.VirtualSize)
 	padSize := int64(newSize) - int64(last.SizeOfRawData)
 	if padSize > 0 {
 		last.SizeOfRawData = newSize
@@ -139,8 +141,8 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 	buffer := bytes.NewBuffer(nil)
 	_ = binary.Write(buffer, binary.LittleEndian, last)
 	copy(inj.dup[shOffset:], buffer.Bytes())
-	buffer.Reset()
 	// adjust the size of image in optional header
+	buffer.Reset()
 	switch inj.arch {
 	case "386":
 		hdr := *inj.hdr32
@@ -151,12 +153,80 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 		hdr.SizeOfImage += uint32(padSize)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 	}
-	// overwrite the optional header
 	copy(inj.dup[hdrOffset:], buffer.Bytes())
 	// copy data to the extended section
 	dst := last.PointerToRawData + oldVirtualSize + reserveSectionSize
 	copy(inj.dup[dst:], data)
 	return last.VirtualAddress + oldVirtualSize + reserveSectionSize
+}
+
+// createSection is used to create a new section after the last section.
+// #nosec G115
+func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader, error) {
+	if len(inj.img.Sections) == 0 {
+		return nil, errors.New("no sections in pe image")
+	}
+	fSection := inj.img.Sections[0]
+	fhOffset := fSection.Offset
+	// calculate the offset about the end of last section header
+	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
+	fHdrOffset := peOffset + 4
+	hdrOffset := fHdrOffset + imageFileHeaderSize
+	sctOffset := hdrOffset + uint32(inj.img.SizeOfOptionalHeader)
+	shOffset := sctOffset + uint32((inj.img.NumberOfSections)*imageSectionHeaderSize)
+	if fhOffset-shOffset < imageSectionHeaderSize {
+		return nil, errors.New("not enough space for add a new section header")
+	}
+	// write a new section header
+	if len(name) > 8 {
+		return nil, errors.New("section name size can not be longer than 8 bytes")
+	}
+	var nameArr [8]byte
+	copy(nameArr[:], name)
+	lastOffset := shOffset - imageSectionHeaderSize
+	last := new(pe.SectionHeader32)
+	_ = binary.Read(bytes.NewReader(inj.dup[lastOffset:]), binary.LittleEndian, last)
+	sh := &pe.SectionHeader32{
+		Name:             nameArr,
+		VirtualSize:      size,
+		VirtualAddress:   last.VirtualAddress + alignMemoryRegion(last.VirtualSize),
+		SizeOfRawData:    alignFileOffset(size),
+		PointerToRawData: last.PointerToRawData + last.SizeOfRawData,
+		Characteristics:  0x60000020, // RX
+	}
+	buffer := bytes.NewBuffer(nil)
+	_ = binary.Write(buffer, binary.LittleEndian, sh)
+	copy(inj.dup[shOffset:], buffer.Bytes())
+	// append data to the tail
+	newSection := bytes.Repeat([]byte{0}, int(sh.SizeOfRawData))
+	inj.dup = append(inj.dup, newSection...)
+	// adjust the file header
+	fileHeader := inj.img.FileHeader
+	fileHeader.NumberOfSections++
+	buffer.Reset()
+	_ = binary.Write(buffer, binary.LittleEndian, &fileHeader)
+	copy(inj.dup[fHdrOffset:], buffer.Bytes())
+	// adjust the size of image in optional header
+	buffer.Reset()
+	switch inj.arch {
+	case "386":
+		hdr := *inj.hdr32
+		hdr.SizeOfImage += uint32(len(newSection))
+		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
+	case "amd64":
+		hdr := *inj.hdr64
+		hdr.SizeOfImage += uint32(len(newSection))
+		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
+	}
+	copy(inj.dup[hdrOffset:], buffer.Bytes())
+	return &pe.SectionHeader{
+		Name:            name,
+		VirtualSize:     sh.VirtualSize,
+		VirtualAddress:  sh.VirtualAddress,
+		Size:            sh.SizeOfRawData,
+		Offset:          sh.PointerToRawData,
+		Characteristics: sh.Characteristics,
+	}, nil
 }
 
 // #nosec G115
@@ -187,4 +257,12 @@ func extractString(section []byte, start uint64) string {
 		}
 	}
 	return ""
+}
+
+func alignFileOffset(size uint32) uint32 {
+	return (size/0x200 + 1) * 0x200
+}
+
+func alignMemoryRegion(size uint32) uint32 {
+	return (size/0x1000 + 1) * 0x1000
 }
