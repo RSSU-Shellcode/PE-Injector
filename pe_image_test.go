@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,10 +17,6 @@ func TestLoadImage(t *testing.T) {
 	t.Run("x86", func(t *testing.T) {
 		image, err := os.ReadFile("testdata/image_x86.dat")
 		require.NoError(t, err)
-		peFile, err := pe.NewFile(bytes.NewReader(image))
-		require.NoError(t, err)
-		injector.img = peFile
-		injector.arch = "386"
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
@@ -32,10 +29,6 @@ func TestLoadImage(t *testing.T) {
 	t.Run("x64", func(t *testing.T) {
 		image, err := os.ReadFile("testdata/image_x64.dat")
 		require.NoError(t, err)
-		peFile, err := pe.NewFile(bytes.NewReader(image))
-		require.NoError(t, err)
-		injector.img = peFile
-		injector.arch = "amd64"
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
@@ -58,8 +51,6 @@ func TestExtendSection(t *testing.T) {
 			require.NoError(t, err)
 			peFile, err := pe.NewFile(bytes.NewReader(image))
 			require.NoError(t, err)
-			injector.img = peFile
-			injector.arch = "386"
 			err = injector.preprocess(image, nil)
 			require.NoError(t, err)
 
@@ -83,8 +74,6 @@ func TestExtendSection(t *testing.T) {
 			require.NoError(t, err)
 			peFile, err := pe.NewFile(bytes.NewReader(image))
 			require.NoError(t, err)
-			injector.img = peFile
-			injector.arch = "amd64"
 			err = injector.preprocess(image, nil)
 			require.NoError(t, err)
 
@@ -110,8 +99,6 @@ func TestExtendSection(t *testing.T) {
 			require.NoError(t, err)
 			peFile, err := pe.NewFile(bytes.NewReader(image))
 			require.NoError(t, err)
-			injector.img = peFile
-			injector.arch = "386"
 			err = injector.preprocess(image, nil)
 			require.NoError(t, err)
 
@@ -135,8 +122,6 @@ func TestExtendSection(t *testing.T) {
 			require.NoError(t, err)
 			peFile, err := pe.NewFile(bytes.NewReader(image))
 			require.NoError(t, err)
-			injector.img = peFile
-			injector.arch = "amd64"
 			err = injector.preprocess(image, nil)
 			require.NoError(t, err)
 
@@ -154,6 +139,49 @@ func TestExtendSection(t *testing.T) {
 
 			testExecuteImage(t, "testdata/injected_x64.exe", output)
 		})
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
+}
+
+func TestCreateSection(t *testing.T) {
+	injector := NewInjector()
+
+	t.Run("x86", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x86.dat")
+		require.NoError(t, err)
+		err = injector.preprocess(image, nil)
+		require.NoError(t, err)
+
+		sh, err := injector.createSection(".patch", 666)
+		require.NoError(t, err)
+		spew.Dump(sh)
+
+		output := injector.dup
+		peFile, err := pe.NewFile(bytes.NewReader(output))
+		require.NoError(t, err)
+		require.Greater(t, peFile.NumberOfSections, injector.img.NumberOfSections)
+
+		testExecuteImage(t, "testdata/injected_x86.exe", output)
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x64.dat")
+		require.NoError(t, err)
+		err = injector.preprocess(image, nil)
+		require.NoError(t, err)
+
+		sh, err := injector.createSection(".patch", 666)
+		require.NoError(t, err)
+		spew.Dump(sh)
+
+		output := injector.dup
+		peFile, err := pe.NewFile(bytes.NewReader(output))
+		require.NoError(t, err)
+		require.Greater(t, peFile.NumberOfSections, injector.img.NumberOfSections)
+
+		testExecuteImage(t, "testdata/injected_x86.exe", output)
 	})
 
 	err := injector.Close()
