@@ -154,7 +154,7 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		return nil, err
 	}
 	inj.encryptStrings(ctx)
-	// get loader source template
+	// select and build loader source
 	var src string
 	switch inj.arch {
 	case "386":
@@ -162,7 +162,7 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 	case "amd64":
 		src = inj.getLoaderX64()
 	}
-	src, err = inj.selectReadMode(ctx, shellcode, src)
+	src, err = inj.buildLoaderSource(ctx, shellcode, src)
 	if err != nil {
 		return nil, err
 	}
@@ -408,14 +408,40 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 	return val, key
 }
 
-func (inj *Injector) selectReadMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
-	if inj.opts.ForceExtendSection && inj.opts.ForceCodeCave {
-		return "", errors.New("invalid read shellcode mode")
+func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (string, error) {
+	var counter int
+	for _, sw := range []bool{
+		inj.opts.ForceCodeCave,
+		inj.opts.ForceExtendSection,
+		inj.opts.ForceCreateSection,
+	} {
+		if sw {
+			counter++
+		}
+	}
+	if counter > 1 {
+		return "", errors.New("invalid force mode with shellcode source")
+	}
+	var maxLoaderSize int
+	switch inj.arch {
+	case "386":
+		maxLoaderSize = maxNumLoaderInstX86
+	case "amd64":
+		maxLoaderSize = maxNumLoaderInstX64
+	}
+	if maxLoaderSize > len(inj.caves) || inj.opts.ForceCreateSection {
+		if inj.opts.ForceCodeCave {
+			return "", errors.New("not enough code caves for force code cave mode")
+		}
+		if inj.opts.ForceExtendSection {
+			return "", errors.New("not enough code caves for force extend section mode")
+		}
+		return inj.useCreateSectionMode(ctx, sc, src), nil
 	}
 	if inj.opts.ForceExtendSection {
 		return inj.useExtendSectionMode(ctx, sc, src), nil
 	}
-	// check need use extend section mode
+	// check can use code cave mode
 	var numCaves int
 	switch inj.arch {
 	case "386":
@@ -425,13 +451,14 @@ func (inj *Injector) selectReadMode(ctx *loaderCtx, sc []byte, src string) (stri
 		numCaves = (len(sc)/8 + 1) * numInstForCopyShellcode
 		numCaves += maxNumLoaderInstX64
 	}
-	if numCaves > len(inj.caves) {
-		if inj.opts.ForceCodeCave {
-			return "", errors.New("shellcode is too large and extend section is disabled")
-		}
-		return inj.useExtendSectionMode(ctx, sc, src), nil
+	if numCaves < len(inj.caves) {
+		return inj.useCodeCaveMode(ctx, sc, src), nil
 	}
-	return inj.useCodeCaveMode(ctx, sc, src), nil
+	// if the number of code caves is not enough
+	if inj.opts.ForceCodeCave {
+		return "", errors.New("not enough code caves for force code cave mode")
+	}
+	return inj.useExtendSectionMode(ctx, sc, src), nil
 }
 
 func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) string {
@@ -519,6 +546,12 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 	}
 	ctx.SectionMode = true
 	ctx.SectionOffset = inj.extendSection(section.Bytes())
+	// remove the flag in assembly source
+	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
+}
+
+func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) string {
+
 	// remove the flag in assembly source
 	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
 }
