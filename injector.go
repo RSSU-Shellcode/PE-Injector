@@ -26,6 +26,10 @@ import (
 // 3. create section
 // The loader and shellcode body are all injected to a new section.
 
+// endOfShellcode is used to mark the end of shellcode.
+// NOP DWORD ptr [EAX + EAX*1 + 00]
+var endOfShellcode = []byte{0x0F, 0x1F, 0x44, 0x00, 0x00}
+
 // Injector is a simple PE injector for inject shellcode.
 type Injector struct {
 	seed int64
@@ -168,7 +172,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 // InjectRaw is used to inject shellcode to a PE image without loader.
 // It is an advanced usage, ensure the shellcode not contains behavior
 // like read data from the shellcode tail.
-// Must use int3(0xCC) for set a flag that define the end of shellcode.
+// Must use nop5 for set a flag that define the end of shellcode.
 func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
@@ -177,6 +181,8 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 	if err != nil {
 		return nil, err
 	}
+	shellcode = bytes.Clone(shellcode)
+	shellcode = append(shellcode, endOfShellcode...)
 	err = inj.inject(shellcode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
@@ -223,6 +229,9 @@ func (inj *Injector) inject(shellcode []byte) error {
 	err = inj.slice(shellcode)
 	if err != nil {
 		return err
+	}
+	if inj.section != nil {
+		return inj.padding(targetRVA)
 	}
 	return inj.insert(targetRVA, first)
 }
@@ -406,8 +415,8 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		if size+nearJumpSize > uint32(c.size) {
 			return errors.New("appear too large instruction in shellcode")
 		}
-		// check it is the tail of the shellcode
-		if bytes.Equal(segment, []byte{0xCC}) {
+		// check it is the end of the shellcode
+		if bytes.Equal(segment, endOfShellcode) {
 			rel := int64(current.virtualAddr) - int64(c.virtualAddr) - nearJumpSize
 			jmp := make([]byte, nearJumpSize)
 			jmp[0] = 0xE9
@@ -541,10 +550,16 @@ func (inj *Injector) removeCodeCave(i int) {
 	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
 }
 
+func (inj *Injector) padding(targetRVA uint32) error {
+
+	return nil
+}
+
 func (inj *Injector) cleanup() {
 	inj.img = nil
 	inj.dup = nil
 	inj.vm = nil
+	inj.section = nil
 	inj.segment = nil
 	inj.caves = nil
 }
