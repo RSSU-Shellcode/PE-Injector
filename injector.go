@@ -14,6 +14,18 @@ import (
 	"golang.org/x/arch/x86/x86asm"
 )
 
+// support modes:
+//
+// 1. code cave
+// The loader and shellcode body are all injected to code caves.
+//
+// 2. extend section
+// The loader is injected to code caves.
+// The shellcode body is injected to the last extended section.
+//
+// 3. create section
+// The loader and shellcode body are all injected to a new section.
+
 // Injector is a simple PE injector for inject shellcode.
 type Injector struct {
 	seed int64
@@ -35,6 +47,9 @@ type Injector struct {
 	// about process IAT
 	vm  []byte
 	iat []*iat
+
+	// about create section mode
+	section *pe.SectionHeader
 
 	// about hook function
 	oriInst [][]byte
@@ -84,13 +99,19 @@ type Options struct {
 
 	// force use code cave mode for write shellcode.
 	// if code cave is not enough, it will return an error.
-	// it is useless for method InjectRaw.
 	ForceCodeCave bool
 
 	// force extend the last section even if the number
 	// of code cave is enough for write shellcode.
 	// it is useless for method InjectRaw.
 	ForceExtendSection bool
+
+	// force create a new section after the last section
+	// for write loader and shellcode.
+	ForceCreateSection bool
+
+	// specify the new section name, the default is ".patch".
+	SectionName string
 
 	// specify a random seed for test and debug.
 	RandSeed int64
@@ -150,7 +171,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 // Must use int3(0xCC) for set a flag that define the end of shellcode.
 func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
-		return nil, errors.New("empty shellcode segment")
+		return nil, errors.New("empty shellcode")
 	}
 	err := inj.preprocess(image, opts)
 	if err != nil {
@@ -158,7 +179,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 	}
 	err = inj.inject(shellcode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to inject shellcode segment: %s", err)
+		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
 	}
 	output := inj.dup
 	inj.cleanup()
