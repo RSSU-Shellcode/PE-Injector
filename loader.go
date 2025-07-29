@@ -116,6 +116,9 @@ type loaderCtx struct {
 	ShellcodeOffset uint32
 	ShellcodeSize   int
 	ShellcodeKey    interface{}
+
+	// mark the end of loader
+	EndOfLoader []byte
 }
 
 func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
@@ -155,6 +158,8 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
 		ShellcodeSize: len(shellcode),
+
+		EndOfLoader: endOfShellcode,
 	}
 	err = inj.findProcFromIAT(ctx)
 	if err != nil {
