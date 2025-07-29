@@ -46,6 +46,7 @@ func TestLoader(t *testing.T) {
 	t.Run("code cave mode", func(t *testing.T) {
 		opts.ForceCodeCave = true
 		opts.ForceExtendSection = false
+		opts.ForceCreateSection = false
 
 		t.Run("x86", func(t *testing.T) {
 			image, err := os.ReadFile("testdata/image_x86.dat")
@@ -53,7 +54,7 @@ func TestLoader(t *testing.T) {
 			shellcode := []byte{0x90}
 
 			output, err := injector.Inject(image, shellcode, opts)
-			errStr := "failed to build loader: shellcode is too large and extend section is disabled"
+			errStr := "failed to build loader: not enough code caves for force code cave mode"
 			require.EqualError(t, err, errStr)
 			require.Empty(t, output)
 		})
@@ -75,6 +76,38 @@ func TestLoader(t *testing.T) {
 	t.Run("extend section mode", func(t *testing.T) {
 		opts.ForceCodeCave = false
 		opts.ForceExtendSection = true
+		opts.ForceCreateSection = false
+
+		t.Run("x86", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_x86.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			errStr := "failed to build loader: not enough code caves for force extend section mode"
+			require.EqualError(t, err, errStr)
+			require.Empty(t, output)
+		})
+
+		t.Run("x64", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_x64.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
+		})
+	})
+
+	t.Run("create section mode", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceExtendSection = false
+		opts.ForceCreateSection = true
 
 		t.Run("x86", func(t *testing.T) {
 			image, err := os.ReadFile("testdata/image_x86.dat")
