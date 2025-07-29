@@ -82,6 +82,9 @@ type loaderCtx struct {
 	RegV map[string]string
 	RegN map[string]string
 
+	// custom arguments from options
+	Args map[string]interface{}
+
 	// store procedure status
 	LackProcedure      bool
 	LackVirtualAlloc   bool
@@ -154,6 +157,7 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		Reg:  inj.buildRandomRegisterMap(),
 		RegV: inj.buildVolatileRegisterMap(),
 		RegN: inj.buildNonvolatileRegisterMap(),
+		Args: inj.opts.Arguments,
 
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,

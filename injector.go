@@ -125,6 +125,9 @@ type Options struct {
 
 	// specify the x64 loader template.
 	LoaderX64 string
+
+	// append custom argument for loader template.
+	Arguments map[string]interface{}
 }
 
 // NewInjector is used to create a simple PE injector.
