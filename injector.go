@@ -163,7 +163,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
 	}
-	err = inj.inject(loader)
+	err = inj.inject(loader, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
@@ -186,7 +186,17 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 	}
 	shellcode = bytes.Clone(shellcode)
 	shellcode = append(shellcode, endOfShellcode...)
-	err = inj.inject(shellcode)
+	opts = inj.opts
+	if opts.ForceCodeCave && opts.ForceCreateSection {
+		return nil, errors.New("invalid force mode with shellcode source")
+	}
+	if opts.ForceCreateSection {
+		inj.section, err = inj.createSection(opts.SectionName, uint32(len(shellcode)))
+		if err != nil {
+			return nil, err
+		}
+	}
+	err = inj.inject(shellcode, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
 	}
@@ -195,7 +205,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 	return output, nil
 }
 
-func (inj *Injector) inject(shellcode []byte) error {
+func (inj *Injector) inject(shellcode []byte, raw bool) error {
 	var entryPoint uint32
 	switch inj.arch {
 	case "386":
@@ -237,7 +247,24 @@ func (inj *Injector) inject(shellcode []byte) error {
 		inj.padding(shellcode, targetRVA)
 		return nil
 	}
-	return inj.insert(targetRVA, first)
+	if !raw {
+		return inj.insert(targetRVA, first)
+	}
+	// try to cove cave mode
+	err = inj.insert(targetRVA, first)
+	if err == nil {
+		return nil
+	}
+	if inj.opts.ForceCodeCave {
+		return err
+	}
+	// if failed, create new section and try again
+	inj.section, err = inj.createSection(inj.opts.SectionName, uint32(len(shellcode)))
+	if err != nil {
+		return err
+	}
+	inj.padding(shellcode, targetRVA)
+	return nil
 }
 
 func (inj *Injector) preprocess(image []byte, opts *Options) error {
@@ -372,7 +399,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 	}
 	num := len(saveContext) + len(restoreContext) + len(inj.segment) + len(inj.oriInst) + 4
 	if num > len(inj.caves) {
-		return errors.New("not enough caves to inject shellcode")
+		return errors.New("not enough code caves to inject shellcode")
 	}
 	current := first
 	next := inj.selectCodeCave()
@@ -554,6 +581,7 @@ func (inj *Injector) removeCodeCave(i int) {
 	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
 }
 
+// padding is used to padding shellcode to the created section.
 func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	var (
 		saveContext    []byte
@@ -610,8 +638,6 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	jmp[0] = 0xE9
 	binary.LittleEndian.PutUint32(jmp[1:], rel)
 	insts.Write(jmp)
-	// write random data for padding caves
-	inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+reservedLoaderSize])
 	// write shellcode loader
 	copy(inj.dup[inj.section.Offset:], insts.Bytes())
 }
