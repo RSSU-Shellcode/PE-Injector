@@ -15,6 +15,8 @@ const (
 	reserveSectionSize     = 8
 )
 
+const defaultSectionName = ".patch"
+
 // Section contains the basic info of section.
 type Section struct {
 	Name            string
@@ -165,6 +167,9 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader, error) {
 	if len(inj.img.Sections) == 0 {
 		return nil, errors.New("no sections in pe image")
+	}
+	if name == "" {
+		name = defaultSectionName
 	}
 	fSection := inj.img.Sections[0]
 	fhOffset := fSection.Offset
