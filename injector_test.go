@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInjector(t *testing.T) {
+func TestInjector_Inject(t *testing.T) {
 	injector := NewInjector()
 	fmt.Println("seed:", injector.Seed())
 
@@ -89,6 +89,77 @@ func testInjector(t *testing.T, injector *Injector, opts *Options) {
 
 			testExecuteImage(t, "testdata/injected_x64.exe", output)
 		})
+	})
+}
+
+func TestInjector_InjectRaw(t *testing.T) {
+	injector := NewInjector()
+	fmt.Println("seed:", injector.Seed())
+
+	t.Run("common", func(t *testing.T) {
+		testInjectorInjectRaw(t, injector, new(Options))
+	})
+
+	t.Run("not save context", func(t *testing.T) {
+		opts := Options{
+			NotSaveContext: true,
+		}
+		testInjectorInjectRaw(t, injector, &opts)
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
+}
+
+func testInjectorInjectRaw(t *testing.T, injector *Injector, opts *Options) {
+	t.Run("auto mode", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceCreateSection = false
+		testInjectorInjectRawWithOpts(t, injector, opts)
+	})
+
+	t.Run("code cave mode", func(t *testing.T) {
+		opts.ForceCodeCave = true
+		opts.ForceCreateSection = false
+		testInjectorInjectRawWithOpts(t, injector, opts)
+	})
+
+	t.Run("create section mode", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceCreateSection = true
+		testInjectorInjectRawWithOpts(t, injector, opts)
+	})
+}
+
+func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Options) {
+	t.Run("x86", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x86.dat")
+		require.NoError(t, err)
+		shellcode := []byte{
+			0x90,
+			0x66, 0x90,
+		}
+
+		output, err := injector.InjectRaw(image, shellcode, opts)
+		require.NoError(t, err)
+		require.NotEmpty(t, output)
+
+		testExecuteImage(t, "testdata/injected_x86.exe", output)
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x64.dat")
+		require.NoError(t, err)
+		shellcode := []byte{
+			0x90,
+			0x66, 0x90,
+		}
+
+		output, err := injector.InjectRaw(image, shellcode, opts)
+		require.NoError(t, err)
+		require.NotEmpty(t, output)
+
+		testExecuteImage(t, "testdata/injected_x64.exe", output)
 	})
 }
 
