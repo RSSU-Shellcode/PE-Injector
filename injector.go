@@ -230,12 +230,21 @@ func (inj *Injector) inject(shellcode []byte, raw bool) error {
 		}
 	}
 	// if failed to search target, random select a cave
-	if first == nil {
+	if first == nil && len(inj.caves) > 0 {
 		i := inj.rand.Intn(len(inj.caves))
 		first = inj.caves[i]
 		inj.removeCodeCave(i)
 	}
-	err := inj.hook(targetRVA, first)
+	var dstRVA uint32
+	if inj.section != nil {
+		dstRVA = inj.section.VirtualAddress
+	} else {
+		if first == nil {
+			return errors.New("not enough code caves for inject shellcode")
+		}
+		dstRVA = first.virtualAddr
+	}
+	err := inj.hook(targetRVA, dstRVA)
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
@@ -258,7 +267,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) error {
 	if inj.opts.ForceCodeCave {
 		return err
 	}
-	// if failed, create new section and try again
+	// if failed, try to use create section mode
 	inj.section, err = inj.createSection(inj.opts.SectionName, uint32(len(shellcode)))
 	if err != nil {
 		return err
@@ -314,8 +323,8 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 
 // hook target function for add a jmp to the first code cave
 // #nosec G115
-func (inj *Injector) hook(rva uint32, first *codeCave) error {
-	offset := int(inj.rvaToOffset(".text", rva))
+func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
+	offset := int(inj.rvaToOffset(".text", srcRVA))
 	if offset+32 > len(inj.dup) {
 		return errors.New("target offset is overflow")
 	}
@@ -337,11 +346,11 @@ func (inj *Injector) hook(rva uint32, first *codeCave) error {
 	}
 	inj.oriInst = original
 	// record the next instruction offset
-	inj.retRVA = rva + uint32(totalSize)
+	inj.retRVA = srcRVA + uint32(totalSize)
 	// build a patch for jump to the first code cave
 	jmp := make([]byte, nearJumpSize)
 	jmp[0] = 0xE9
-	rel := int64(first.pointerToRaw) - int64(offset) - nearJumpSize
+	rel := int64(dstRVA) - int64(srcRVA) - nearJumpSize
 	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 	padding := bytes.Repeat([]byte{0xCC}, totalSize-nearJumpSize)
 	patch := make([]byte, 0, totalSize)
