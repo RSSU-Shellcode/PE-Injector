@@ -606,8 +606,8 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	oriInstOffset += uint32(len(restoreContext))
 	// build final instructions
 	insts := bytes.NewBuffer(make([]byte, 0, len(shellcode)+64))
+	// replace the end of shellcode to jmp to the tail of shellcode
 	insts.Write(saveContext)
-	// replace the end of shellcode to jmp to restore context
 	var scLen uint32
 	for i := 0; i < len(inj.segment); i++ {
 		segment := inj.segment[i]
@@ -617,7 +617,7 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 			scLen += uint32(len(segment))
 			continue
 		}
-		offset := uint32(len(saveContext)+len(shellcode)) - scLen
+		offset := uint32(len(shellcode)) - scLen
 		rel := offset - nearJumpSize
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
@@ -642,10 +642,10 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	}
 	// write jmp to the next original instruction
 	offset := inj.section.VirtualAddress + oriInstOffset + offInst
-	rel := offset - targetRVA - nearJumpSize
+	rel := int64(inj.retRVA) - int64(offset) - nearJumpSize
 	jmp := make([]byte, nearJumpSize)
 	jmp[0] = 0xE9
-	binary.LittleEndian.PutUint32(jmp[1:], rel)
+	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 	insts.Write(jmp)
 	// write shellcode loader
 	copy(inj.dup[inj.section.Offset:], insts.Bytes())
