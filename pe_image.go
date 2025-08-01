@@ -113,6 +113,22 @@ func (inj *Injector) processIAT() {
 	inj.iat = list
 }
 
+func (inj *Injector) removeSignature() {
+	var dataDirectory [16]pe.DataDirectory
+	switch inj.arch {
+	case "386":
+		dataDirectory = inj.hdr32.DataDirectory
+	case "amd64":
+		dataDirectory = inj.hdr64.DataDirectory
+	}
+	dd := dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_SECURITY]
+	if dd.VirtualAddress == 0 || dd.Size == 0 {
+		return
+	}
+	padding := bytes.Repeat([]byte{0x00}, int(dd.Size))
+	copy(inj.dup[dd.VirtualAddress:], padding)
+}
+
 // extendSection is used to extend the last section for write data.
 // It will return the RVA about the start of written data.
 // #nosec G115

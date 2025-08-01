@@ -318,6 +318,8 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	dup := make([]byte, len(image))
 	copy(dup, image)
 	inj.dup = dup
+	// remove the digital signature of the PE file
+	inj.removeSignature()
 	return nil
 }
 
