@@ -16,13 +16,16 @@ func TestInjector_Inject(t *testing.T) {
 	fmt.Println("seed:", injector.Seed())
 
 	t.Run("common", func(t *testing.T) {
-		testInjectorInject(t, injector, nil)
+		opts := new(Options)
+
+		testInjectorInject(t, injector, opts)
 	})
 
 	t.Run("not save context", func(t *testing.T) {
 		opts := Options{
 			NotSaveContext: true,
 		}
+
 		testInjectorInject(t, injector, &opts)
 	})
 
@@ -31,30 +34,108 @@ func TestInjector_Inject(t *testing.T) {
 }
 
 func testInjectorInject(t *testing.T, injector *Injector, opts *Options) {
+	t.Run("auto mode", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceExtendSection = false
+		opts.ForceCreateSection = false
+		testInjectorInjectWithOpts(t, injector, opts)
+	})
+
+	t.Run("code cave mode", func(t *testing.T) {
+		opts.ForceCodeCave = true
+		opts.ForceExtendSection = false
+		opts.ForceCreateSection = false
+		testInjectorInjectWithOpts(t, injector, opts)
+	})
+
+	t.Run("extend section mode", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceExtendSection = true
+		opts.ForceCreateSection = false
+		testInjectorInjectWithOpts(t, injector, opts)
+	})
+
+	t.Run("create section mode", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceExtendSection = false
+		opts.ForceCreateSection = true
+		testInjectorInjectWithOpts(t, injector, opts)
+	})
+}
+
+func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options) {
 	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x86.dat")
-		require.NoError(t, err)
-		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
-		require.NoError(t, err)
+		if opts.ForceCodeCave || opts.ForceExtendSection {
+			return
+		}
 
-		output, err := injector.Inject(image, shellcode, opts)
-		require.NoError(t, err)
-		require.NotEmpty(t, output)
+		t.Run("entry point", func(t *testing.T) {
+			opts.Address = 0
 
-		testExecuteImage(t, "testdata/injected_x86.exe", output)
+			image, err := os.ReadFile("testdata/image_x86.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
+		})
+
+		t.Run("custom address", func(t *testing.T) {
+			if opts.NotSaveContext {
+				return
+			}
+			opts.Address = 0x46A6F1
+
+			image, err := os.ReadFile("testdata/image_x86.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
+		})
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x64.dat")
-		require.NoError(t, err)
-		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
-		require.NoError(t, err)
+		t.Run("entry point", func(t *testing.T) {
+			opts.Address = 0
 
-		output, err := injector.Inject(image, shellcode, opts)
-		require.NoError(t, err)
-		require.NotEmpty(t, output)
+			image, err := os.ReadFile("testdata/image_x64.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+			require.NoError(t, err)
 
-		testExecuteImage(t, "testdata/injected_x64.exe", output)
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
+		})
+
+		t.Run("custom address", func(t *testing.T) {
+			if opts.NotSaveContext {
+				return
+			}
+			opts.Address = 0x469E4F
+
+			image, err := os.ReadFile("testdata/image_x64.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+			require.NoError(t, err)
+
+			output, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
+		})
 	})
 }
 
@@ -63,7 +144,9 @@ func TestInjector_InjectRaw(t *testing.T) {
 	fmt.Println("seed:", injector.Seed())
 
 	t.Run("common", func(t *testing.T) {
-		testInjectorInjectRaw(t, injector, new(Options))
+		opts := new(Options)
+
+		testInjectorInjectRaw(t, injector, opts)
 	})
 
 	t.Run("not save context", func(t *testing.T) {
