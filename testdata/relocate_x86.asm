@@ -14,7 +14,8 @@ je2:
   call fn2
   nop
   pop esi
-  int3
+  // mark the end of loader
+  {{db .EndOfLoader}}
 
 next:
   xor eax, eax

@@ -12,7 +12,8 @@ fn2:
 je2:
   call fn2
   nop
-  int3
+  // mark the end of loader
+  {{db .EndOfLoader}}
 
 next:
   xor rax, rax
