@@ -99,35 +99,75 @@ func testInjectorInjectRaw(t *testing.T, injector *Injector, opts *Options) {
 
 func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Options) {
 	t.Run("x86", func(t *testing.T) {
-		// TODO with address
+		t.Run("entry point", func(t *testing.T) {
+			opts.Address = 0
 
-		image, err := os.ReadFile("testdata/image_x86.dat")
-		require.NoError(t, err)
-		shellcode := []byte{
-			0x90,
-			0x66, 0x90,
-		}
+			image, err := os.ReadFile("testdata/image_x86.dat")
+			require.NoError(t, err)
+			shellcode := []byte{
+				0x90,
+				0x66, 0x90,
+			}
 
-		output, err := injector.InjectRaw(image, shellcode, opts)
-		require.NoError(t, err)
-		require.NotEmpty(t, output)
+			output, err := injector.InjectRaw(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
 
-		testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
+		})
+
+		t.Run("custom address", func(t *testing.T) {
+			opts.Address = 0x46A6F1
+
+			image, err := os.ReadFile("testdata/image_x86.dat")
+			require.NoError(t, err)
+			shellcode := []byte{
+				0x90,
+				0x66, 0x90,
+			}
+
+			output, err := injector.InjectRaw(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x86.exe", output)
+		})
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x64.dat")
-		require.NoError(t, err)
-		shellcode := []byte{
-			0x90,
-			0x66, 0x90,
-		}
+		t.Run("entry point", func(t *testing.T) {
+			opts.Address = 0
 
-		output, err := injector.InjectRaw(image, shellcode, opts)
-		require.NoError(t, err)
-		require.NotEmpty(t, output)
+			image, err := os.ReadFile("testdata/image_x64.dat")
+			require.NoError(t, err)
+			shellcode := []byte{
+				0x90,
+				0x66, 0x90,
+			}
 
-		testExecuteImage(t, "testdata/injected_x64.exe", output)
+			output, err := injector.InjectRaw(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
+		})
+
+		t.Run("custom address", func(t *testing.T) {
+			opts.Address = 0x469E4F
+
+			image, err := os.ReadFile("testdata/image_x64.dat")
+			require.NoError(t, err)
+			shellcode := []byte{
+				0x90,
+				0x66, 0x90,
+			}
+
+			output, err := injector.InjectRaw(image, shellcode, opts)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImage(t, "testdata/injected_x64.exe", output)
+		})
 	})
 }
 
