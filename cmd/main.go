@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -16,6 +17,7 @@ var (
 	hexSC bool
 	out   string
 	aye   bool
+	args  string
 	opts  injector.Options
 )
 
@@ -25,13 +27,15 @@ func init() {
 	flag.BoolVar(&hexSC, "hex", false, "input shellcode with hex format")
 	flag.StringVar(&out, "o", "", "set output pe image file path")
 	flag.BoolVar(&aye, "a", false, "analyze the pe image for inject")
+	flag.StringVar(&args, "args", "", "set custom arguments from a json file")
 	flag.Uint64Var(&opts.Address, "addr", 0, "specify the target function address that will be hooked")
 	flag.BoolVar(&opts.NotSaveContext, "nsc", false, "not append instruction about save and restore context")
 	flag.BoolVar(&opts.NotCreateThread, "nct", false, "not create thread at the shellcode")
 	flag.BoolVar(&opts.NotWaitThread, "nwt", false, "not wait created thread at the shellcode")
 	flag.BoolVar(&opts.NotEraseShellcode, "nes", false, "not erase shellcode after execute finish")
-	flag.BoolVar(&opts.ForceCodeCave, "fcc", false, "force use code cave mode for write shellcode")
-	flag.BoolVar(&opts.ForceExtendSection, "fes", false, "force extend the last section for write shellcode")
+	flag.BoolVar(&opts.ForceCodeCave, "fcc", false, "force use code cave mode")
+	flag.BoolVar(&opts.ForceExtendSection, "fes", false, "force use extend section mode")
+	flag.BoolVar(&opts.ForceCreateSection, "fcs", false, "force use create section mode")
 	flag.Int64Var(&opts.RandSeed, "seed", 0, "specify a random seed for generate loader")
 	flag.StringVar(&opts.LoaderX86, "ldr-x86", "", "specify the x86 loader template file path")
 	flag.StringVar(&opts.LoaderX64, "ldr-x64", "", "specify the x64 loader template file path")
@@ -47,6 +51,7 @@ func main() {
 		analyzeImage()
 		return
 	}
+
 	if out == "" {
 		err := os.Mkdir("output", 0700)
 		checkError(err)
@@ -54,6 +59,12 @@ func main() {
 	}
 	opts.LoaderX86 = loadSourceTemplate(opts.LoaderX86)
 	opts.LoaderX64 = loadSourceTemplate(opts.LoaderX64)
+	if args != "" {
+		data, err := os.ReadFile(args)
+		checkError(err)
+		err = json.Unmarshal(data, &opts.Arguments)
+		checkError(err)
+	}
 
 	inj := injector.NewInjector()
 	seed := opts.RandSeed
