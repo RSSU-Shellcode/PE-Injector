@@ -19,6 +19,7 @@ type Info struct {
 	NumCodeCaves     int
 	CanInjectLoader  bool
 	InjectLoaderRank int
+	CanCreateSection bool
 }
 
 // Analyze is used to analyze the target pe image file that can be injected.
@@ -85,6 +86,11 @@ func Analyze(image []byte) (*Info, error) {
 	if canInjectLoader {
 		injectLoaderRank = calcInjectLoaderRank(ctx)
 	}
+	var canCreateSection bool
+	_, err = injector.createSection(".test", 1024)
+	if err == nil {
+		canCreateSection = true
+	}
 	info := Info{
 		Architecture:      arch,
 		ImageSize:         imageSize,
@@ -101,6 +107,7 @@ func Analyze(image []byte) (*Info, error) {
 		NumCodeCaves:      numCaves,
 		CanInjectLoader:   canInjectLoader,
 		InjectLoaderRank:  injectLoaderRank,
+		CanCreateSection:  canCreateSection,
 	}
 	err = injector.Close()
 	if err != nil {
