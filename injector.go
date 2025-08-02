@@ -207,35 +207,8 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 }
 
 func (inj *Injector) inject(shellcode []byte, raw bool) error {
-	var entryPoint uint32
-	switch inj.arch {
-	case "386":
-		entryPoint = inj.hdr32.AddressOfEntryPoint
-	case "amd64":
-		entryPoint = inj.hdr64.AddressOfEntryPoint
-	}
-	var targetRVA uint32
-	if inj.opts.Address != 0 {
-		targetRVA = inj.vaToRVA(inj.opts.Address)
-	} else {
-		targetRVA = entryPoint
-	}
-	// search a cave near the target RVA
-	var first *codeCave
-	for i, cave := range inj.caves {
-		offset := int64(cave.virtualAddr) - int64(targetRVA)
-		if offset <= 4096 && offset >= -4096 {
-			first = cave
-			inj.removeCodeCave(i)
-			break
-		}
-	}
-	// if failed to search target, random select a cave
-	if first == nil && len(inj.caves) > 0 {
-		i := inj.rand.Intn(len(inj.caves))
-		first = inj.caves[i]
-		inj.removeCodeCave(i)
-	}
+	targetRVA := inj.selectTargetRVA()
+	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
 	if inj.section != nil {
 		dstRVA = inj.section.VirtualAddress
@@ -323,6 +296,43 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	// remove the digital signature of the PE file
 	inj.removeSignature()
 	return nil
+}
+
+func (inj *Injector) selectTargetRVA() uint32 {
+	var entryPoint uint32
+	switch inj.arch {
+	case "386":
+		entryPoint = inj.hdr32.AddressOfEntryPoint
+	case "amd64":
+		entryPoint = inj.hdr64.AddressOfEntryPoint
+	}
+	var targetRVA uint32
+	if inj.opts.Address != 0 {
+		targetRVA = inj.vaToRVA(inj.opts.Address)
+	} else {
+		targetRVA = entryPoint
+	}
+	return targetRVA
+}
+
+func (inj *Injector) selectFirstCodeCave(targetRVA uint32) *codeCave {
+	var first *codeCave
+	// search a cave near the target RVA
+	for i, cave := range inj.caves {
+		offset := int64(cave.virtualAddr) - int64(targetRVA)
+		if offset <= 4096 && offset >= -4096 {
+			first = cave
+			inj.removeCodeCave(i)
+			break
+		}
+	}
+	// if failed to search target, random select a cave
+	if first == nil && len(inj.caves) > 0 {
+		i := inj.rand.Intn(len(inj.caves))
+		first = inj.caves[i]
+		inj.removeCodeCave(i)
+	}
+	return first
 }
 
 // hook target function for add a jmp to the first code cave
