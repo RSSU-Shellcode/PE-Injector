@@ -11,6 +11,7 @@ const (
 	imageDOSHeader         = 64
 	imageFileHeaderSize    = 20
 	imageSectionHeaderSize = 40
+	imageDataDirectorySize = 4 + 4
 	importDirectorySize    = 5 * 4
 	reserveSectionSize     = 8
 )
@@ -125,6 +126,16 @@ func (inj *Injector) removeSignature() {
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
+	// calculate the offset of the security entry
+	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
+	fhOffset := peOffset + 4
+	hdrOffset := fhOffset + imageFileHeaderSize
+	ddOffset := hdrOffset + uint32(inj.img.SizeOfOptionalHeader)
+	ddOffset -= uint32(len(dataDirectory)) * imageDataDirectorySize
+	secOffset := ddOffset + pe.IMAGE_DIRECTORY_ENTRY_SECURITY*imageDataDirectorySize
+	// reset the directory entry and erase the signature
+	ndd := bytes.Repeat([]byte{0x00}, imageDataDirectorySize)
+	copy(inj.dup[secOffset:], ndd)
 	padding := bytes.Repeat([]byte{0x00}, int(dd.Size))
 	copy(inj.dup[dd.VirtualAddress:], padding)
 }
