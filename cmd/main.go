@@ -17,6 +17,7 @@ var (
 	hexSC bool
 	out   string
 	aye   bool
+	raw   bool
 	args  string
 	opts  injector.Options
 )
@@ -27,7 +28,8 @@ func init() {
 	flag.BoolVar(&hexSC, "hex", false, "input shellcode with hex format")
 	flag.StringVar(&out, "o", "", "set output pe image file path")
 	flag.BoolVar(&aye, "a", false, "analyze the pe image for inject")
-	flag.StringVar(&args, "args", "", "set custom arguments from a json file")
+	flag.BoolVar(&raw, "raw", false, "inject shellcode without loader")
+	flag.StringVar(&args, "args", "", "set custom arguments for loader template from a json file")
 	flag.Uint64Var(&opts.Address, "addr", 0, "specify the target function address that will be hooked")
 	flag.BoolVar(&opts.NotSaveContext, "nsc", false, "not append instruction about save and restore context")
 	flag.BoolVar(&opts.NotCreateThread, "nct", false, "not create thread at the shellcode")
@@ -60,7 +62,7 @@ func main() {
 	opts.LoaderX86 = loadSourceTemplate(opts.LoaderX86)
 	opts.LoaderX64 = loadSourceTemplate(opts.LoaderX64)
 	if args != "" {
-		data, err := os.ReadFile(args)
+		data, err := os.ReadFile(args) // #nosec
 		checkError(err)
 		err = json.Unmarshal(data, &opts.Arguments)
 		checkError(err)
@@ -87,9 +89,13 @@ func main() {
 	}
 	fmt.Println("input shellcode size:", len(shellcode))
 
-	output, err := inj.Inject(image, shellcode, &opts)
+	var output []byte
+	if raw {
+		output, err = inj.InjectRaw(image, shellcode, &opts)
+	} else {
+		output, err = inj.Inject(image, shellcode, &opts)
+	}
 	checkError(err)
-
 	fmt.Printf("write output image to \"%s\"\n", out)
 	err = os.WriteFile(out, output, 0600)
 	checkError(err)
