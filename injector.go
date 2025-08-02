@@ -191,7 +191,8 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 		return nil, errors.New("invalid force mode with shellcode source")
 	}
 	if opts.ForceCreateSection {
-		inj.section, err = inj.createSection(opts.SectionName, uint32(len(shellcode)))
+		size := uint32(len(shellcode)) // #nosec G115
+		inj.section, err = inj.createSection(opts.SectionName, size)
 		if err != nil {
 			return nil, err
 		}
@@ -268,7 +269,8 @@ func (inj *Injector) inject(shellcode []byte, raw bool) error {
 		return err
 	}
 	// if failed, try to use create section mode
-	inj.section, err = inj.createSection(inj.opts.SectionName, uint32(len(shellcode)))
+	size := uint32(len(shellcode)) // #nosec G115
+	inj.section, err = inj.createSection(inj.opts.SectionName, size)
 	if err != nil {
 		return err
 	}
@@ -593,6 +595,7 @@ func (inj *Injector) removeCodeCave(i int) {
 }
 
 // padding is used to padding shellcode to the created section.
+// #nosec G115
 func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	var (
 		saveContext    []byte
