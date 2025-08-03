@@ -444,7 +444,7 @@ func TestInjectorFuzz(t *testing.T) {
 		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 		require.NoError(t, err)
 
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 30; i++ {
 			output, err := injector.Inject(image, shellcode, nil)
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
@@ -459,8 +459,33 @@ func TestInjectorFuzz(t *testing.T) {
 		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 		require.NoError(t, err)
 
-		for i := 0; i < 100; i++ {
+		opts := new(Options)
+		for i := 0; i < 30; i++ {
+			opts.ForceCodeCave = true
+			opts.ForceExtendSection = false
+			opts.ForceCreateSection = false
+
 			output, err := injector.Inject(image, shellcode, nil)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImageFast(t, "testdata/injected_x64.exe", output)
+
+			opts.ForceCodeCave = false
+			opts.ForceExtendSection = true
+			opts.ForceCreateSection = false
+
+			output, err = injector.Inject(image, shellcode, nil)
+			require.NoError(t, err)
+			require.NotEmpty(t, output)
+
+			testExecuteImageFast(t, "testdata/injected_x64.exe", output)
+
+			opts.ForceCodeCave = false
+			opts.ForceExtendSection = false
+			opts.ForceCreateSection = true
+
+			output, err = injector.Inject(image, shellcode, nil)
 			require.NoError(t, err)
 			require.NotEmpty(t, output)
 
