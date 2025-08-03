@@ -196,11 +196,9 @@ entry:
   add {{.RegV.rax}}, {{.Reg.r10}}
   add {{.RegV.rax}}, {{.Reg.r11}}
  loop_padding:
+  // it will waste some loop but clean code
   call xor_shift
-push rax
-  mov rax, {{.RegV.rax}}
-  mov [{{.RegV.rdx}}], al
-pop rax
+  mov [{{.RegV.rdx}}], {{.RegV.rax}}
   // check padding garbage is finish
   inc {{.RegV.rdx}}
   dec {{.RegV.rcx}}
