@@ -5,11 +5,21 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if runtime.GOOS == "windows" {
+		_ = exec.Command("taskkill", "/IM", "calc.exe", "/F").Run()
+		_ = exec.Command("taskkill", "/IM", "win32calc.exe", "/F").Run()
+	}
+	os.Exit(code)
+}
 
 func TestInjector_Inject(t *testing.T) {
 	injector := NewInjector()
