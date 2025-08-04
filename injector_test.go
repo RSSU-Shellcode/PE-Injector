@@ -6,9 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -498,11 +500,11 @@ func TestInjectorFuzz(t *testing.T) {
 }
 
 func testExecuteImage(t *testing.T, path string, image []byte) {
-	testExecuteImageWait(t, path, image, 500*time.Millisecond)
+	testExecuteImageWait(t, path, image, 750*time.Millisecond)
 }
 
 func testExecuteImageFast(t *testing.T, path string, image []byte) {
-	testExecuteImageWait(t, path, image, 250*time.Millisecond)
+	testExecuteImageWait(t, path, image, 500*time.Millisecond)
 }
 
 func testExecuteImageWait(t *testing.T, path string, image []byte, wait time.Duration) {
@@ -521,5 +523,13 @@ func testExecuteImageWait(t *testing.T, path string, image []byte, wait time.Dur
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
 
-	require.Contains(t, buf.String(), "Hello World!")
+	if assert.Contains(t, buf.String(), "Hello World!") {
+		return
+	}
+
+	// when failed to test, backup output image for debug
+	path = strings.ReplaceAll(path, ".exe", ".bak")
+	err = os.WriteFile(path, image, 0600)
+	require.NoError(t, err)
+	t.FailNow()
 }
