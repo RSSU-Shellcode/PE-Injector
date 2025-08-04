@@ -32,9 +32,9 @@ import (
 // the FileHeader.NumberOfSections and OptionalHeader.SizeOfImage
 
 const (
-	ModeCodeCave      = "code cave"
-	ModeExtendSection = "extend section"
-	ModeCreateSection = "create section"
+	ModeCodeCave      = "code-cave"
+	ModeExtendSection = "extend-section"
+	ModeCreateSection = "create-section"
 )
 
 // endOfShellcode is used to mark the end of shellcode.
@@ -43,13 +43,13 @@ var endOfShellcode = []byte{0x0F, 0x1F, 0x44, 0x00, 0x00}
 
 // Injector is a simple PE injector for inject shellcode.
 type Injector struct {
-	ctx  *Context
 	rand *rand.Rand
 
 	// assembler engine
 	engine *keystone.Engine
 
 	// context arguments
+	ctx  *Context
 	opts *Options
 	arch string
 	dup  []byte
@@ -143,7 +143,7 @@ type Options struct {
 
 // Context contains the output and context data in Inject and InjectRaw.
 type Context struct {
-	Image []byte
+	Output []byte
 
 	Arch  string
 	Mode  string
@@ -163,11 +163,11 @@ type Context struct {
 	HasLoadLibraryA   bool
 	HasLoadLibraryW   bool
 
-	NumCodeCaves     int
-	NumUsedCodeCaves int
-	NumInstOfLoader  int
-	HookAddress      uint64
-	FirstCodeCave    uint64
+	NumCodeCaves      int
+	NumUsedCodeCaves  int
+	NumInstOfLoader   int
+	HookAddress       uint64
+	FirstCodeCaveAddr uint64
 }
 
 // NewInjector is used to create a simple PE injector.
@@ -180,10 +180,8 @@ func NewInjector() *Injector {
 	} else {
 		seed = time.Now().UTC().UnixNano()
 	}
-	rng := rand.New(rand.NewSource(seed)) // #nosec
 	injector := Injector{
-		ctx:  new(Context),
-		rand: rng,
+		rand: rand.New(rand.NewSource(seed)), // #nosec
 	}
 	return &injector
 }
@@ -191,7 +189,7 @@ func NewInjector() *Injector {
 // Inject is used to inject shellcode to a PE image file.
 // It will inject a shellcode loader to code cave,
 // loader will decrypt and execute the input shellcode.
-func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, error) {
+func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
@@ -207,16 +205,17 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) ([]byte, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
-	output := inj.dup
+	inj.ctx.IsRaw = false
+	ctx := inj.ctx
 	inj.cleanup()
-	return output, nil
+	return ctx, nil
 }
 
 // InjectRaw is used to inject shellcode to a PE image without loader.
 // It is an advanced usage, ensure the shellcode not contains behavior
 // like read data from the shellcode tail.
 // Must use "nop 5" for set a flag that define the end of shellcode.
-func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([]byte, error) {
+func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*Context, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
@@ -241,9 +240,10 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
 	}
-	output := inj.dup
+	inj.ctx.IsRaw = true
+	ctx := inj.ctx
 	inj.cleanup()
-	return output, nil
+	return ctx, nil
 }
 
 func (inj *Injector) inject(shellcode []byte, raw bool) error {
@@ -267,6 +267,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) error {
 		return err
 	}
 	if inj.section != nil {
+		inj.ctx.Mode = ModeCreateSection
 		inj.padding(shellcode, targetRVA)
 		return nil
 	}
@@ -274,6 +275,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) error {
 		return inj.insert(targetRVA, first)
 	}
 	// try to cove cave mode
+	inj.ctx.Mode = ModeCodeCave
 	err = inj.insert(targetRVA, first)
 	if err == nil {
 		return nil
@@ -281,6 +283,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) error {
 	if inj.opts.ForceCodeCave {
 		return err
 	}
+	inj.ctx.Mode = ModeCreateSection
 	// if failed, try to use create section mode
 	size := uint32(len(shellcode)) // #nosec G115
 	inj.section, err = inj.createSection(inj.opts.SectionName, size)
@@ -327,14 +330,24 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		seed = inj.rand.Int63()
 	}
 	inj.rand.Seed(seed)
-	// record the last seed
-	inj.seed = seed
 	// make duplicate for make output image
 	dup := make([]byte, len(image))
 	copy(dup, image)
 	inj.dup = dup
 	// remove the digital signature of the PE file
 	inj.removeSignature()
+	// update context
+	inj.ctx = &Context{
+		Arch: arch,
+		Seed: seed,
+
+		SaveContext:    !opts.NotSaveContext,
+		CreateThread:   !opts.NotCreateThread,
+		WaitThread:     !opts.NotWaitThread,
+		EraseShellcode: !opts.NotEraseShellcode,
+
+		NumCodeCaves: len(caves),
+	}
 	return nil
 }
 
@@ -715,17 +728,13 @@ func mergeBytes(b [][]byte) []byte {
 }
 
 func (inj *Injector) cleanup() {
-	inj.img = nil
+	inj.ctx = nil
 	inj.dup = nil
+	inj.img = nil
 	inj.vm = nil
 	inj.section = nil
 	inj.segment = nil
 	inj.caves = nil
-}
-
-// Seed is used to get the random seed for debug.
-func (inj *Injector) Seed() int64 {
-	return inj.seed
 }
 
 // Close is used to close pe injector.
