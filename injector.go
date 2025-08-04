@@ -18,13 +18,24 @@ import (
 //
 // 1. code cave
 // The loader and shellcode body are all injected to code caves.
+// It will only change the .text section.
 //
 // 2. extend section
 // The loader is injected to code caves.
 // The shellcode body is injected to the last extended section.
+// It will change the .text section, adjust the last section
+// header and the OptionalHeader.SizeOfImage
 //
 // 3. create section
 // The loader and shellcode body are all injected to a new section.
+// It will change the .text section, create a new section, adjust
+// the FileHeader.NumberOfSections and OptionalHeader.SizeOfImage
+
+const (
+	ModeCodeCave      = "code cave"
+	ModeExtendSection = "extend section"
+	ModeCreateSection = "create section"
+)
 
 // endOfShellcode is used to mark the end of shellcode.
 // NOP DWORD ptr [EAX + EAX*1 + 00]
@@ -32,7 +43,7 @@ var endOfShellcode = []byte{0x0F, 0x1F, 0x44, 0x00, 0x00}
 
 // Injector is a simple PE injector for inject shellcode.
 type Injector struct {
-	seed int64
+	ctx  *Context
 	rand *rand.Rand
 
 	// assembler engine
@@ -130,6 +141,35 @@ type Options struct {
 	Arguments map[string]interface{}
 }
 
+// Context contains the output and context data in Inject and InjectRaw.
+type Context struct {
+	Image []byte
+
+	Arch  string
+	Mode  string
+	IsRaw bool
+	Seed  int64
+
+	SaveContext    bool
+	CreateThread   bool
+	WaitThread     bool
+	EraseShellcode bool
+	SectionName    string
+
+	HasAllProcedures  bool
+	HasVirtualAlloc   bool
+	HasVirtualProtect bool
+	HasCreateThread   bool
+	HasLoadLibraryA   bool
+	HasLoadLibraryW   bool
+
+	NumCodeCaves     int
+	NumUsedCodeCaves int
+	NumInstOfLoader  int
+	HookAddress      uint64
+	FirstCodeCave    uint64
+}
+
 // NewInjector is used to create a simple PE injector.
 func NewInjector() *Injector {
 	var seed int64
@@ -142,7 +182,7 @@ func NewInjector() *Injector {
 	}
 	rng := rand.New(rand.NewSource(seed)) // #nosec
 	injector := Injector{
-		seed: rng.Int63(),
+		ctx:  new(Context),
 		rand: rng,
 	}
 	return &injector
