@@ -167,6 +167,15 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		return nil, err
 	}
 	inj.encryptStrings(ctx)
+	// update context
+	hasLoadLibraryA := inj.getProcFromIAT("LoadLibraryA") != nil
+	hasLoadLibraryW := inj.getProcFromIAT("LoadLibraryW") != nil
+	inj.ctx.HasAllProcedures = !ctx.LackProcedure
+	inj.ctx.HasVirtualAlloc = !ctx.LackVirtualAlloc
+	inj.ctx.HasVirtualProtect = !ctx.LackVirtualProtect
+	inj.ctx.HasCreateThread = !ctx.LackCreateThread
+	inj.ctx.HasLoadLibraryA = hasLoadLibraryA
+	inj.ctx.HasLoadLibraryW = hasLoadLibraryW
 	// select and build loader source
 	var src string
 	switch inj.arch {
@@ -506,6 +515,7 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 		}
 	}
 	ctx.CodeCave = true
+	inj.ctx.Mode = ModeCodeCave
 	// replace the flag to assembly source
 	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", stub)
 }
@@ -515,6 +525,7 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 	offset := inj.extendSection(shellcode)
 	ctx.ExtendSection = true
 	ctx.ShellcodeOffset = offset
+	inj.ctx.Mode = ModeExtendSection
 	// remove the flag in assembly source
 	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
 }
@@ -533,6 +544,7 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string)
 	copy(inj.dup[section.Offset+reservedLoaderSize:], shellcode)
 	ctx.CreateSection = true
 	ctx.ShellcodeOffset = section.VirtualAddress + reservedLoaderSize
+	inj.ctx.Mode = ModeCreateSection
 	// remove the flag in assembly source
 	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", ""), nil
 }
