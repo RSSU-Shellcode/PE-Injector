@@ -53,27 +53,11 @@ func main() {
 		analyzeImage()
 		return
 	}
-
 	if out == "" {
 		err := os.Mkdir("output", 0700)
 		checkError(err)
 		out = filepath.Join("output", filepath.Base(img))
 	}
-	opts.LoaderX86 = loadSourceTemplate(opts.LoaderX86)
-	opts.LoaderX64 = loadSourceTemplate(opts.LoaderX64)
-	if args != "" {
-		data, err := os.ReadFile(args) // #nosec
-		checkError(err)
-		err = json.Unmarshal(data, &opts.Arguments)
-		checkError(err)
-	}
-
-	inj := injector.NewInjector()
-	seed := opts.RandSeed
-	if seed == 0 {
-		seed = inj.Seed()
-	}
-	fmt.Println("random seed:", seed)
 
 	fmt.Printf("read input PE image from \"%s\"\n", img)
 	image, err := os.ReadFile(img) // #nosec
@@ -89,15 +73,50 @@ func main() {
 	}
 	fmt.Println("input shellcode size:", len(shellcode))
 
-	var output []byte
+	opts.LoaderX86 = loadLoaderTemplate(opts.LoaderX86)
+	opts.LoaderX64 = loadLoaderTemplate(opts.LoaderX64)
+	if args != "" {
+		data, err := os.ReadFile(args) // #nosec
+		checkError(err)
+		err = json.Unmarshal(data, &opts.Arguments)
+		checkError(err)
+	}
+
+	inj := injector.NewInjector()
+	var ctx *injector.Context
 	if raw {
-		output, err = inj.InjectRaw(image, shellcode, &opts)
+		ctx, err = inj.InjectRaw(image, shellcode, &opts)
 	} else {
-		output, err = inj.Inject(image, shellcode, &opts)
+		ctx, err = inj.Inject(image, shellcode, &opts)
 	}
 	checkError(err)
+	fmt.Println("==============Context===============")
+	fmt.Println("size:", len(ctx.Output))
+	fmt.Println("arch:", ctx.Arch)
+	fmt.Println("mode:", ctx.Mode)
+	fmt.Println("raw: ", ctx.IsRaw)
+	fmt.Println("seed:", ctx.Seed)
+	fmt.Println()
+	fmt.Println("save context:", ctx.SaveContext)
+	fmt.Println("create thread:", ctx.CreateThread)
+	fmt.Println("wait thread:", ctx.WaitThread)
+	fmt.Println("erase shellcode:", ctx.EraseShellcode)
+	fmt.Println("section name:", ctx.SectionName)
+	fmt.Println()
+	fmt.Println("ProcComplete:  ", ctx.HasAllProcedures)
+	fmt.Println("VirtualAlloc:  ", ctx.HasVirtualAlloc)
+	fmt.Println("VirtualProtect:", ctx.HasVirtualProtect)
+	fmt.Println("CreateThread:  ", ctx.HasCreateThread)
+	fmt.Println("LoadLibraryA:  ", ctx.HasLoadLibraryA)
+	fmt.Println("LoadLibraryW:  ", ctx.HasLoadLibraryW)
+	fmt.Println()
+	fmt.Println("num code caves:  ", ctx.NumCodeCaves)
+	fmt.Println("num loader insts:", ctx.NumLoaderInst)
+	fmt.Printf("hook address:     0x%X\n", ctx.HookAddress)
+	fmt.Println("====================================")
+
 	fmt.Printf("write output image to \"%s\"\n", out)
-	err = os.WriteFile(out, output, 0600)
+	err = os.WriteFile(out, ctx.Output, 0600)
 	checkError(err)
 
 	err = inj.Close()
@@ -129,14 +148,14 @@ func analyzeImage() {
 	fmt.Println("========================================")
 }
 
-func loadSourceTemplate(path string) string {
+func loadLoaderTemplate(path string) string {
 	if path == "" {
 		return ""
 	}
 	fmt.Println("load custom loader template:", path)
-	asm, err := os.ReadFile(path) // #nosec
+	template, err := os.ReadFile(path) // #nosec
 	checkError(err)
-	return string(asm)
+	return string(template)
 }
 
 func checkError(err error) {
