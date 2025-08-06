@@ -24,11 +24,11 @@ func TestRelocateInstructionSegment(t *testing.T) {
 		require.NoError(t, err)
 		opts.LoaderX86 = string(loader)
 
-		output, err := injector.Inject(image, shellcode, opts)
+		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
-		require.NotEmpty(t, output)
+		require.Equal(t, ModeCreateSection, ctx.Mode)
 
-		testExecuteImage(t, "testdata/injected_x86.exe", output)
+		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -40,11 +40,11 @@ func TestRelocateInstructionSegment(t *testing.T) {
 		require.NoError(t, err)
 		opts.LoaderX64 = string(loader)
 
-		output, err := injector.Inject(image, shellcode, opts)
+		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
-		require.NotEmpty(t, output)
+		require.Equal(t, ModeCodeCave, ctx.Mode)
 
-		testExecuteImage(t, "testdata/injected_x64.exe", output)
+		testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 	})
 
 	err := injector.Close()
