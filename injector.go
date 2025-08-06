@@ -31,6 +31,7 @@ import (
 // It will change the .text section, create a new section, adjust
 // the FileHeader.NumberOfSections and OptionalHeader.SizeOfImage
 
+// these modes are used to display the mode that injector used.
 const (
 	ModeCodeCave      = "code-cave"
 	ModeExtendSection = "extend-section"
@@ -49,6 +50,7 @@ type Injector struct {
 	engine *keystone.Engine
 
 	// context arguments
+	raw  bool
 	ctx  *Context
 	opts *Options
 	arch string
@@ -163,11 +165,9 @@ type Context struct {
 	HasLoadLibraryA   bool
 	HasLoadLibraryW   bool
 
-	NumCodeCaves      int
-	NumUsedCodeCaves  int
-	NumInstOfLoader   int
-	HookAddress       uint64
-	FirstCodeCaveAddr uint64
+	NumCodeCaves  int
+	NumLoaderInst int
+	HookAddress   uint64
 }
 
 // NewInjector is used to create a simple PE injector.
@@ -193,6 +193,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, e
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
+	inj.raw = false
 	err := inj.preprocess(image, opts)
 	if err != nil {
 		return nil, err
@@ -205,10 +206,9 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
-	inj.ctx.IsRaw = false
-	ctx := inj.ctx
+	inj.ctx.Output = inj.dup
 	inj.cleanup()
-	return ctx, nil
+	return inj.ctx, nil
 }
 
 // InjectRaw is used to inject shellcode to a PE image without loader.
@@ -219,6 +219,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
+	inj.raw = true
 	err := inj.preprocess(image, opts)
 	if err != nil {
 		return nil, err
@@ -240,14 +241,14 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
 	}
-	inj.ctx.IsRaw = true
-	ctx := inj.ctx
+	inj.ctx.Output = inj.dup
 	inj.cleanup()
-	return ctx, nil
+	return inj.ctx, nil
 }
 
 func (inj *Injector) inject(shellcode []byte, raw bool) error {
 	targetRVA := inj.selectTargetRVA()
+	inj.ctx.HookAddress = inj.rvaToVA(targetRVA)
 	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
 	if inj.section != nil {
@@ -459,6 +460,11 @@ func (inj *Injector) slice(shellcode []byte) error {
 		off += l
 	}
 	inj.segment = segments
+	// update context
+	if !inj.raw {
+		inj.ctx.NumLoaderInst = len(segments)
+	}
+	inj.ctx.IsRaw = inj.raw
 	return nil
 }
 
@@ -728,7 +734,6 @@ func mergeBytes(b [][]byte) []byte {
 }
 
 func (inj *Injector) cleanup() {
-	inj.ctx = nil
 	inj.dup = nil
 	inj.img = nil
 	inj.vm = nil
