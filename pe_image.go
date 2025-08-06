@@ -251,6 +251,8 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 	}
 	copy(inj.dup[hdrOffset:], buffer.Bytes())
+	// update context
+	inj.ctx.SectionName = name
 	return &pe.SectionHeader{
 		Name:            name,
 		VirtualSize:     sh.VirtualSize,
@@ -273,8 +275,23 @@ func (inj *Injector) vaToRVA(va uint64) uint32 {
 	return uint32(int64(va) - base)
 }
 
+// #nosec G115
+func (inj *Injector) rvaToVA(rva uint32) uint64 {
+	var base int64
+	switch inj.arch {
+	case "386":
+		base = int64(inj.hdr32.ImageBase)
+	case "amd64":
+		base = int64(inj.hdr64.ImageBase)
+	}
+	return uint64(base + int64(rva))
+}
+
 func (inj *Injector) rvaToOffset(section string, rva uint32) uint32 {
 	s := inj.img.Section(section)
+	if s == nil {
+		return 0
+	}
 	return s.Offset + (rva - s.VirtualAddress)
 }
 
