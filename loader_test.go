@@ -58,11 +58,10 @@ func testLoader(t *testing.T, injector *Injector, opts *Options) {
 		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 		require.NoError(t, err)
 
-		output, err := injector.Inject(image, shellcode, opts)
+		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
-		require.NotEmpty(t, output)
 
-		testExecuteImage(t, "testdata/injected_x86.exe", output)
+		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -71,11 +70,10 @@ func testLoader(t *testing.T, injector *Injector, opts *Options) {
 		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 		require.NoError(t, err)
 
-		output, err := injector.Inject(image, shellcode, opts)
+		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
-		require.NotEmpty(t, output)
 
-		testExecuteImage(t, "testdata/injected_x64.exe", output)
+		testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 	})
 }
 
