@@ -25,7 +25,6 @@ func TestMain(m *testing.M) {
 
 func TestInjector_Inject(t *testing.T) {
 	injector := NewInjector()
-	fmt.Println("seed:", injector.Seed())
 
 	t.Run("common", func(t *testing.T) {
 		opts := new(Options)
@@ -89,11 +88,11 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options)
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
 
-			output, err := injector.Inject(image, shellcode, opts)
+			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			fmt.Println("seed:", ctx.Seed)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		})
 
 		t.Run("custom address", func(t *testing.T) {
@@ -107,11 +106,10 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options)
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
 
-			output, err := injector.Inject(image, shellcode, opts)
+			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		})
 	})
 
@@ -124,11 +122,10 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options)
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
 
-			output, err := injector.Inject(image, shellcode, opts)
+			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		})
 
 		t.Run("custom address", func(t *testing.T) {
@@ -142,18 +139,16 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options)
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
 
-			output, err := injector.Inject(image, shellcode, opts)
+			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		})
 	})
 }
 
 func TestInjector_InjectRaw(t *testing.T) {
 	injector := NewInjector()
-	fmt.Println("seed:", injector.Seed())
 
 	t.Run("common", func(t *testing.T) {
 		opts := new(Options)
@@ -204,11 +199,10 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 				0x66, 0x90,
 			}
 
-			output, err := injector.InjectRaw(image, shellcode, opts)
+			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		})
 
 		t.Run("custom address", func(t *testing.T) {
@@ -221,11 +215,10 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 				0x66, 0x90,
 			}
 
-			output, err := injector.InjectRaw(image, shellcode, opts)
+			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		})
 	})
 
@@ -240,11 +233,10 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 				0x66, 0x90,
 			}
 
-			output, err := injector.InjectRaw(image, shellcode, opts)
+			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		})
 
 		t.Run("custom address", func(t *testing.T) {
@@ -257,11 +249,10 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 				0x66, 0x90,
 			}
 
-			output, err := injector.InjectRaw(image, shellcode, opts)
+			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		})
 	})
 }
@@ -280,11 +271,10 @@ func TestSpecificAddress(t *testing.T) {
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
 
-			output, err := injector.Inject(image, shellcode, opts)
+			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -297,11 +287,10 @@ func TestSpecificAddress(t *testing.T) {
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
 
-			output, err := injector.Inject(image, shellcode, opts)
+			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		})
 	})
 
@@ -318,11 +307,10 @@ func TestSpecificAddress(t *testing.T) {
 				0x66, 0x90,
 			}
 
-			output, err := injector.InjectRaw(image, shellcode, opts)
+			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -337,11 +325,10 @@ func TestSpecificAddress(t *testing.T) {
 				0x66, 0x90,
 			}
 
-			output, err := injector.InjectRaw(image, shellcode, opts)
+			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		})
 	})
 
@@ -363,15 +350,13 @@ func TestSpecificSeed(t *testing.T) {
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
 
-			output1, err := injector.Inject(image, shellcode, opts)
+			ctx1, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output1)
-			output2, err := injector.Inject(image, shellcode, opts)
+			ctx2, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output2)
-			require.Equal(t, output1, output2)
+			require.Equal(t, ctx1, ctx2)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output1)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx1.Output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -380,15 +365,13 @@ func TestSpecificSeed(t *testing.T) {
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
 
-			output1, err := injector.Inject(image, shellcode, opts)
+			ctx1, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output1)
-			output2, err := injector.Inject(image, shellcode, opts)
+			ctx2, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output2)
-			require.Equal(t, output1, output2)
+			require.Equal(t, ctx1, ctx2)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output1)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx1.Output)
 		})
 	})
 
@@ -401,15 +384,13 @@ func TestSpecificSeed(t *testing.T) {
 				0x66, 0x90,
 			}
 
-			output1, err := injector.InjectRaw(image, shellcode, opts)
+			ctx1, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output1)
-			output2, err := injector.InjectRaw(image, shellcode, opts)
+			ctx2, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output2)
-			require.Equal(t, output1, output2)
+			require.Equal(t, ctx1, ctx2)
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output1)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx1.Output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -420,15 +401,13 @@ func TestSpecificSeed(t *testing.T) {
 				0x66, 0x90,
 			}
 
-			output1, err := injector.InjectRaw(image, shellcode, opts)
+			ctx1, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output1)
-			output2, err := injector.InjectRaw(image, shellcode, opts)
+			ctx2, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output2)
-			require.Equal(t, output1, output2)
+			require.Equal(t, ctx1, ctx2)
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output1)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx1.Output)
 		})
 	})
 
@@ -438,7 +417,6 @@ func TestSpecificSeed(t *testing.T) {
 
 func TestInjectorFuzz(t *testing.T) {
 	injector := NewInjector()
-	fmt.Println("seed:", injector.Seed())
 
 	t.Run("x86", func(t *testing.T) {
 		image, err := os.ReadFile("testdata/image_x86.dat")
@@ -447,11 +425,11 @@ func TestInjectorFuzz(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 30; i++ {
-			output, err := injector.Inject(image, shellcode, nil)
+			ctx, err := injector.Inject(image, shellcode, nil)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			require.Equal(t, ModeCreateSection, ctx.Mode)
 
-			testExecuteImageFast(t, "testdata/injected_x86.exe", output)
+			testExecuteImageFast(t, "testdata/injected_x86.exe", ctx.Output)
 		}
 	})
 
@@ -467,31 +445,31 @@ func TestInjectorFuzz(t *testing.T) {
 			opts.ForceExtendSection = false
 			opts.ForceCreateSection = false
 
-			output, err := injector.Inject(image, shellcode, nil)
+			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			require.Equal(t, ModeCodeCave, ctx.Mode)
 
-			testExecuteImageFast(t, "testdata/injected_x64.exe", output)
+			testExecuteImageFast(t, "testdata/injected_x64.exe", ctx.Output)
 
 			opts.ForceCodeCave = false
 			opts.ForceExtendSection = true
 			opts.ForceCreateSection = false
 
-			output, err = injector.Inject(image, shellcode, nil)
+			ctx, err = injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			require.Equal(t, ModeExtendSection, ctx.Mode)
 
-			testExecuteImageFast(t, "testdata/injected_x64.exe", output)
+			testExecuteImageFast(t, "testdata/injected_x64.exe", ctx.Output)
 
 			opts.ForceCodeCave = false
 			opts.ForceExtendSection = false
 			opts.ForceCreateSection = true
 
-			output, err = injector.Inject(image, shellcode, nil)
+			ctx, err = injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
-			require.NotEmpty(t, output)
+			require.Equal(t, ModeCreateSection, ctx.Mode)
 
-			testExecuteImageFast(t, "testdata/injected_x64.exe", output)
+			testExecuteImageFast(t, "testdata/injected_x64.exe", ctx.Output)
 		}
 	})
 
