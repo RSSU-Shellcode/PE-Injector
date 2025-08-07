@@ -19,38 +19,42 @@ func TestLoader(t *testing.T) {
 		opts.ForceCodeCave = false
 		opts.ForceExtendSection = false
 		opts.ForceCreateSection = false
-		testLoader(t, injector, opts)
+		testLoader(t, injector, opts, "auto")
 	})
 
 	t.Run("code cave mode", func(t *testing.T) {
 		opts.ForceCodeCave = true
 		opts.ForceExtendSection = false
 		opts.ForceCreateSection = false
-		testLoader(t, injector, opts)
+		testLoader(t, injector, opts, ModeCodeCave)
 	})
 
 	t.Run("extend section mode", func(t *testing.T) {
 		opts.ForceCodeCave = false
 		opts.ForceExtendSection = true
 		opts.ForceCreateSection = false
-		testLoader(t, injector, opts)
+		testLoader(t, injector, opts, ModeExtendSection)
 	})
 
 	t.Run("create section mode", func(t *testing.T) {
 		opts.ForceCodeCave = false
 		opts.ForceExtendSection = false
 		opts.ForceCreateSection = true
-		testLoader(t, injector, opts)
+		testLoader(t, injector, opts, ModeCreateSection)
 	})
 
 	err := injector.Close()
 	require.NoError(t, err)
 }
 
-func testLoader(t *testing.T, injector *Injector, opts *Options) {
+func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 	t.Run("x86", func(t *testing.T) {
 		if opts.ForceCodeCave || opts.ForceExtendSection {
 			return
+		}
+		mode := mode
+		if mode == "auto" {
+			mode = ModeCreateSection
 		}
 
 		image, err := os.ReadFile("testdata/image_x86.dat")
@@ -60,11 +64,17 @@ func testLoader(t *testing.T, injector *Injector, opts *Options) {
 
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
+		require.Equal(t, mode, ctx.Mode)
 
 		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
+		mode := mode
+		if mode == "auto" {
+			mode = ModeCodeCave
+		}
+
 		image, err := os.ReadFile("testdata/image_x64.dat")
 		require.NoError(t, err)
 		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
@@ -72,6 +82,7 @@ func testLoader(t *testing.T, injector *Injector, opts *Options) {
 
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
+		require.Equal(t, mode, ctx.Mode)
 
 		testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 	})
