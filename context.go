@@ -74,12 +74,14 @@ func (inj *Injector) saveContext() [][]byte {
 		inst := make([]byte, len(fp[i]))
 		copy(inst, fp[i])
 		insts = append(insts, inst)
+		insts = append(insts, inj.garbageInst())
 	}
 	for i := 0; i < len(save); i++ {
 		selected := save[inj.contextSeq[i]]
 		inst := make([]byte, len(selected))
 		copy(inst, selected)
 		insts = append(insts, inst)
+		insts = append(insts, inj.garbageInst())
 	}
 	return insts
 }
@@ -103,11 +105,13 @@ func (inj *Injector) restoreContext() [][]byte {
 		inst := make([]byte, len(selected))
 		copy(inst, selected)
 		insts = append(insts, inst)
+		insts = append(insts, inj.garbageInst())
 	}
 	for i := 0; i < len(fp); i++ {
 		inst := make([]byte, len(fp[i]))
 		copy(inst, fp[i])
 		insts = append(insts, inst)
+		insts = append(insts, inj.garbageInst())
 	}
 	return insts
 }
