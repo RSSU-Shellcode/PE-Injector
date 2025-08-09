@@ -121,15 +121,11 @@ type loaderCtx struct {
 	EndOfLoader []byte
 }
 
-func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
-	// initialize keystone engine
-	err := inj.initAssembler()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize assembler: %s", err)
-	}
+func (inj *Injector) buildLoader(shellcode []byte) (output []byte, err error) {
 	defer func() {
-		_ = inj.engine.Close()
-		inj.engine = nil
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprint(r))
+		}
 	}()
 	// make sure shellcode is 4 or 8 bytes alignment
 	var numPad int
@@ -193,6 +189,7 @@ func (inj *Injector) buildLoader(shellcode []byte) ([]byte, error) {
 		"db":  toDB,
 		"hex": toHex,
 		"dr":  toRegDWORD,
+		"igi": inj.insertGarbageInst,
 	}).Parse(src)
 	if err != nil {
 		return nil, fmt.Errorf("invalid loader template: %s", err)
@@ -598,6 +595,13 @@ func (inj *Injector) encryptShellcode(ctx *loaderCtx, sc []byte) []byte {
 		}
 	}
 	return section.Bytes()
+}
+
+func (inj *Injector) insertGarbageInst() string {
+	if inj.opts.NoGarbage || inj.ctx.Mode != ModeCreateSection {
+		return ""
+	}
+	return ";" + toDB(inj.garbageInst())
 }
 
 func xorShift32(seed uint32) uint32 {
