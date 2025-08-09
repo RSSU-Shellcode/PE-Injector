@@ -1,7 +1,6 @@
 package injector
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -466,7 +465,7 @@ func TestInjectorFuzz(t *testing.T) {
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCreateSection, ctx.Mode)
 
-			testExecuteImageFast(t, "testdata/injected_x86.exe", ctx.Output)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		}
 	})
 
@@ -487,7 +486,7 @@ func TestInjectorFuzz(t *testing.T) {
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCodeCave, ctx.Mode)
 
-			testExecuteImageFast(t, "testdata/injected_x64.exe", ctx.Output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 
 			opts.ForceCodeCave = false
 			opts.ForceExtendSection = true
@@ -498,7 +497,7 @@ func TestInjectorFuzz(t *testing.T) {
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeExtendSection, ctx.Mode)
 
-			testExecuteImageFast(t, "testdata/injected_x64.exe", ctx.Output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 
 			opts.ForceCodeCave = false
 			opts.ForceExtendSection = false
@@ -509,7 +508,7 @@ func TestInjectorFuzz(t *testing.T) {
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCreateSection, ctx.Mode)
 
-			testExecuteImageFast(t, "testdata/injected_x64.exe", ctx.Output)
+			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		}
 	})
 
@@ -518,32 +517,43 @@ func TestInjectorFuzz(t *testing.T) {
 }
 
 func testExecuteImage(t *testing.T, path string, image []byte) {
-	testExecuteImageWait(t, path, image, 750*time.Millisecond)
-}
-
-func testExecuteImageFast(t *testing.T, path string, image []byte) {
-	testExecuteImageWait(t, path, image, 500*time.Millisecond)
-}
-
-// TODO replace to pipe and goroutine
-func testExecuteImageWait(t *testing.T, path string, image []byte, wait time.Duration) {
 	err := os.WriteFile(path, image, 0600)
 	require.NoError(t, err)
 
-	buf := bytes.NewBuffer(nil)
-	cmd := exec.Command(path)
-	cmd.Stdout = buf
-	cmd.Stderr = buf
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer func() {
+		_ = r.Close()
+		_ = w.Close()
+	}()
 
+	cmd := exec.Command(path)
+	cmd.Stdout = w
+	cmd.Stderr = w
 	err = cmd.Start()
 	require.NoError(t, err)
+	defer func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
 
-	time.Sleep(wait)
-	_ = cmd.Process.Kill()
-	_ = cmd.Wait()
+	go func() {
+		time.Sleep(3 * time.Second)
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		_ = r.Close()
+		_ = w.Close()
+	}()
 
-	if assert.Contains(t, buf.String(), "Hello World!") {
-		return
+	for {
+		buf := make([]byte, 1024)
+		n, err := r.Read(buf)
+		if assert.Contains(t, string(buf[:n]), "Hello World!") {
+			return
+		}
+		if err != nil {
+			break
+		}
 	}
 
 	// when failed to test, backup output image for debug
