@@ -130,6 +130,10 @@ type Options struct {
 	// specify the new section name, the default is ".patch".
 	SectionName string
 
+	// not append garbage instruction to loader.
+	// It is only for Inject with ModeCreateSection.
+	NoGarbage bool
+
 	// specify a random seed for test and debug.
 	RandSeed int64
 
@@ -138,6 +142,12 @@ type Options struct {
 
 	// specify the x64 loader template.
 	LoaderX64 string
+
+	// specify the x86 junk code templates.
+	JunkCodeX86 []string
+
+	// specify the x64 junk code templates.
+	JunkCodeX64 []string
 
 	// append custom argument for loader template.
 	Arguments map[string]interface{}
@@ -193,11 +203,21 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, e
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
-	inj.raw = false
 	err := inj.preprocess(image, opts)
 	if err != nil {
 		return nil, err
 	}
+	// initialize keystone engine
+	err = inj.initAssembler()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize assembler: %s", err)
+	}
+	defer func() {
+		_ = inj.engine.Close()
+		inj.engine = nil
+	}()
+	// set method flag
+	inj.raw = false
 	loader, err := inj.buildLoader(shellcode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
@@ -219,13 +239,25 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
-	inj.raw = true
 	err := inj.preprocess(image, opts)
 	if err != nil {
 		return nil, err
 	}
+	// initialize keystone engine
+	err = inj.initAssembler()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize assembler: %s", err)
+	}
+	defer func() {
+		_ = inj.engine.Close()
+		inj.engine = nil
+	}()
+	// set method flag
+	inj.raw = true
+	// auto append the mark about end of shellcode
 	shellcode = bytes.Clone(shellcode)
 	shellcode = append(shellcode, endOfShellcode...)
+	// prepare force inject mode
 	opts = inj.opts
 	if opts.ForceCodeCave && opts.ForceCreateSection {
 		return nil, errors.New("invalid force mode with shellcode source")
@@ -246,7 +278,12 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	return inj.ctx, nil
 }
 
-func (inj *Injector) inject(shellcode []byte, raw bool) error {
+func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprint(r))
+		}
+	}()
 	targetRVA := inj.selectTargetRVA()
 	inj.ctx.HookAddress = inj.rvaToVA(targetRVA)
 	first := inj.selectFirstCodeCave(targetRVA)
@@ -259,7 +296,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) error {
 		}
 		dstRVA = first.virtualAddr
 	}
-	err := inj.hook(targetRVA, dstRVA)
+	err = inj.hook(targetRVA, dstRVA)
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
