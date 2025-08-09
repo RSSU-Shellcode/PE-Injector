@@ -65,7 +65,7 @@ type junkCodeCtx struct {
 
 // the output garbage instruction length is no limit.
 func (inj *Injector) garbageInst() []byte {
-	if inj.opts.NoGarbage {
+	if inj.opts.NoGarbage || inj.ctx.Mode != ModeCreateSection {
 		return nil
 	}
 	// dynamically adjust probability
@@ -76,8 +76,10 @@ func (inj *Injector) garbageInst() []byte {
 	case "amd64":
 		junkCodes = inj.getJunkCodeX64()
 	}
-	switch inj.rand.Intn(1 + len(junkCodes)) {
+	switch inj.rand.Intn(2 + len(junkCodes)) {
 	case 0:
+		return nil
+	case 1:
 		return inj.garbageMultiByteNOP()
 	default:
 		return inj.garbageTemplate()
@@ -120,13 +122,27 @@ func (inj *Injector) garbageTemplate() []byte {
 	}
 	// select random junk code template
 	idx := inj.rand.Intn(len(junkCodes))
-	junkCode := junkCodes[idx]
+	src := junkCodes[idx]
+	asm, err := inj.buildJunkCode(src)
+	if err != nil {
+		panic(err)
+	}
+	// assemble junk code
+	inst, err := inj.assemble(asm)
+	if err != nil {
+		panic(fmt.Sprintf("failed to assemble junk code: %s", err))
+	}
+	return inst
+}
+
+// #nosec G115
+func (inj *Injector) buildJunkCode(src string) (string, error) {
 	// process assembly source
 	tpl, err := template.New("junk_code").Funcs(template.FuncMap{
 		"dr": toRegDWORD,
-	}).Parse(junkCode)
+	}).Parse(src)
 	if err != nil {
-		panic("invalid junk code template")
+		return "", fmt.Errorf("invalid junk code template: %s", err)
 	}
 	// initialize random data
 	switches := make(map[string]bool)
@@ -160,12 +176,7 @@ func (inj *Injector) garbageTemplate() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, &ctx)
 	if err != nil {
-		panic(fmt.Sprintf("failed to build junk code assembly source: %s", err))
+		return "", fmt.Errorf("failed to build junk code assembly source: %s", err)
 	}
-	// assemble junk code
-	inst, err := inj.assemble(buf.String())
-	if err != nil {
-		panic(fmt.Sprintf("failed to assemble junk code: %s", err))
-	}
-	return inst
+	return buf.String(), nil
 }
