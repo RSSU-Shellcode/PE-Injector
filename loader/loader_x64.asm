@@ -12,14 +12,14 @@ entry:
 // get necessary procedure address
 {{if .LackProcedure}}
   // push kernel32 module name to stack
-  mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}
-  mov {{.Reg.r8}},  {{index .Kernel32DLLKey 0}}
-  xor {{.Reg.rax}}, {{.Reg.r8}}
-  push {{.Reg.rax}}
-  mov {{.Reg.rbx}}, {{index .Kernel32DLLDB 1}}
-  mov {{.Reg.r9}},  {{index .Kernel32DLLKey 1}}
-  xor {{.Reg.rbx}}, {{.Reg.r9}}
-  push {{.Reg.rbx}}
+  mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}                {{igi}}
+  mov {{.Reg.r8}},  {{index .Kernel32DLLKey 0}}               {{igi}}
+  xor {{.Reg.rax}}, {{.Reg.r8}}                               {{igi}}
+  push {{.Reg.rax}}                                           {{igi}}
+  mov {{.Reg.rbx}}, {{index .Kernel32DLLDB 1}}                {{igi}}
+  mov {{.Reg.r9}},  {{index .Kernel32DLLKey 1}}               {{igi}}
+  xor {{.Reg.rbx}}, {{.Reg.r9}}                               {{igi}}
+  push {{.Reg.rbx}}                                           {{igi}}
 
   {{if .LoadLibraryWOnly}}
     mov {{.Reg.rcx}}, {{index .Kernel32DLLDB 2}}
