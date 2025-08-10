@@ -7,11 +7,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
-
-	"github.com/For-ACGN/go-keystone"
 )
 
 // just for prevent [import _ "embed"] :)
@@ -202,20 +201,6 @@ func (inj *Injector) buildLoader(shellcode []byte) (output []byte, err error) {
 	return inj.assemble(buf.String())
 }
 
-func (inj *Injector) initAssembler() error {
-	var err error
-	switch inj.arch {
-	case "386":
-		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
-	case "amd64":
-		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
-	}
-	if err != nil {
-		return err
-	}
-	return inj.engine.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
-}
-
 func (inj *Injector) getLoaderX86() string {
 	if inj.opts.LoaderX86 != "" {
 		return inj.opts.LoaderX86
@@ -230,22 +215,13 @@ func (inj *Injector) getLoaderX64() string {
 	return defaultLoaderX64
 }
 
-func (inj *Injector) assemble(src string) ([]byte, error) {
-	if strings.Contains(src, "<no value>") {
-		return nil, errors.New("invalid register in assembly source")
-	}
-	return inj.engine.Assemble(src, 0)
-}
-
 func (inj *Injector) buildRandomRegisterMap() map[string]string {
 	var reg []string
 	switch inj.arch {
 	case "386":
-		reg = make([]string, len(registerX86))
-		copy(reg, registerX86)
+		reg = slices.Clone(registerX86)
 	case "amd64":
-		reg = make([]string, len(registerX64))
-		copy(reg, registerX64)
+		reg = slices.Clone(registerX64)
 	}
 	inj.regBox = reg
 	register := make(map[string]string, len(reg))
@@ -266,11 +242,9 @@ func (inj *Injector) buildVolatileRegisterMap() map[string]string {
 	var reg []string
 	switch inj.arch {
 	case "386":
-		reg = make([]string, len(regVolatileX86))
-		copy(reg, regVolatileX86)
+		reg = slices.Clone(regVolatileX86)
 	case "amd64":
-		reg = make([]string, len(regVolatileX64))
-		copy(reg, regVolatileX64)
+		reg = slices.Clone(regVolatileX64)
 	}
 	inj.regBox = reg
 	register := make(map[string]string, len(reg))
@@ -291,11 +265,9 @@ func (inj *Injector) buildNonvolatileRegisterMap() map[string]string {
 	var reg []string
 	switch inj.arch {
 	case "386":
-		reg = make([]string, len(regNonvolatileX86))
-		copy(reg, regNonvolatileX86)
+		reg = slices.Clone(regNonvolatileX86)
 	case "amd64":
-		reg = make([]string, len(regNonvolatileX64))
-		copy(reg, regNonvolatileX64)
+		reg = slices.Clone(regNonvolatileX64)
 	}
 	inj.regBox = reg
 	register := make(map[string]string, len(reg))

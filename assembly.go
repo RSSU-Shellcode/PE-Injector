@@ -1,6 +1,7 @@
 package injector
 
 import (
+	"bytes"
 	"encoding/binary"
 
 	"golang.org/x/arch/x86/x86asm"
@@ -92,8 +93,7 @@ func (inj *Injector) relocateInstruction(src []byte, offset int64) []byte {
 	if err != nil {
 		panic(err)
 	}
-	output := make([]byte, len(src))
-	copy(output, src)
+	output := bytes.Clone(src)
 	switch inst.Args[0].(type) {
 	case x86asm.Rel:
 	default:

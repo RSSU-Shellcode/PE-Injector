@@ -1,5 +1,9 @@
 package injector
 
+import (
+	"bytes"
+)
+
 var (
 	saveContextX86    = [][]byte{{0x60}} //              pushad
 	restoreContextX86 = [][]byte{{0x61}} //              popad
@@ -71,16 +75,12 @@ func (inj *Injector) saveContext() [][]byte {
 	inj.contextSeq = inj.rand.Perm(len(save))
 	insts := make([][]byte, 0, len(fp)+len(save))
 	for i := 0; i < len(fp); i++ {
-		inst := make([]byte, len(fp[i]))
-		copy(inst, fp[i])
-		insts = append(insts, inst)
+		insts = append(insts, bytes.Clone(fp[i]))
 		insts = append(insts, inj.garbageInst())
 	}
 	for i := 0; i < len(save); i++ {
 		selected := save[inj.contextSeq[i]]
-		inst := make([]byte, len(selected))
-		copy(inst, selected)
-		insts = append(insts, inst)
+		insts = append(insts, bytes.Clone(selected))
 		insts = append(insts, inj.garbageInst())
 	}
 	return insts
@@ -102,15 +102,11 @@ func (inj *Injector) restoreContext() [][]byte {
 	insts := make([][]byte, 0, len(fp)+len(restore))
 	for i := len(restore) - 1; i >= 0; i-- {
 		selected := restore[inj.contextSeq[i]]
-		inst := make([]byte, len(selected))
-		copy(inst, selected)
-		insts = append(insts, inst)
+		insts = append(insts, bytes.Clone(selected))
 		insts = append(insts, inj.garbageInst())
 	}
 	for i := 0; i < len(fp); i++ {
-		inst := make([]byte, len(fp[i]))
-		copy(inst, fp[i])
-		insts = append(insts, inst)
+		insts = append(insts, bytes.Clone(fp[i]))
 		insts = append(insts, inj.garbageInst())
 	}
 	return insts
