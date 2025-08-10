@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/For-ACGN/go-keystone"
@@ -330,6 +331,27 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	return nil
 }
 
+func (inj *Injector) initAssembler() error {
+	var err error
+	switch inj.arch {
+	case "386":
+		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
+	case "amd64":
+		inj.engine, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
+	}
+	if err != nil {
+		return err
+	}
+	return inj.engine.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
+}
+
+func (inj *Injector) assemble(src string) ([]byte, error) {
+	if strings.Contains(src, "<no value>") {
+		return nil, errors.New("invalid register in assembly source")
+	}
+	return inj.engine.Assemble(src, 0)
+}
+
 func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	if opts == nil {
 		opts = new(Options)
@@ -367,9 +389,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	}
 	inj.rand.Seed(seed)
 	// make duplicate for make output image
-	dup := make([]byte, len(image))
-	copy(dup, image)
-	inj.dup = dup
+	inj.dup = bytes.Clone(image)
 	// remove the digital signature of the PE file
 	inj.removeSignature()
 	// update context
