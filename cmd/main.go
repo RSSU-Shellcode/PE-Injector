@@ -18,6 +18,8 @@ var (
 	out   string
 	aye   bool
 	raw   bool
+	jcx86 string
+	jcx64 string
 	args  string
 	opts  injector.Options
 )
@@ -38,9 +40,13 @@ func init() {
 	flag.BoolVar(&opts.ForceCodeCave, "fcc", false, "force use code cave mode")
 	flag.BoolVar(&opts.ForceExtendSection, "fes", false, "force use extend section mode")
 	flag.BoolVar(&opts.ForceCreateSection, "fcs", false, "force use create section mode")
+	flag.StringVar(&opts.SectionName, "sn", "", "specify the section name that will be created")
+	flag.BoolVar(&opts.NoGarbage, "ng", false, "not append garbage instruction to loader")
 	flag.Int64Var(&opts.RandSeed, "seed", 0, "specify a random seed for generate loader")
 	flag.StringVar(&opts.LoaderX86, "ldr-x86", "", "specify the x86 loader template file path")
 	flag.StringVar(&opts.LoaderX64, "ldr-x64", "", "specify the x64 loader template file path")
+	flag.StringVar(&jcx86, "junk-x86", "", "specify the x86 junk template directory path")
+	flag.StringVar(&jcx64, "junk-x64", "", "specify the x64 junk template directory path")
 	flag.Parse()
 }
 
@@ -75,6 +81,8 @@ func main() {
 
 	opts.LoaderX86 = loadLoaderTemplate(opts.LoaderX86)
 	opts.LoaderX64 = loadLoaderTemplate(opts.LoaderX64)
+	opts.JunkCodeX86 = loadJunkCodeTemplate(jcx86)
+	opts.JunkCodeX64 = loadJunkCodeTemplate(jcx64)
 	if args != "" {
 		data, err := os.ReadFile(args) // #nosec
 		checkError(err)
@@ -156,6 +164,25 @@ func loadLoaderTemplate(path string) string {
 	template, err := os.ReadFile(path) // #nosec
 	checkError(err)
 	return string(template)
+}
+
+func loadJunkCodeTemplate(dir string) []string {
+	if dir == "" {
+		return nil
+	}
+	fmt.Println("load custom junk code template directory:", dir)
+	files, err := os.ReadDir(dir)
+	checkError(err)
+	templates := make([]string, 0, len(files))
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, file.Name())) // #nosec
+		checkError(err)
+		templates = append(templates, string(data))
+	}
+	return templates
 }
 
 func checkError(err error) {
