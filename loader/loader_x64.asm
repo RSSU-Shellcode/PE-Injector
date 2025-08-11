@@ -151,15 +151,54 @@ entry:
       sub rsp, 0x20
       call {{.RegN.rbp}}
       add rsp, 0x20
-      mov {{.RegN.r15}}, rax
       // restore stack for procedure name
       add rsp, 2*8
+      // store procedure address to stack
+      mov [rsp+0x28], rax
     {{else}}
       mov {{.RegV.r8}}, {{.RegN.rdi}}
       add {{.RegV.r8}}, {{hex .CreateThread}}
-      mov {{.RegN.r15}}, [{{.RegV.r8}}]
+      mov {{.RegV.r8}}, [{{.RegV.r8}}]
+      mov [rsp+0x28], {{.RegV.r8}}
     {{end}}
   {{end}}
+
+  // get procedure address of WaitForSingleObject
+  {{if .NeedWaitThread}}
+    {{if .LackWaitForSingleObject}}
+      // ensure stack is 16 bytes aligned
+      push {{.RegV.rax}}
+      // push procedure name to stack
+      mov {{.RegV.rax}}, {{index .WaitForSingleObjectDB 0}}
+      mov {{.RegV.r8}},  {{index .WaitForSingleObjectKey 0}}
+      xor {{.RegV.rax}}, {{.RegV.r8}}
+      push {{.RegV.rax}}
+      mov {{.RegV.rcx}}, {{index .WaitForSingleObjectDB 1}}
+      mov {{.RegV.r9}},  {{index .WaitForSingleObjectKey 1}}
+      xor {{.RegV.rcx}}, {{.RegV.r9}}
+      push {{.RegV.rcx}}
+      mov {{.RegV.rdx}}, {{index .WaitForSingleObjectDB 2}}
+      mov {{.RegV.r10}}, {{index .WaitForSingleObjectKey 2}}
+      xor {{.RegV.rdx}}, {{.RegV.r10}}
+      push {{.RegV.rdx}}
+      // call GetProcAddress
+      mov rcx, {{.RegN.rsi}}
+      mov rdx, rsp
+      sub rsp, 0x20
+      call {{.RegN.rbp}}
+      add rsp, 0x20
+      // restore stack for procedure name
+      add rsp, 4*8
+      // store procedure address to stack
+      mov [rsp+0x30], rax
+    {{else}}
+      mov {{.RegV.r9}}, {{.RegN.rdi}}
+      add {{.RegV.r9}}, {{hex .WaitForSingleObject}}
+      mov {{.RegV.r9}}, [{{.RegV.r9}}]
+      mov [rsp+0x30], {{.RegV.r9}}
+    {{end}}
+  {{end}}
+
 {{else}}
   // get pointer to the PEB
   xor {{.Reg.rax}}, {{.Reg.rax}}
@@ -167,7 +206,6 @@ entry:
   mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]
   // store image base address
   mov {{.RegN.rdi}}, [{{.Reg.rbx}} + 0x10]
-
   // get procedure address of VirtualAlloc
   mov {{.RegV.rcx}}, {{.RegN.rdi}}
   add {{.RegV.rcx}}, {{hex .VirtualAlloc}}
@@ -182,7 +220,15 @@ entry:
   {{if .NeedCreateThread}}
     mov {{.RegV.r8}}, {{.RegN.rdi}}
     add {{.RegV.r8}}, {{hex .CreateThread}}
-    mov {{.RegN.r15}}, [{{.RegV.r8}}]
+    mov {{.RegV.r8}}, [{{.RegV.r8}}]
+    mov [rsp+0x28], {{.RegV.r8}}
+  {{end}}
+  // get procedure address of WaitForSingleObject
+  {{if .NeedWaitThread}}
+    mov {{.RegV.r9}}, {{.RegN.rdi}}
+    add {{.RegV.r9}}, {{hex .WaitForSingleObject}}
+    mov {{.RegV.r9}}, [{{.RegV.r9}}]
+    mov [rsp+0x30], {{.RegV.r9}}
   {{end}}
 {{end}} // LackProcedure
 
