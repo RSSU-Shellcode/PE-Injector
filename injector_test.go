@@ -15,6 +15,9 @@ import (
 
 func TestMain(m *testing.M) {
 	code := m.Run()
+	// wait time for show calculators
+	time.Sleep(time.Second)
+	// kill process of calculators
 	if runtime.GOOS == "windows" {
 		_ = exec.Command("taskkill", "/IM", "calc.exe", "/F").Run()
 		_ = exec.Command("taskkill", "/IM", "win32calc.exe", "/F").Run()

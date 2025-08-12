@@ -105,7 +105,7 @@ type Options struct {
 	NotCreateThread bool
 
 	// not wait created thread at the shellcode,
-	// it will not erase shellcode after execute finish.
+	// if it is true it will ignore the option NotEraseShellcode.
 	// it is useless for method InjectRaw.
 	NotWaitThread bool
 
