@@ -84,18 +84,22 @@ type loaderCtx struct {
 	// store procedure status
 	LackProcedure           bool
 	LackVirtualAlloc        bool
+	LackVirtualFree         bool
 	LackVirtualProtect      bool
 	LackCreateThread        bool
 	LackWaitForSingleObject bool
 	LoadLibraryWOnly        bool
 	NeedCreateThread        bool
 	NeedWaitThread          bool
+	NeedEraseShellcode      bool
 
 	// encrypt procedure name with xor
 	Kernel32DLLDB          []int64
 	Kernel32DLLKey         []int64
 	VirtualAllocDB         []int64
 	VirtualAllocKey        []int64
+	VirtualFreeDB          []int64
+	VirtualFreeKey         []int64
 	VirtualProtectDB       []int64
 	VirtualProtectKey      []int64
 	CreateThreadDB         []int64
@@ -107,6 +111,7 @@ type loaderCtx struct {
 	LoadLibrary         uint64
 	GetProcAddress      uint64
 	VirtualAlloc        uint64
+	VirtualFree         uint64
 	VirtualProtect      uint64
 	CreateThread        uint64
 	WaitForSingleObject uint64
@@ -320,6 +325,7 @@ func (inj *Injector) selectRegister() string {
 
 func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 	VirtualAlloc := inj.getProcFromIAT("VirtualAlloc")
+	VirtualFree := inj.getProcFromIAT("VirtualFree")
 	VirtualProtect := inj.getProcFromIAT("VirtualProtect")
 	CreateThread := inj.getProcFromIAT("CreateThread")
 	WaitForSingleObject := inj.getProcFromIAT("WaitForSingleObject")
@@ -329,6 +335,17 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 	} else {
 		ctx.LackVirtualAlloc = true
 		lackProcedure = true
+	}
+	if !inj.opts.NotEraseShellcode {
+		if !(!inj.opts.NotCreateThread && inj.opts.NotWaitThread) {
+			if VirtualFree != nil {
+				ctx.VirtualFree = VirtualFree.addr
+			} else {
+				ctx.LackVirtualFree = true
+				lackProcedure = true
+			}
+			ctx.NeedEraseShellcode = true
+		}
 	}
 	if VirtualProtect != nil {
 		ctx.VirtualProtect = VirtualProtect.addr
@@ -358,6 +375,10 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 	if !lackProcedure {
 		return nil
 	}
+	return inj.findProcForLack(ctx)
+}
+
+func (inj *Injector) findProcForLack(ctx *loaderCtx) error {
 	LoadLibraryA := inj.getProcFromIAT("LoadLibraryA")
 	LoadLibraryW := inj.getProcFromIAT("LoadLibraryW")
 	GetProcAddress := inj.getProcFromIAT("GetProcAddress")
@@ -390,6 +411,7 @@ func (inj *Injector) encryptStrings(ctx *loaderCtx) {
 	isUTF16 := ctx.LoadLibraryWOnly
 	ctx.Kernel32DLLDB, ctx.Kernel32DLLKey = inj.encryptString("kernel32.dll", isUTF16)
 	ctx.VirtualAllocDB, ctx.VirtualAllocKey = inj.encryptString("VirtualAlloc", false)
+	ctx.VirtualFreeDB, ctx.VirtualFreeKey = inj.encryptString("VirtualFree", false)
 	ctx.VirtualProtectDB, ctx.VirtualProtectKey = inj.encryptString("VirtualProtect", false)
 	ctx.CreateThreadDB, ctx.CreateThreadKey = inj.encryptString("CreateThread", false)
 	ctx.WaitForSingleObjectDB, ctx.WaitForSingleObjectKey = inj.encryptString("WaitForSingleObject", false)
