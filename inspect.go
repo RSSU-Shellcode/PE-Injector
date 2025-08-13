@@ -11,10 +11,12 @@ type InspectOptions struct {
 	ExtendSectionMode bool
 	CreateSectionMode bool
 
-	HasVirtualAlloc   bool
-	HasVirtualProtect bool
-	HasCreateThread   bool
-	HasLoadLibraryA   bool
+	HasVirtualAlloc        bool
+	HasVirtualFree         bool
+	HasVirtualProtect      bool
+	HasCreateThread        bool
+	HasWaitForSingleObject bool
+	HasLoadLibraryA        bool
 
 	Arguments map[string]interface{}
 }
@@ -42,37 +44,51 @@ func InspectLoaderTemplate(arch string, src string, opts *InspectOptions) (strin
 			addr: 0x2000,
 		})
 	}
+	if opts.HasVirtualFree {
+		list = append(list, &iat{
+			dll:  "kernel32.dll",
+			proc: "VirtualFree",
+			addr: 0x3000,
+		})
+	}
 	if opts.HasVirtualProtect {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "VirtualProtect",
-			addr: 0x3000,
+			addr: 0x4000,
 		})
 	}
 	if opts.HasCreateThread {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "CreateThread",
-			addr: 0x4000,
+			addr: 0x5000,
+		})
+	}
+	if opts.HasWaitForSingleObject {
+		list = append(list, &iat{
+			dll:  "kernel32.dll",
+			proc: "WaitForSingleObject",
+			addr: 0x6000,
 		})
 	}
 	if opts.HasLoadLibraryA {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "LoadLibraryA",
-			addr: 0x5000,
+			addr: 0x7000,
 		})
 	} else {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "LoadLibraryW",
-			addr: 0x5000,
+			addr: 0x7000,
 		})
 	}
 	list = append(list, &iat{
 		dll:  "kernel32.dll",
 		proc: "GetProcAddress",
-		addr: 0x6000,
+		addr: 0x8000,
 	})
 	injector.iat = list
 	src = strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
