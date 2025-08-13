@@ -25,13 +25,24 @@ func (inj *Injector) decodeInst(src []byte) (*x86asm.Inst, error) {
 }
 
 func (inj *Injector) disassemble(src []byte) ([]*x86asm.Inst, error) {
+	var mode int
+	switch inj.arch {
+	case "386":
+		mode = 32
+	case "amd64":
+		mode = 64
+	}
+	return disassemble(src, mode)
+}
+
+func disassemble(src []byte, mode int) ([]*x86asm.Inst, error) {
 	var insts []*x86asm.Inst
 	for len(src) > 0 {
-		inst, err := inj.decodeInst(src)
+		inst, err := x86asm.Decode(src, mode)
 		if err != nil {
 			return nil, err
 		}
-		insts = append(insts, inst)
+		insts = append(insts, &inst)
 		src = src[inst.Len:]
 	}
 	return insts, nil
