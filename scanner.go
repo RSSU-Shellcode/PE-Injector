@@ -18,6 +18,10 @@ type codeCave struct {
 	size         int
 }
 
+func (c *codeCave) Write(img, data []byte) {
+	copy(img[c.pointerToRaw:], data)
+}
+
 func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 	text := inj.img.Section(".text")
 	if text == nil {
