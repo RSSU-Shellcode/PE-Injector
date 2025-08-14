@@ -93,7 +93,7 @@ type Options struct {
 	// if it is zero, use the entry point.
 	Address uint64
 
-	// not append instruction about save and restore context
+	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or
 	// register, you need set it with true.
 	NotSaveContext bool
@@ -101,11 +101,12 @@ type Options struct {
 	// not create thread at the shellcode,
 	// ensure the shellcode can be called as a function.
 	// on x86, the calling convention is stdcall.
+	// if it is true, it will ignore the option NotWaitThread.
 	// it is useless for method InjectRaw.
 	NotCreateThread bool
 
 	// not wait created thread at the shellcode,
-	// if it is true it will ignore the option NotEraseShellcode.
+	// if it is true, it will ignore the option NotEraseShellcode.
 	// it is useless for method InjectRaw.
 	NotWaitThread bool
 
@@ -551,7 +552,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 		rebuild := append([]byte{}, inst...)
 		rebuild = append(rebuild, jmp...)
-		copy(inj.dup[current.pointerToRaw:], rebuild)
+		current.Write(inj.dup, rebuild)
 		// update status
 		current = next
 		next = inj.selectCodeCave()
@@ -589,7 +590,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			jmp := make([]byte, nearJumpSize)
 			jmp[0] = 0xE9
 			binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-			copy(inj.dup[c.pointerToRaw:], jmp)
+			c.Write(inj.dup, jmp)
 			continue
 		}
 		// build jmp instruction to next code cave
@@ -599,7 +600,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 		rebuild := append([]byte{}, segment...)
 		rebuild = append(rebuild, jmp...)
-		copy(inj.dup[c.pointerToRaw:], rebuild)
+		c.Write(inj.dup, rebuild)
 	}
 	// insert instruction about restore context
 	for i := 0; i < len(restoreContext); i++ {
@@ -612,7 +613,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 		rebuild := append([]byte{}, inst...)
 		rebuild = append(rebuild, jmp...)
-		copy(inj.dup[current.pointerToRaw:], rebuild)
+		current.Write(inj.dup, rebuild)
 		// update status
 		current = next
 		next = inj.selectCodeCave()
@@ -640,7 +641,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 		rebuild := append([]byte{}, inst...)
 		rebuild = append(rebuild, jmp...)
-		copy(inj.dup[current.pointerToRaw:], rebuild)
+		current.Write(inj.dup, rebuild)
 		// update status
 		current = next
 		next = inj.selectCodeCave()
