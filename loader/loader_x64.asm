@@ -107,6 +107,33 @@ entry:
     mov [rsp+0x10], {{.RegV.rcx}}                              {{igi}}
   {{end}}
 
+  // get procedure address of VirtualFree
+  {{if .LackVirtualFree}}
+    // push procedure name to stack
+    mov {{.RegV.rax}}, {{index .VirtualFreeDB  0}}             {{igi}}
+    mov {{.RegV.r8}},  {{index .VirtualFreeKey 0}}             {{igi}}
+    xor {{.RegV.rax}}, {{.RegV.r8}}                            {{igi}}
+    push {{.RegV.rax}}                                         {{igi}}
+    mov {{.RegV.rcx}}, {{index .VirtualFreeDB  1}}             {{igi}}
+    mov {{.RegV.r9}},  {{index .VirtualFreeKey 1}}             {{igi}}
+    xor {{.RegV.rcx}}, {{.RegV.r9}}                            {{igi}}
+    push {{.RegV.rcx}}                                         {{igi}}
+    mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
+    mov rdx, rsp             {{igi}} // lpProcName
+    sub rsp, 0x20            {{igi}} // reserve stack for call convention
+    call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
+    add rsp, 0x20            {{igi}} // restore stack for call convention
+    // restore stack for procedure name
+    add rsp, 2*8                                               {{igi}}
+    // store procedure address to stack
+    mov [rsp+0x18], rax                                        {{igi}}
+  {{else}}
+    mov {{.RegV.rcx}}, {{.RegN.rdi}}                           {{igi}}
+    add {{.RegV.rcx}}, {{hex .VirtualFree}}                    {{igi}}
+    mov {{.RegV.rcx}}, [{{.RegV.rcx}}]                         {{igi}}
+    mov [rsp+0x18], {{.RegV.rcx}}                              {{igi}}
+  {{end}}
+
   // get procedure address of VirtualProtect
   {{if .LackVirtualProtect}}
     // push procedure name to stack
@@ -210,6 +237,13 @@ entry:
   add {{.RegV.rcx}}, {{hex .VirtualAlloc}}                     {{igi}}
   mov {{.RegV.rcx}}, [{{.RegV.rcx}}]                           {{igi}}
   mov [rsp+0x10], {{.RegV.rcx}}                                {{igi}}
+  // get procedure address of VirtualFree
+  {{if .NeedEraseShellcode}}
+    mov {{.RegV.rcx}}, {{.RegN.rdi}}                           {{igi}}
+    add {{.RegV.rcx}}, {{hex .VirtualFree}}                    {{igi}}
+    mov {{.RegV.rcx}}, [{{.RegV.rcx}}]                         {{igi}}
+    mov [rsp+0x18], {{.RegV.rcx}}                              {{igi}}
+  {{end}}
   // get procedure address of VirtualProtect
   mov {{.RegV.rdx}}, {{.RegN.rdi}}                             {{igi}}
   add {{.RegV.rdx}}, {{hex .VirtualProtect}}                   {{igi}}
@@ -365,6 +399,12 @@ entry:
   sub rsp, 0x20                                                {{igi}}
   call {{.RegV.rax}}                                           {{igi}}
   add rsp, 0x20                                                {{igi}}
+{{end}}
+
+// =================================== erase shellcode ===================================
+
+{{if .NeedEraseShellcode}}
+
 {{end}}
 
 // ================================== clean environment ==================================
