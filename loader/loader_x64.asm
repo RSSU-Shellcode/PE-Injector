@@ -458,6 +458,8 @@ entry:
   // mark the end of loader
   {{db .EndOfLoader}}
 
+// ====================================== function =======================================
+
 xor_shift:
   mov {{.RegV.r8}}, {{.RegV.rax}}                              {{igi}}
   shl {{.RegV.r8}}, 13                                         {{igi}}
