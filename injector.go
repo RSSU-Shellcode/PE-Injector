@@ -205,6 +205,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, e
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
+	defer inj.cleanup()
 	err := inj.preprocess(image, opts)
 	if err != nil {
 		return nil, err
@@ -229,7 +230,6 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, e
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
 	inj.ctx.Output = inj.dup
-	inj.cleanup()
 	return inj.ctx, nil
 }
 
@@ -241,6 +241,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
 	}
+	defer inj.cleanup()
 	err := inj.preprocess(image, opts)
 	if err != nil {
 		return nil, err
@@ -275,7 +276,6 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
 	}
 	inj.ctx.Output = inj.dup
-	inj.cleanup()
 	return inj.ctx, nil
 }
 
