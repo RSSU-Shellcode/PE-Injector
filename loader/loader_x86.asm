@@ -483,12 +483,12 @@ entry:
   xor {{.RegN.ebp}}, {{.RegN.ebp}}                             {{igi}}
 
   // clear stack that store sensitive data
-  mov [rsp+0x04], {{.RegN.edi}}                                {{igi}}
-  mov [rsp+0x08], {{.RegN.esi}}                                {{igi}}
-  mov [rsp+0x0C], {{.RegN.ebx}}                                {{igi}}
-  mov [rsp+0x10], {{.RegN.ebp}}                                {{igi}}
-  mov [rsp+0x14], {{.RegN.edi}}                                {{igi}}
-  mov [rsp+0x18], {{.RegN.esi}}                                {{igi}}
+  mov [esp+0x04], {{.RegN.edi}}                                {{igi}}
+  mov [esp+0x08], {{.RegN.esi}}                                {{igi}}
+  mov [esp+0x0C], {{.RegN.ebx}}                                {{igi}}
+  mov [esp+0x10], {{.RegN.ebp}}                                {{igi}}
+  mov [esp+0x14], {{.RegN.edi}}                                {{igi}}
+  mov [esp+0x18], {{.RegN.esi}}                                {{igi}}
 
   // restore stack for store variables
   add esp, 0x2C                                                {{igi}}
