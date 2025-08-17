@@ -42,6 +42,40 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
+	t.Run("not create thread", func(t *testing.T) {
+		opts := Options{
+			NotCreateThread: true,
+			NotWaitThread:   true, // it will be ignored
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
+	t.Run("not wait thread", func(t *testing.T) {
+		opts := Options{
+			NotWaitThread:     true,
+			NotEraseShellcode: true, // it will be ignored
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
+	t.Run("not erase shellcode", func(t *testing.T) {
+		opts := Options{
+			NotEraseShellcode: true,
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
+	t.Run("no garbage", func(t *testing.T) {
+		opts := Options{
+			NoGarbage: true,
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
 	err := injector.Close()
 	require.NoError(t, err)
 }
@@ -177,6 +211,13 @@ func TestInjector_InjectRaw(t *testing.T) {
 	t.Run("not save context", func(t *testing.T) {
 		opts := Options{
 			NotSaveContext: true,
+		}
+		testInjectorInjectRaw(t, injector, &opts)
+	})
+
+	t.Run("no garbage", func(t *testing.T) {
+		opts := Options{
+			NoGarbage: true,
 		}
 		testInjectorInjectRaw(t, injector, &opts)
 	})
