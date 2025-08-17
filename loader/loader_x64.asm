@@ -379,6 +379,7 @@ entry:
   {{else}}
     mov r10, [rsp+0x08]                        {{igi}} // address of memory page
     add r10, {{hex .EntryOffset}}              {{igi}} // address of shellcode
+    xor r11, r11                               {{igi}} // clear register for lpParameter
   {{end}}
 
   mov rax, [rsp+0x28]                          {{igi}} // address of CreateThread
@@ -450,6 +451,20 @@ entry:
 {{end}}
 
 // ================================== clean environment ==================================
+
+  // clear volatile register that store sensitive data
+  xor {{.RegN.rdi}}, {{.RegN.rdi}}                             {{igi}}
+  xor {{.RegN.rsi}}, {{.RegN.rsi}}                             {{igi}}
+  xor {{.RegN.rbx}}, {{.RegN.rbx}}                             {{igi}}
+  xor {{.RegN.rbp}}, {{.RegN.rbp}}                             {{igi}}
+
+  // clear stack that store sensitive data
+  mov [rsp+0x08], {{.RegN.rdi}}                                {{igi}}
+  mov [rsp+0x10], {{.RegN.rsi}}                                {{igi}}
+  mov [rsp+0x18], {{.RegN.rbx}}                                {{igi}}
+  mov [rsp+0x20], {{.RegN.rbp}}                                {{igi}}
+  mov [rsp+0x28], {{.RegN.rdi}}                                {{igi}}
+  mov [rsp+0x30], {{.RegN.rsi}}                                {{igi}}
 
   // restore stack for store variables
   add rsp, 0x48                                                {{igi}}
