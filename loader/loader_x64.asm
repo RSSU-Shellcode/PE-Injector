@@ -371,7 +371,7 @@ entry:
 // ================================== execute shellcode ==================================
 
 {{if .NeedCreateThread}}
-  {{if .NeedJumper}}
+  {{if .NeedShellcodeJumper}}
     mov r10, {{.RegN.rdi}}                     {{igi}} // address of image base
     add r10, {{hex .JumperOffset}}             {{igi}} // address of jumper
     mov r11, [rsp+0x08]                        {{igi}} // address of memory page

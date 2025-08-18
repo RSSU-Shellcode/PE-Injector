@@ -405,7 +405,7 @@ entry:
 // ================================== execute shellcode ==================================
 
 {{if .NeedCreateThread}}
-  {{if .NeedJumper}}
+  {{if .NeedShellcodeJumper}}
     mov {{.RegV.ecx}}, {{.RegN.edi}}           {{igi}} // address of image base
     add {{.RegV.ecx}}, {{hex .JumperOffset}}   {{igi}} // address of jumper
     mov {{.RegV.edx}}, [esp+0x04]              {{igi}} // address of memory page
