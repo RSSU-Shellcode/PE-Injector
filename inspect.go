@@ -35,7 +35,32 @@ func InspectLoaderTemplate(arch string, src string, opts *InspectOptions) (strin
 		Arguments: opts.Arguments,
 	}
 	injector.ctx = new(Context)
-	// build fake IAT from options.
+	injector.dup = make([]byte, 16*1024)
+	injector.caves = []*codeCave{
+		{0x10000, 0x1000, 32},
+	}
+	injector.iat = buildFakeIATList(opts)
+	src = strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
+	err := injector.initAssembler()
+	if err != nil {
+		return "", nil, err
+	}
+	asm, err := injector.buildLoaderASM(src, nil, true)
+	if err != nil {
+		return "", nil, err
+	}
+	inst, err := injector.assemble(asm)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to assemble loader: %s", err)
+	}
+	err = injector.Close()
+	if err != nil {
+		return "", nil, err
+	}
+	return asm, inst, nil
+}
+
+func buildFakeIATList(opts *InspectOptions) []*iat {
 	var list []*iat
 	if opts.HasVirtualAlloc {
 		list = append(list, &iat{
@@ -90,25 +115,7 @@ func InspectLoaderTemplate(arch string, src string, opts *InspectOptions) (strin
 		proc: "GetProcAddress",
 		addr: 0x8000,
 	})
-	injector.iat = list
-	src = strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
-	err := injector.initAssembler()
-	if err != nil {
-		return "", nil, err
-	}
-	asm, err := injector.buildLoaderASM(src, nil, true)
-	if err != nil {
-		return "", nil, err
-	}
-	inst, err := injector.assemble(asm)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to assemble loader: %s", err)
-	}
-	err = injector.Close()
-	if err != nil {
-		return "", nil, err
-	}
-	return asm, inst, nil
+	return list
 }
 
 // InspectJunkCodeTemplate is used to test junk code template.
