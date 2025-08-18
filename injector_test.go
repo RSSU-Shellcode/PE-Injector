@@ -45,7 +45,7 @@ func TestInjector_Inject(t *testing.T) {
 	t.Run("not create thread", func(t *testing.T) {
 		opts := Options{
 			NotCreateThread: true,
-			NotWaitThread:   true, // it will be ignored
+			NotWaitThread:   false, // it will be ignored
 		}
 
 		testInjectorInject(t, injector, &opts)
@@ -54,7 +54,7 @@ func TestInjector_Inject(t *testing.T) {
 	t.Run("not wait thread", func(t *testing.T) {
 		opts := Options{
 			NotWaitThread:     true,
-			NotEraseShellcode: true, // it will be ignored
+			NotEraseShellcode: false, // it will be ignored
 		}
 
 		testInjectorInject(t, injector, &opts)
