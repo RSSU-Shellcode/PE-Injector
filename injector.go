@@ -55,6 +55,7 @@ type Injector struct {
 	ctx  *Context
 	opts *Options
 	arch string
+	size int
 	dup  []byte
 
 	// about pe image
@@ -164,11 +165,12 @@ type Context struct {
 	IsRaw bool
 	Seed  int64
 
-	SaveContext    bool
-	CreateThread   bool
-	WaitThread     bool
-	EraseShellcode bool
-	SectionName    string
+	SaveContext     bool
+	CreateThread    bool
+	WaitThread      bool
+	EraseShellcode  bool
+	ShellcodeJumper bool
+	SectionName     string
 
 	HasAllProcedures  bool
 	HasVirtualAlloc   bool
@@ -376,6 +378,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	}
 	inj.img = peFile
 	inj.arch = arch
+	inj.size = len(image)
 	inj.loadImage(image)
 	// scan code cave in image text section
 	caves, err := inj.scanCodeCave()
@@ -398,10 +401,8 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		Arch: arch,
 		Seed: seed,
 
-		SaveContext:    !opts.NotSaveContext,
-		CreateThread:   !opts.NotCreateThread,
-		WaitThread:     !opts.NotWaitThread,
-		EraseShellcode: !opts.NotEraseShellcode,
+		SaveContext:  !opts.NotSaveContext,
+		CreateThread: !opts.NotCreateThread,
 
 		NumCodeCaves: len(caves),
 	}
