@@ -68,6 +68,14 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
+	t.Run("no shellcode jumper", func(t *testing.T) {
+		opts := Options{
+			NoShellcodeJumper: true,
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
 	t.Run("no garbage", func(t *testing.T) {
 		opts := Options{
 			NoGarbage: true,
