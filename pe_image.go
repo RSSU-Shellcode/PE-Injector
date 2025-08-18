@@ -115,23 +115,32 @@ func (inj *Injector) processIAT() {
 }
 
 func (inj *Injector) removeSignature() {
-	var dataDirectory [16]pe.DataDirectory
+	var dataDirectory *[16]pe.DataDirectory
 	switch inj.arch {
 	case "386":
-		dataDirectory = inj.hdr32.DataDirectory
+		dataDirectory = &inj.hdr32.DataDirectory
 	case "amd64":
-		dataDirectory = inj.hdr64.DataDirectory
+		dataDirectory = &inj.hdr64.DataDirectory
 	}
-	dd := dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_SECURITY]
+	dd := &dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_SECURITY]
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
+	// extendSection or createSection will read optional header
+	dd.VirtualAddress = 0
+	dd.Size = 0
 	// calculate the offset of the security entry
 	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
 	fhOffset := peOffset + 4
 	hdrOffset := fhOffset + imageFileHeaderSize
-	ddOffset := hdrOffset + uint32(inj.img.SizeOfOptionalHeader)
-	ddOffset -= uint32(len(dataDirectory)) * imageDataDirectorySize
+	var optHeaderSize uint32
+	switch inj.arch {
+	case "386":
+		optHeaderSize = 96
+	case "amd64":
+		optHeaderSize = 112
+	}
+	ddOffset := hdrOffset + optHeaderSize
 	secOffset := ddOffset + pe.IMAGE_DIRECTORY_ENTRY_SECURITY*imageDataDirectorySize
 	// reset the directory entry and erase the signature
 	ndd := bytes.Repeat([]byte{0x00}, imageDataDirectorySize)
