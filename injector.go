@@ -117,6 +117,17 @@ type Options struct {
 	// it is useless for method InjectRaw.
 	NotEraseShellcode bool
 
+	// not add a shellcode jumper to call shellcode.
+	// it is useless for method InjectRaw.
+	NoShellcodeJumper bool
+
+	// not append garbage instruction to loader.
+	// It is only for Inject with ModeCreateSection.
+	NoGarbage bool
+
+	// specify the new section name, the default is ".patch".
+	SectionName string
+
 	// force use code cave mode for write shellcode.
 	// if code cave is not enough, it will return an error.
 	ForceCodeCave bool
@@ -129,13 +140,6 @@ type Options struct {
 	// force create a new section after the last section
 	// for write loader and shellcode.
 	ForceCreateSection bool
-
-	// specify the new section name, the default is ".patch".
-	SectionName string
-
-	// not append garbage instruction to loader.
-	// It is only for Inject with ModeCreateSection.
-	NoGarbage bool
 
 	// specify a random seed for test and debug.
 	RandSeed int64
@@ -170,14 +174,17 @@ type Context struct {
 	WaitThread      bool
 	EraseShellcode  bool
 	ShellcodeJumper bool
+	HasGarbage      bool
 	SectionName     string
 
-	HasAllProcedures  bool
-	HasVirtualAlloc   bool
-	HasVirtualProtect bool
-	HasCreateThread   bool
-	HasLoadLibraryA   bool
-	HasLoadLibraryW   bool
+	HasAllProcedures       bool
+	HasVirtualAlloc        bool
+	HasVirtualFree         bool
+	HasVirtualProtect      bool
+	HasCreateThread        bool
+	HasWaitForSingleObject bool
+	HasLoadLibraryA        bool
+	HasLoadLibraryW        bool
 
 	NumCodeCaves  int
 	NumLoaderInst int
@@ -403,6 +410,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 
 		SaveContext:  !opts.NotSaveContext,
 		CreateThread: !opts.NotCreateThread,
+		HasGarbage:   !opts.NoGarbage,
 
 		NumCodeCaves: len(caves),
 	}
