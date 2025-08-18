@@ -202,6 +202,9 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 	// update context
 	hasLoadLibraryA := inj.getProcFromIAT("LoadLibraryA") != nil
 	hasLoadLibraryW := inj.getProcFromIAT("LoadLibraryW") != nil
+	inj.ctx.WaitThread = ctx.NeedWaitThread
+	inj.ctx.EraseShellcode = ctx.NeedEraseShellcode
+	inj.ctx.ShellcodeJumper = ctx.NeedJumper
 	inj.ctx.HasAllProcedures = !ctx.LackProcedure
 	inj.ctx.HasVirtualAlloc = !ctx.LackVirtualAlloc
 	inj.ctx.HasVirtualProtect = !ctx.LackVirtualProtect
