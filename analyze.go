@@ -8,18 +8,21 @@ type Info struct {
 	EntryPoint   uint32
 	Sections     []*Section
 
-	HasAllProcedures  bool
-	HasVirtualAlloc   bool
-	HasVirtualProtect bool
-	HasCreateThread   bool
-	HasLoadLibraryA   bool
-	HasLoadLibraryW   bool
-	HasGetProcAddress bool
+	HasAllProcedures       bool
+	HasVirtualAlloc        bool
+	HasVirtualFree         bool
+	HasVirtualProtect      bool
+	HasCreateThread        bool
+	HasWaitForSingleObject bool
+	HasLoadLibraryA        bool
+	HasLoadLibraryW        bool
+	HasGetProcAddress      bool
 
 	NumCodeCaves     int
+	CanCreateSection bool
+	CanInjectJumper  bool
 	CanInjectLoader  bool
 	InjectLoaderRank int
-	CanCreateSection bool
 }
 
 // Analyze is used to analyze the target pe image file that can be injected.
@@ -92,22 +95,25 @@ func Analyze(image []byte) (*Info, error) {
 		canCreateSection = true
 	}
 	info := Info{
-		Architecture:      arch,
-		ImageSize:         imageSize,
-		ImageBase:         imageBase,
-		EntryPoint:        entryPoint,
-		Sections:          sections,
-		HasAllProcedures:  !ctx.LackProcedure,
-		HasVirtualAlloc:   !ctx.LackVirtualAlloc,
-		HasVirtualProtect: !ctx.LackVirtualProtect,
-		HasCreateThread:   !ctx.LackCreateThread,
-		HasLoadLibraryA:   hasLoadLibraryA,
-		HasLoadLibraryW:   hasLoadLibraryW,
-		HasGetProcAddress: hasGetProcAddress,
-		NumCodeCaves:      numCaves,
-		CanInjectLoader:   canInjectLoader,
-		InjectLoaderRank:  injectLoaderRank,
-		CanCreateSection:  canCreateSection,
+		Architecture:           arch,
+		ImageSize:              imageSize,
+		ImageBase:              imageBase,
+		EntryPoint:             entryPoint,
+		Sections:               sections,
+		HasAllProcedures:       !ctx.LackProcedure,
+		HasVirtualAlloc:        !ctx.LackVirtualAlloc,
+		HasVirtualFree:         !ctx.LackVirtualFree,
+		HasVirtualProtect:      !ctx.LackVirtualProtect,
+		HasCreateThread:        !ctx.LackCreateThread,
+		HasWaitForSingleObject: !ctx.LackWaitForSingleObject,
+		HasLoadLibraryA:        hasLoadLibraryA,
+		HasLoadLibraryW:        hasLoadLibraryW,
+		HasGetProcAddress:      hasGetProcAddress,
+		NumCodeCaves:           numCaves,
+		CanCreateSection:       canCreateSection,
+		CanInjectJumper:        numCaves > 0,
+		CanInjectLoader:        canInjectLoader,
+		InjectLoaderRank:       injectLoaderRank,
 	}
 	err = injector.Close()
 	if err != nil {
@@ -123,16 +129,22 @@ func calcInjectLoaderRank(ctx *loaderCtx) int {
 		return rank
 	}
 	if !ctx.LackVirtualAlloc {
-		rank += 25
+		rank += 18
+	}
+	if !ctx.LackVirtualFree {
+		rank += 18
 	}
 	if !ctx.LackVirtualProtect {
-		rank += 25
+		rank += 18
 	}
 	if !ctx.LackCreateThread {
-		rank += 25
+		rank += 18
+	}
+	if !ctx.LackWaitForSingleObject {
+		rank += 18
 	}
 	if !ctx.LoadLibraryWOnly {
-		rank += 25
+		rank += 10
 	}
 	return rank
 }
