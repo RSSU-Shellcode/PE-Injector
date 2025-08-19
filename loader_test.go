@@ -11,8 +11,8 @@ func TestLoader(t *testing.T) {
 	injector := NewInjector()
 
 	opts := &Options{
-		RandSeed:       1234,
 		NotSaveContext: true,
+		RandSeed:       1234,
 	}
 
 	t.Run("auto mode", func(t *testing.T) {
@@ -49,12 +49,12 @@ func TestLoader(t *testing.T) {
 
 func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 	t.Run("x86", func(t *testing.T) {
-		if opts.ForceCodeCave || opts.ForceExtendSection {
+		if opts.ForceCodeCave {
 			return
 		}
 		mode := mode
 		if mode == "auto" {
-			mode = ModeCreateSection
+			mode = ModeExtendSection
 		}
 
 		image, err := os.ReadFile("testdata/image_x86.dat")
