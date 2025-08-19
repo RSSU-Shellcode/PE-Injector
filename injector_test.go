@@ -120,12 +120,12 @@ func testInjectorInject(t *testing.T, injector *Injector, opts *Options) {
 
 func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options, mode string) {
 	t.Run("x86", func(t *testing.T) {
-		if opts.ForceCodeCave || opts.ForceExtendSection {
+		if opts.ForceCodeCave {
 			return
 		}
 		mode := mode
 		if mode == "auto" {
-			mode = ModeCreateSection
+			mode = ModeExtendSection
 		}
 
 		t.Run("entry point", func(t *testing.T) {
@@ -148,7 +148,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			if opts.NotSaveContext {
 				return
 			}
-			opts.Address = 0x46A6F1
+			opts.Address = 0x478101
 
 			image, err := os.ReadFile("testdata/image_x86.dat")
 			require.NoError(t, err)
@@ -190,7 +190,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			if opts.NotSaveContext {
 				return
 			}
-			opts.Address = 0x469E4F
+			opts.Address = 0x140075DDC
 
 			image, err := os.ReadFile("testdata/image_x64.dat")
 			require.NoError(t, err)
@@ -279,7 +279,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 		})
 
 		t.Run("custom address", func(t *testing.T) {
-			opts.Address = 0x46A6F1
+			opts.Address = 0x478101
 
 			image, err := os.ReadFile("testdata/image_x86.dat")
 			require.NoError(t, err)
@@ -317,7 +317,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 		})
 
 		t.Run("custom address", func(t *testing.T) {
-			opts.Address = 0x469E4F
+			opts.Address = 0x140075DDC
 
 			image, err := os.ReadFile("testdata/image_x64.dat")
 			require.NoError(t, err)
@@ -342,7 +342,7 @@ func TestSpecificAddress(t *testing.T) {
 	t.Run("loader", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x46A6F1,
+				Address: 0x478101,
 			}
 
 			image, err := os.ReadFile("testdata/image_x86.dat")
@@ -353,14 +353,14 @@ func TestSpecificAddress(t *testing.T) {
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeCreateSection, ctx.Mode)
+			require.Equal(t, ModeExtendSection, ctx.Mode)
 
 			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x469E4F,
+				Address: 0x140075DDC,
 			}
 
 			image, err := os.ReadFile("testdata/image_x64.dat")
@@ -380,7 +380,7 @@ func TestSpecificAddress(t *testing.T) {
 	t.Run("raw", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x46A6F1,
+				Address: 0x478101,
 			}
 
 			image, err := os.ReadFile("testdata/image_x86.dat")
@@ -400,7 +400,7 @@ func TestSpecificAddress(t *testing.T) {
 
 		t.Run("x64", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x469E4F,
+				Address: 0x140075DDC,
 			}
 
 			image, err := os.ReadFile("testdata/image_x64.dat")
@@ -511,12 +511,26 @@ func TestInjectorFuzz(t *testing.T) {
 		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 		require.NoError(t, err)
 
+		opts := new(Options)
 		for i := 0; i < 30; i++ {
-			ctx, err := injector.Inject(image, shellcode, nil)
+			opts.ForceCodeCave = false
+			opts.ForceExtendSection = true
+			opts.ForceCreateSection = false
+
+			ctx, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			require.Equal(t, ModeExtendSection, ctx.Mode)
+			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
+
+			opts.ForceCodeCave = false
+			opts.ForceExtendSection = false
+			opts.ForceCreateSection = true
+
+			ctx, err = injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCreateSection, ctx.Mode)
-
 			testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 		}
 	})
@@ -537,7 +551,6 @@ func TestInjectorFuzz(t *testing.T) {
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCodeCave, ctx.Mode)
-
 			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 
 			opts.ForceCodeCave = false
@@ -548,7 +561,6 @@ func TestInjectorFuzz(t *testing.T) {
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeExtendSection, ctx.Mode)
-
 			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 
 			opts.ForceCodeCave = false
@@ -559,7 +571,6 @@ func TestInjectorFuzz(t *testing.T) {
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCreateSection, ctx.Mode)
-
 			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		}
 	})
