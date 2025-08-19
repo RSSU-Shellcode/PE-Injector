@@ -128,6 +128,9 @@ type Options struct {
 	// specify the new section name, the default is ".patch".
 	SectionName string
 
+	// specify a random seed for test and debug.
+	RandSeed int64
+
 	// force use code cave mode for write shellcode.
 	// if code cave is not enough, it will return an error.
 	ForceCodeCave bool
@@ -140,9 +143,6 @@ type Options struct {
 	// force create a new section after the last section
 	// for write loader and shellcode.
 	ForceCreateSection bool
-
-	// specify a random seed for test and debug.
-	RandSeed int64
 
 	// specify the x86 loader template.
 	LoaderX86 string
