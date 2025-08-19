@@ -126,9 +126,8 @@ func (inj *Injector) removeSignature() {
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
-	// extendSection or createSection will read optional header
-	dd.VirtualAddress = 0
-	dd.Size = 0
+	// erase the signature at tail of image
+	inj.dup = inj.dup[:dd.VirtualAddress]
 	// calculate the offset of the security entry
 	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
 	fhOffset := peOffset + 4
@@ -142,11 +141,13 @@ func (inj *Injector) removeSignature() {
 	}
 	ddOffset := hdrOffset + optHeaderSize
 	secOffset := ddOffset + pe.IMAGE_DIRECTORY_ENTRY_SECURITY*imageDataDirectorySize
-	// reset the directory entry and erase the signature
+	// erase the directory entry
 	ndd := bytes.Repeat([]byte{0x00}, imageDataDirectorySize)
 	copy(inj.dup[secOffset:], ndd)
-	padding := bytes.Repeat([]byte{0x00}, int(dd.Size))
-	copy(inj.dup[dd.VirtualAddress:], padding)
+	// extendSection or createSection will read optional header
+	// so need overwrite these fields in data directory
+	dd.VirtualAddress = 0
+	dd.Size = 0
 }
 
 // extendSection is used to extend the last section for write data.
