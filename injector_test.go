@@ -14,15 +14,32 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	code := m.Run()
-	// wait time for show calculators
-	time.Sleep(time.Second)
-	// kill process of calculators
 	if runtime.GOOS == "windows" {
-		_ = exec.Command("taskkill", "/IM", "calc.exe", "/F").Run()
-		_ = exec.Command("taskkill", "/IM", "win32calc.exe", "/F").Run()
+		testAutoKillCalculator()
+	}
+	code := m.Run()
+	if runtime.GOOS == "windows" {
+		// wait time for show calculators
+		time.Sleep(time.Second)
+		testKillCalculator()
 	}
 	os.Exit(code)
+}
+
+func testAutoKillCalculator() {
+	go func() {
+		for {
+			// wait enough time for fast tests
+			time.Sleep(5 * time.Second)
+			testKillCalculator()
+		}
+	}()
+}
+
+// kill process of calculators
+func testKillCalculator() {
+	_ = exec.Command("taskkill", "/IM", "calc.exe", "/F").Run()
+	_ = exec.Command("taskkill", "/IM", "win32calc.exe", "/F").Run()
 }
 
 func TestInjector_Inject(t *testing.T) {
