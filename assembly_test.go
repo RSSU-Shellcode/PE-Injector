@@ -11,8 +11,8 @@ func TestRelocateInstructionSegment(t *testing.T) {
 	injector := NewInjector()
 
 	opts := &Options{
-		RandSeed:       1234,
 		NotSaveContext: true,
+		RandSeed:       1234,
 	}
 
 	t.Run("x86", func(t *testing.T) {
@@ -26,7 +26,7 @@ func TestRelocateInstructionSegment(t *testing.T) {
 
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
-		require.Equal(t, ModeCreateSection, ctx.Mode)
+		require.Equal(t, ModeExtendSection, ctx.Mode)
 
 		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 	})
