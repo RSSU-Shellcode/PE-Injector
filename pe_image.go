@@ -151,6 +151,8 @@ func (inj *Injector) removeSignature() {
 	// so need overwrite these fields in data directory
 	dd.VirtualAddress = 0
 	dd.Size = 0
+	// store state for analyze
+	inj.hasSignature = true
 }
 
 // extendSection is used to extend the last section for write data.

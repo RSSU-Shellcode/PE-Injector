@@ -63,6 +63,9 @@ type Injector struct {
 	hdr32 *pe.OptionalHeader32
 	hdr64 *pe.OptionalHeader64
 
+	// restore before remove
+	hasSignature bool
+
 	// about process IAT
 	vm  []byte
 	iat []*iat
@@ -295,7 +298,6 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 		}
 	}()
 	targetRVA := inj.selectTargetRVA()
-	inj.ctx.HookAddress = inj.rvaToVA(targetRVA)
 	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
 	if inj.section != nil {
@@ -310,6 +312,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
+	inj.ctx.HookAddress = inj.rvaToVA(targetRVA)
 	err = inj.slice(shellcode)
 	if err != nil {
 		return err
