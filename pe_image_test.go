@@ -42,6 +42,49 @@ func TestLoadImage(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestRemoveSignature(t *testing.T) {
+	image, err := os.ReadFile("testdata/putty.dat")
+	require.NoError(t, err)
+	peFile, err := pe.NewFile(bytes.NewReader(image))
+	require.NoError(t, err)
+	hdr := peFile.OptionalHeader.(*pe.OptionalHeader64)
+	dd := hdr.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_SECURITY]
+	require.NotZero(t, dd.VirtualAddress)
+	require.NotZero(t, dd.Size)
+
+	injector := NewInjector()
+	err = injector.preprocess(image, nil)
+	require.NoError(t, err)
+	check := func() {
+		peOut, err := pe.NewFile(bytes.NewReader(injector.dup))
+		require.NoError(t, err)
+		hdr = peOut.OptionalHeader.(*pe.OptionalHeader64)
+		dd = hdr.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_SECURITY]
+		require.Zero(t, dd.VirtualAddress)
+		require.Zero(t, dd.Size)
+	}
+
+	t.Run("code cave", func(t *testing.T) {
+		check()
+	})
+
+	t.Run("extend section", func(t *testing.T) {
+		injector.extendSection(bytes.Repeat([]byte{0x10}, 4096))
+
+		check()
+	})
+
+	t.Run("create section", func(t *testing.T) {
+		_, err = injector.createSection(".test", 4096)
+		require.NoError(t, err)
+
+		check()
+	})
+
+	err = injector.Close()
+	require.NoError(t, err)
+}
+
 func TestExtendSection(t *testing.T) {
 	injector := NewInjector()
 
