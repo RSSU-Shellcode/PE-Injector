@@ -28,4 +28,14 @@ func TestAnalyze(t *testing.T) {
 
 		spew.Dump(info)
 	})
+
+	t.Run("with signature", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/putty.dat")
+		require.NoError(t, err)
+
+		info, err := Analyze(image)
+		require.NoError(t, err)
+
+		spew.Dump(info)
+	})
 }
