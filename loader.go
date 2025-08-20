@@ -27,7 +27,10 @@ const (
 	maxNumLoaderInstX64 = 300
 )
 
-const reservedLoaderSize = 4096
+const (
+	codeCaveModeStub   = "{{STUB CodeCaveMode STUB}}"
+	reservedLoaderSize = 4096
+)
 
 // The role of the shellcode loader is used to decrypt shellcode
 // in the tail section to a new RWX page, then create thread at
@@ -608,7 +611,7 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 	ctx.CodeCave = true
 	inj.ctx.Mode = ModeCodeCave
 	// replace the flag to assembly source
-	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", stub)
+	return strings.ReplaceAll(src, codeCaveModeStub, stub)
 }
 
 func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string) string {
@@ -618,7 +621,7 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 	ctx.ShellcodeOffset = offset
 	inj.ctx.Mode = ModeExtendSection
 	// remove the flag in assembly source
-	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
+	return strings.ReplaceAll(src, codeCaveModeStub, "")
 }
 
 func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
@@ -639,7 +642,7 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string)
 	ctx.ShellcodeOffset = section.VirtualAddress + scOffset
 	inj.ctx.Mode = ModeCreateSection
 	// remove the flag in assembly source
-	return strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", ""), nil
+	return strings.ReplaceAll(src, codeCaveModeStub, ""), nil
 }
 
 func (inj *Injector) encryptShellcode(ctx *loaderCtx, sc []byte) []byte {

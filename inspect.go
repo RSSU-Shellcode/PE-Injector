@@ -40,7 +40,7 @@ func InspectLoaderTemplate(arch string, src string, opts *InspectOptions) (strin
 		{0x10000, 0x1000, 32},
 	}
 	injector.iat = buildFakeIATList(opts)
-	src = strings.ReplaceAll(src, "{{STUB CodeCaveMode STUB}}", "")
+	src = strings.ReplaceAll(src, codeCaveModeStub, "")
 	err := injector.initAssembler()
 	if err != nil {
 		return "", nil, err
