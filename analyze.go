@@ -19,6 +19,7 @@ type Info struct {
 	HasGetProcAddress      bool
 
 	NumCodeCaves     int
+	HasSignature     bool
 	CanCreateSection bool
 	CanInjectJumper  bool
 	CanInjectLoader  bool
@@ -71,6 +72,11 @@ func Analyze(image []byte) (*Info, error) {
 	hasCoreProc := injector.findProcFromIAT(ctx) == nil
 	// process total rank
 	numCaves := len(injector.caves)
+	var canCreateSection bool
+	_, err = injector.createSection(".test", 1024)
+	if err == nil {
+		canCreateSection = true
+	}
 	canInjectLoader := true
 	if !hasCoreProc {
 		canInjectLoader = false
@@ -89,11 +95,6 @@ func Analyze(image []byte) (*Info, error) {
 	if canInjectLoader {
 		injectLoaderRank = calcInjectLoaderRank(ctx)
 	}
-	var canCreateSection bool
-	_, err = injector.createSection(".test", 1024)
-	if err == nil {
-		canCreateSection = true
-	}
 	info := Info{
 		Architecture:           arch,
 		ImageSize:              imageSize,
@@ -110,6 +111,7 @@ func Analyze(image []byte) (*Info, error) {
 		HasLoadLibraryW:        hasLoadLibraryW,
 		HasGetProcAddress:      hasGetProcAddress,
 		NumCodeCaves:           numCaves,
+		HasSignature:           injector.hasSignature,
 		CanCreateSection:       canCreateSection,
 		CanInjectJumper:        numCaves > 0,
 		CanInjectLoader:        canInjectLoader,
