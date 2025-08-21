@@ -84,6 +84,9 @@ type loaderCtx struct {
 	// custom arguments from options
 	Args map[string]interface{}
 
+	// about image information
+	IsDLL bool
+
 	// store procedure status
 	LackProcedure           bool
 	LackVirtualAlloc        bool
@@ -183,6 +186,8 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 		RegN: inj.buildNonvolatileRegisterMap(),
 		Args: inj.opts.Arguments,
 
+		IsDLL: inj.dll,
+
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
 		ShellcodeSize: len(shellcode),
@@ -205,6 +210,7 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 	// update context
 	hasLoadLibraryA := inj.getProcFromIAT("LoadLibraryA") != nil
 	hasLoadLibraryW := inj.getProcFromIAT("LoadLibraryW") != nil
+	hasGetProcAddress := inj.getProcFromIAT("GetProcAddress") != nil
 	inj.ctx.WaitThread = ctx.NeedWaitThread
 	inj.ctx.EraseShellcode = ctx.NeedEraseShellcode
 	inj.ctx.ShellcodeJumper = ctx.NeedShellcodeJumper
@@ -216,6 +222,7 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 	inj.ctx.HasWaitForSingleObject = !ctx.LackWaitForSingleObject
 	inj.ctx.HasLoadLibraryA = hasLoadLibraryA
 	inj.ctx.HasLoadLibraryW = hasLoadLibraryW
+	inj.ctx.HasGetProcAddress = hasGetProcAddress
 	if ins {
 		switch inj.arch {
 		case "386":
