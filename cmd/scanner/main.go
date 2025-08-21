@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	
+
 	"github.com/RSSU-Shellcode/PE-Injector"
 )
 
@@ -17,7 +17,7 @@ var (
 
 func init() {
 	flag.StringVar(&target, "path", "", "target directory path for scan")
-	flag.IntVar(&minNumCaves, "mnc", 0, "set minimum number of cave nodes")
+	flag.IntVar(&minNumCaves, "mnc", 200, "set minimum number of cave nodes")
 	flag.BoolVar(&mustNotSign, "mns", false, "ignore PE image with digital signature")
 	flag.Parse()
 }
@@ -43,6 +43,9 @@ func main() {
 		if err != nil {
 			return nil
 		}
+		if !info.CanCreateSection && !info.CanInjectLoader {
+			return nil
+		}
 		if info.NumCodeCaves < minNumCaves {
 			return nil
 		}
@@ -51,6 +54,7 @@ func main() {
 		}
 		fmt.Println("found target:", path)
 		fmt.Println("num code caves:    ", info.NumCodeCaves)
+		fmt.Println("can create section:", info.CanCreateSection)
 		fmt.Println("inject loader rank:", info.InjectLoaderRank)
 		return nil
 	})
