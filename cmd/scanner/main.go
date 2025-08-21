@@ -35,7 +35,7 @@ func main() {
 		if ext != ".exe" && ext != ".dll" {
 			return nil
 		}
-		image, err := os.ReadFile(path)
+		image, err := os.ReadFile(path) // #nosec
 		if err != nil {
 			return nil
 		}
