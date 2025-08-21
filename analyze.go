@@ -3,6 +3,7 @@ package injector
 // Info contains the image analyze result.
 type Info struct {
 	Architecture string
+	IsDLL        bool
 	ImageSize    uint32
 	ImageBase    uint64
 	EntryPoint   uint32
@@ -97,6 +98,7 @@ func Analyze(image []byte) (*Info, error) {
 	}
 	info := Info{
 		Architecture:           arch,
+		IsDLL:                  injector.dll,
 		ImageSize:              imageSize,
 		ImageBase:              imageBase,
 		EntryPoint:             entryPoint,
