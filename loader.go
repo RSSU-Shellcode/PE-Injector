@@ -84,9 +84,6 @@ type loaderCtx struct {
 	// custom arguments from options
 	Args map[string]interface{}
 
-	// about image information
-	IsDLL bool
-
 	// store procedure status
 	LackProcedure           bool
 	LackVirtualAlloc        bool
@@ -185,8 +182,6 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 		RegV: inj.buildVolatileRegisterMap(),
 		RegN: inj.buildNonvolatileRegisterMap(),
 		Args: inj.opts.Arguments,
-
-		IsDLL: inj.dll,
 
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
