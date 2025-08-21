@@ -55,6 +55,7 @@ type Injector struct {
 	ctx  *Context
 	opts *Options
 	arch string
+	dll  bool
 	size int
 	dup  []byte
 
@@ -169,6 +170,7 @@ type Context struct {
 
 	Arch  string
 	Mode  string
+	IsDLL bool
 	IsRaw bool
 	Seed  int64
 
@@ -188,6 +190,7 @@ type Context struct {
 	HasWaitForSingleObject bool
 	HasLoadLibraryA        bool
 	HasLoadLibraryW        bool
+	HasGetProcAddress      bool
 
 	NumCodeCaves  int
 	NumLoaderInst int
@@ -375,6 +378,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	if err != nil {
 		return err
 	}
+	isDLL := peFile.Characteristics&pe.IMAGE_FILE_DLL != 0
 	var arch string
 	switch peFile.Machine {
 	case pe.IMAGE_FILE_MACHINE_I386:
@@ -389,13 +393,14 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.img = peFile
 	inj.arch = arch
 	inj.size = len(image)
-	inj.loadImage(image)
+	inj.dll = isDLL
 	// scan code cave in image text section
 	caves, err := inj.scanCodeCave()
 	if err != nil {
 		return fmt.Errorf("failed to scan code cave: %s", err)
 	}
 	inj.caves = caves
+	inj.loadImage(image)
 	// set random seed
 	seed := opts.RandSeed
 	if seed == 0 {
@@ -408,8 +413,9 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.removeSignature()
 	// update context
 	inj.ctx = &Context{
-		Arch: arch,
-		Seed: seed,
+		Arch:  arch,
+		IsDLL: isDLL,
+		Seed:  seed,
 
 		SaveContext:  !opts.NotSaveContext,
 		CreateThread: !opts.NotCreateThread,
