@@ -84,6 +84,34 @@ func (inj *Injector) extendInstruction(inst *x86asm.Inst, src []byte) []byte {
 		rel := uint32(inst.Args[0].(x86asm.Rel))
 		binary.LittleEndian.PutUint32(jne[2:], rel)
 		return jne
+	case x86asm.JG:
+		jg := make([]byte, 6)
+		jg[0] = 0x0F
+		jg[1] = 0x8F
+		rel := uint32(inst.Args[0].(x86asm.Rel))
+		binary.LittleEndian.PutUint32(jg[2:], rel)
+		return jg
+	case x86asm.JGE:
+		jge := make([]byte, 6)
+		jge[0] = 0x0F
+		jge[1] = 0x8D
+		rel := uint32(inst.Args[0].(x86asm.Rel))
+		binary.LittleEndian.PutUint32(jge[2:], rel)
+		return jge
+	case x86asm.JL:
+		jl := make([]byte, 6)
+		jl[0] = 0x0F
+		jl[1] = 0x8C
+		rel := uint32(inst.Args[0].(x86asm.Rel))
+		binary.LittleEndian.PutUint32(jl[2:], rel)
+		return jl
+	case x86asm.JLE:
+		jle := make([]byte, 6)
+		jle[0] = 0x0F
+		jle[1] = 0x8E
+		rel := uint32(inst.Args[0].(x86asm.Rel))
+		binary.LittleEndian.PutUint32(jle[2:], rel)
+		return jle
 	case x86asm.JBE:
 		jbe := make([]byte, 6)
 		jbe[0] = 0x0F
@@ -124,45 +152,3 @@ func (inj *Injector) relocateInstruction(src []byte, offset int64) []byte {
 	}
 	return output
 }
-
-// switch inst.Op {
-// case x86asm.CALL:
-// 	switch output[0] {
-// 	case 0xFF:
-// 		switch output[1] {
-// 		case 0x15:
-// 			mem := inst.Args[0].(x86asm.Mem)
-// 			binary.LittleEndian.PutUint32(output[2:], uint32(mem.Disp-offset))
-// 		}
-// 	case 0xE8:
-// 		mem := inst.Args[0].(x86asm.Mem)
-// 		binary.LittleEndian.PutUint32(output[1:], uint32(mem.Disp-offset))
-// 	}
-// case x86asm.JMP:
-// 	switch output[0] {
-// 	case 0xEB:
-// 		rel := int64(inst.Args[0].(x86asm.Rel))
-// 		output[1] = uint8(rel - offset)
-// 	case 0xE9:
-// 		rel := int64(inst.Args[0].(x86asm.Rel))
-// 		binary.LittleEndian.PutUint32(output[1:], uint32(rel-offset))
-// 	case 0x48:
-// 		switch output[1] {
-// 		case 0xFF:
-// 			switch output[2] {
-// 			case 0x25:
-// 				mem := inst.Args[0].(x86asm.Mem)
-// 				binary.LittleEndian.PutUint32(output[3:], uint32(mem.Disp-offset))
-// 			}
-// 		}
-// 	}
-// case x86asm.JG:
-// case x86asm.JGE:
-// case x86asm.JL:
-// case x86asm.JLE:
-// case x86asm.JE:
-// case x86asm.JNE:
-//
-// default:
-// }
-// return output
