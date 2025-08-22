@@ -19,6 +19,9 @@ type codeCave struct {
 }
 
 func (c *codeCave) Write(img, data []byte) {
+	if len(data) > c.size {
+		panic("data length is grater than code cave size")
+	}
 	copy(img[c.pointerToRaw:], data)
 }
 
