@@ -306,6 +306,9 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 		}
 	}()
 	targetRVA := inj.selectTargetRVA()
+	if targetRVA == 0 {
+		return errors.New("hook target function address is zero")
+	}
 	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
 	if inj.section != nil {
@@ -432,6 +435,12 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 }
 
 func (inj *Injector) selectTargetRVA() uint32 {
+	if inj.opts.Address != 0 {
+		return inj.vaToRVA(inj.opts.Address)
+	}
+	if inj.dll {
+		return 0
+	}
 	var entryPoint uint32
 	switch inj.arch {
 	case "386":
@@ -439,13 +448,7 @@ func (inj *Injector) selectTargetRVA() uint32 {
 	case "amd64":
 		entryPoint = inj.hdr64.AddressOfEntryPoint
 	}
-	var targetRVA uint32
-	if inj.opts.Address != 0 {
-		targetRVA = inj.vaToRVA(inj.opts.Address)
-	} else {
-		targetRVA = entryPoint
-	}
-	return targetRVA
+	return entryPoint
 }
 
 func (inj *Injector) selectFirstCodeCave(targetRVA uint32) *codeCave {
@@ -689,7 +692,6 @@ func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave)
 	}
 	switch inst.Args[0].(type) {
 	case x86asm.Rel:
-	// case x86asm.Reg:
 	default:
 		return segment
 	}
