@@ -489,7 +489,7 @@ func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
             // read thread argument that stored the shellcode address
             mov {{.Reg.eax}}, [esp+4]
             call {{.Reg.eax}}
-            ret                       `
+            ret                      `
 	case "amd64":
 		src = `
             .code64
@@ -498,7 +498,7 @@ func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
             sub rsp, 0x20
             call {{.Reg.rax}}
             add rsp, 0x20
-            ret                   `
+            ret                  `
 	}
 	type jumperCtx struct {
 		Reg map[string]string
