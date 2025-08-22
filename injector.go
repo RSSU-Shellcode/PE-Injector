@@ -5,6 +5,7 @@ import (
 	cr "crypto/rand"
 	"debug/pe"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -172,6 +173,7 @@ type Options struct {
 // Context contains the output and context data in Inject and InjectRaw.
 type Context struct {
 	Output []byte
+	Loader [2]string
 
 	Arch  string
 	Mode  string
@@ -249,6 +251,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
+	inj.ctx.Loader = inj.disassembleLoader(loader)
 	inj.ctx.Output = inj.dup
 	return inj.ctx, nil
 }
@@ -837,6 +840,48 @@ func mergeBytes(b [][]byte) []byte {
 		o = append(o, b[i]...)
 	}
 	return o
+}
+
+func (inj *Injector) disassembleLoader(loader []byte) [2]string {
+	bin := strings.Builder{}
+	insts := strings.Builder{}
+	for len(loader) > 0 {
+		inst, err := inj.decodeInst(loader)
+		if err != nil {
+			panic(err)
+		}
+		b := loader[:inst.Len]
+		s := strings.ToUpper(hex.EncodeToString(b))
+		bin.WriteString(s)
+		bin.Write([]byte("\r\n"))
+		insts.WriteString(printInstruction(inst))
+		insts.Write([]byte("\r\n"))
+		loader = loader[inst.Len:]
+	}
+	return [2]string{bin.String(), insts.String()}
+}
+
+func printInstruction(inst *x86asm.Inst) string {
+	var buf bytes.Buffer
+	for _, p := range inst.Prefix {
+		if p == 0 {
+			break
+		}
+		if p&x86asm.PrefixImplicit != 0 {
+			continue
+		}
+		_, _ = fmt.Fprintf(&buf, "%s ", strings.ToLower(p.String()))
+	}
+	_, _ = fmt.Fprintf(&buf, "%s", strings.ToLower(inst.Op.String()))
+	sep := " "
+	for _, v := range inst.Args {
+		if v == nil {
+			break
+		}
+		_, _ = fmt.Fprintf(&buf, "%s%s", sep, strings.ToLower(v.String()))
+		sep = ", "
+	}
+	return buf.String()
 }
 
 func (inj *Injector) cleanup() {
