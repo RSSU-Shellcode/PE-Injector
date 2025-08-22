@@ -146,9 +146,9 @@ func analyzeImage() {
 	fmt.Println("================PE image================")
 	fmt.Println("Arch: ", info.Architecture)
 	fmt.Println("IsDLL:", info.IsDLL)
-	fmt.Println("ImageSize:   ", info.ImageSize)
-	fmt.Printf("ImageBase:    0x%X\n", info.ImageBase)
-	fmt.Printf("EntryPoint:   0x%X\n", info.EntryPoint)
+	fmt.Println("ImageSize: ", info.ImageSize)
+	fmt.Printf("ImageBase:  0x%X\n", info.ImageBase)
+	fmt.Printf("EntryPoint: 0x%X\n", info.EntryPoint)
 	fmt.Println("===============PE Sections==============")
 	for _, s := range info.Sections {
 		fmt.Print(s.Name + " ")
