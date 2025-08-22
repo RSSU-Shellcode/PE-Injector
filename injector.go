@@ -473,12 +473,9 @@ func (inj *Injector) selectFirstCodeCave(targetRVA uint32) *codeCave {
 func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
 	offset := int(inj.rvaToOffset(".text", srcRVA))
 	if offset+32 > len(inj.dup) {
-		return errors.New("target offset is overflow")
+		return errors.New("hook target is overflow")
 	}
-	insts, err := inj.disassemble(inj.dup[offset : offset+32])
-	if err != nil {
-		return err
-	}
+	insts, _ := inj.disassemble(inj.dup[offset : offset+32])
 	numInst, totalSize, err := calcInstNumAndSize(insts)
 	if err != nil {
 		return err
