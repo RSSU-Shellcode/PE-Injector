@@ -478,7 +478,7 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 // tryWriteJumper is used to try to find a code cave for store instructions about
 // a jumper to the shellcode, that the thread start address is in .text section.
 func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
-	if inj.opts.NoShellcodeJumper || len(inj.caves) == 0 {
+	if inj.opts.NoShellcodeJumper || inj.opts.NotCreateThread || len(inj.caves) == 0 {
 		return nil
 	}
 	var src string
@@ -495,9 +495,9 @@ func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
             .code64
             // read thread argument that stored the shellcode address
             mov {{.Reg.rax}}, rcx
-            sub rsp, 0x20
+            sub rsp, 0x28
             call {{.Reg.rax}}
-            add rsp, 0x20
+            add rsp, 0x28
             ret                  `
 	}
 	type jumperCtx struct {
