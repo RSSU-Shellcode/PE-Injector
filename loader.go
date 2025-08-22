@@ -495,7 +495,9 @@ func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
             .code64
             // read thread argument that stored the shellcode address
             mov {{.Reg.rax}}, rcx
+            sub rsp, 0x20
             call {{.Reg.rax}}
+            add rsp, 0x20
             ret                   `
 	}
 	type jumperCtx struct {
