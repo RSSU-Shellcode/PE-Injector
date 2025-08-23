@@ -3,6 +3,9 @@ package injector
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"strings"
 
 	"golang.org/x/arch/x86/x86asm"
 )
@@ -151,4 +154,43 @@ func (inj *Injector) relocateInstruction(src []byte, offset int64) []byte {
 		binary.LittleEndian.PutUint32(output[inst.PCRelOff:], uint32(rel-offset))
 	}
 	return output
+}
+
+func printAssemblyBinary(inst *x86asm.Inst, b []byte) string {
+	var bin strings.Builder
+	switch {
+	case inst.PCRelOff != 0:
+		s1 := strings.ToUpper(hex.EncodeToString(b[:inst.PCRelOff]))
+		s2 := strings.ToUpper(hex.EncodeToString(b[inst.PCRelOff:]))
+		bin.WriteString(s1)
+		bin.WriteString(" ")
+		bin.WriteString(s2)
+	default:
+		s := strings.ToUpper(hex.EncodeToString(b))
+		bin.WriteString(s)
+	}
+	return bin.String()
+}
+
+func printAssemblyInstruction(inst *x86asm.Inst) string {
+	var buf bytes.Buffer
+	for _, p := range inst.Prefix {
+		if p == 0 {
+			break
+		}
+		if p&x86asm.PrefixImplicit != 0 {
+			continue
+		}
+		_, _ = fmt.Fprintf(&buf, "%s ", strings.ToLower(p.String()))
+	}
+	_, _ = fmt.Fprintf(&buf, "%s", strings.ToLower(inst.Op.String()))
+	sep := " "
+	for _, v := range inst.Args {
+		if v == nil {
+			break
+		}
+		_, _ = fmt.Fprintf(&buf, "%s%s", sep, strings.ToLower(v.String()))
+		sep = ", "
+	}
+	return buf.String()
 }
