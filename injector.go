@@ -219,12 +219,12 @@ func NewInjector() *Injector {
 	return &injector
 }
 
-// Inject is used to inject shellcode to a PE image file.
-// It will inject a shellcode loader to code cave,
-// loader will decrypt and execute the input shellcode.
-func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, error) {
-	if len(shellcode) == 0 {
-		return nil, errors.New("empty shellcode")
+// Inject is used to inject payload to a PE image file.
+// It will inject a payload loader to code cave,
+// loader will decrypt and execute the input payload.
+func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, error) {
+	if len(payload) == 0 {
+		return nil, errors.New("empty payload")
 	}
 	defer inj.cleanup()
 	err := inj.preprocess(image, opts)
@@ -242,7 +242,7 @@ func (inj *Injector) Inject(image, shellcode []byte, opts *Options) (*Context, e
 	}()
 	// set method flag
 	inj.raw = false
-	loader, err := inj.buildLoader(shellcode)
+	loader, err := inj.buildLoader(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
 	}
