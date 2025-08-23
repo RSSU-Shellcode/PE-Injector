@@ -5,7 +5,6 @@ import (
 	cr "crypto/rand"
 	"debug/pe"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -851,37 +850,13 @@ func (inj *Injector) disassembleLoader(loader []byte) [2]string {
 			panic(err)
 		}
 		b := loader[:inst.Len]
-		s := strings.ToUpper(hex.EncodeToString(b))
-		bin.WriteString(s)
+		bin.WriteString(printAssemblyBinary(inst, b))
 		bin.Write([]byte("\r\n"))
-		insts.WriteString(printInstruction(inst))
+		insts.WriteString(printAssemblyInstruction(inst))
 		insts.Write([]byte("\r\n"))
 		loader = loader[inst.Len:]
 	}
 	return [2]string{bin.String(), insts.String()}
-}
-
-func printInstruction(inst *x86asm.Inst) string {
-	var buf bytes.Buffer
-	for _, p := range inst.Prefix {
-		if p == 0 {
-			break
-		}
-		if p&x86asm.PrefixImplicit != 0 {
-			continue
-		}
-		_, _ = fmt.Fprintf(&buf, "%s ", strings.ToLower(p.String()))
-	}
-	_, _ = fmt.Fprintf(&buf, "%s", strings.ToLower(inst.Op.String()))
-	sep := " "
-	for _, v := range inst.Args {
-		if v == nil {
-			break
-		}
-		_, _ = fmt.Fprintf(&buf, "%s%s", sep, strings.ToLower(v.String()))
-		sep = ", "
-	}
-	return buf.String()
 }
 
 func (inj *Injector) cleanup() {
