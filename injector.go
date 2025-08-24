@@ -101,118 +101,106 @@ type Options struct {
 	// be hooked, it is an VA address, not a file offset
 	// or RVA, remember disable ASLR when debug image.
 	// if it is zero, use the entry point.
-	Address uint64
+	Address uint64 `toml:"address" json:"address"`
 
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or
 	// register, you need set it with true.
-	NotSaveContext bool
+	NotSaveContext bool `toml:"not_save_context" json:"not_save_context"`
 
 	// not create thread at the shellcode,
 	// ensure the shellcode can be called as a function.
 	// on x86, the calling convention is stdcall.
 	// if it is true, it will ignore the option NotWaitThread.
 	// it is useless for method InjectRaw.
-	NotCreateThread bool
+	NotCreateThread bool `toml:"not_create_thread" json:"not_create_thread"`
 
 	// not wait created thread at the shellcode,
 	// if it is true, it will ignore the option NotEraseShellcode.
 	// it is useless for method InjectRaw.
-	NotWaitThread bool
+	NotWaitThread bool `toml:"not_wait_thread" json:"not_wait_thread"`
 
 	// not erase shellcode after execute finish.
 	// when you need run shellcode as a background
 	// program, you need set it with true.
 	// it is useless for method InjectRaw.
-	NotEraseShellcode bool
+	NotEraseShellcode bool `toml:"not_erase_shellcode" json:"not_erase_shellcode"`
 
 	// not add a shellcode jumper to call shellcode.
 	// it is useless for method InjectRaw.
-	NoShellcodeJumper bool
+	NoShellcodeJumper bool `toml:"no_shellcode_jumper" json:"no_shellcode_jumper"`
 
 	// not append garbage instruction to loader.
 	// It is only for Inject with ModeCreateSection.
-	NoGarbage bool
+	NoGarbage bool `toml:"no_garbage" json:"no_garbage"`
 
 	// specify the new section name, the default is ".patch".
-	SectionName string
+	SectionName string `toml:"section_name" json:"section_name"`
 
 	// specify a random seed for test and debug.
-	RandSeed int64
+	RandSeed int64 `toml:"rand_seed" json:"rand_seed"`
 
 	// force use code cave mode for write shellcode.
 	// if code cave is not enough, it will return an error.
-	ForceCodeCave bool
+	ForceCodeCave bool `toml:"force_code_cave" json:"force_code_cave"`
 
 	// force extend the last section even if the number
 	// of code cave is enough for write shellcode.
 	// it is useless for method InjectRaw.
-	ForceExtendSection bool
+	ForceExtendSection bool `toml:"force_extend_section" json:"force_extend_section"`
 
 	// force create a new section after the last section
 	// for write loader and shellcode.
-	ForceCreateSection bool
+	ForceCreateSection bool `toml:"force_create_section" json:"force_create_section"`
 
 	// specify the x86 loader template.
-	LoaderX86 string
+	LoaderX86 string `toml:"loader_x86" json:"loader_x86"`
 
 	// specify the x64 loader template.
-	LoaderX64 string
+	LoaderX64 string `toml:"loader_x64" json:"loader_x64"`
 
 	// specify the x86 junk code templates.
-	JunkCodeX86 []string
+	JunkCodeX86 []string `toml:"junk_code_x86" json:"junk_code_x86"`
 
 	// specify the x64 junk code templates.
-	JunkCodeX64 []string
+	JunkCodeX64 []string `toml:"junk_code_x64" json:"junk_code_x64"`
 
-	// append custom integer that will be encrypted.
-	Integers []uint64
-
-	// append custom ANSI string that will be encrypted.
-	ANSI []string
-
-	// append custom UTF16 string that will be encrypted.
-	UTF16 []string
-
-	// append custom argument for loader template.
-	Arguments map[string]interface{}
-
-	// append custom switch for if statements.
-	Switches map[string]bool
+	// specify highly customizable loader template.
+	Template *Template `toml:"template" json:"template"`
 }
 
 // Context contains the output and context data in Inject and InjectRaw.
 type Context struct {
-	Output []byte
-	Loader [2]string
+	Output []byte    `toml:"output" json:"output"`
+	Loader [2]string `toml:"loader" json:"loader"`
 
-	Arch  string
-	Mode  string
-	IsDLL bool
-	IsRaw bool
-	Seed  int64
+	Arch  string `toml:"arch"   json:"arch"`
+	Mode  string `toml:"mode"   json:"mode"`
+	IsDLL bool   `toml:"is_dll" json:"is_dll"`
+	IsRaw bool   `toml:"is_raw" json:"is_raw"`
+	Seed  int64  `toml:"seed"   json:"seed"`
 
-	SaveContext     bool
-	CreateThread    bool
-	WaitThread      bool
-	EraseShellcode  bool
-	ShellcodeJumper bool
-	HasGarbage      bool
-	SectionName     string
+	SaveContext     bool   `toml:"save_context"     json:"save_context"`
+	CreateThread    bool   `toml:"create_thread"    json:"create_thread"`
+	WaitThread      bool   `toml:"wait_thread"      json:"wait_thread"`
+	EraseShellcode  bool   `toml:"erase_shellcode"  json:"erase_shellcode"`
+	ShellcodeJumper bool   `toml:"shellcode_jumper" json:"shellcode_jumper"`
+	HasGarbage      bool   `toml:"has_garbage"      json:"has_garbage"`
+	SectionName     string `toml:"section_name"     json:"section_name"`
 
-	HasAllProcedures       bool
-	HasVirtualAlloc        bool
-	HasVirtualFree         bool
-	HasVirtualProtect      bool
-	HasCreateThread        bool
-	HasWaitForSingleObject bool
-	HasLoadLibraryA        bool
-	HasLoadLibraryW        bool
-	HasGetProcAddress      bool
+	HasAllProcedures       bool `toml:"has_all_procedures"         json:"has_all_procedures"`
+	HasVirtualAlloc        bool `toml:"has_virtual_alloc"          json:"has_virtual_alloc"`
+	HasVirtualFree         bool `toml:"has_virtual_free"           json:"has_virtual_free"`
+	HasVirtualProtect      bool `toml:"has_virtual_protect"        json:"has_virtual_protect"`
+	HasCreateThread        bool `toml:"has_create_thread"          json:"has_create_thread"`
+	HasWaitForSingleObject bool `toml:"has_wait_for_single_object" json:"has_wait_for_single_object"`
+	HasLoadLibraryA        bool `toml:"has_load_library_a"         json:"has_load_library_a"`
+	HasLoadLibraryW        bool `toml:"has_load_library_w"         json:"has_load_library_w"`
+	HasGetProcAddress      bool `toml:"has_get_proc_address"       json:"has_get_proc_address"`
 
-	NumCodeCaves  int
-	NumLoaderInst int
-	HookAddress   uint64
+	NumCodeCaves  int    `toml:"num_code_caves"  json:"num_code_caves"`
+	NumLoaderInst int    `toml:"num_loader_inst" json:"num_loader_inst"`
+	HookAddress   uint64 `toml:"hook_address"    json:"hook_address"`
 }
 
 // NewInjector is used to create a simple PE injector.
