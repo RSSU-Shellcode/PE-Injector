@@ -165,8 +165,20 @@ type Options struct {
 	// specify the x64 junk code templates.
 	JunkCodeX64 []string
 
+	// append custom integer that will be encrypted.
+	Integers []uint64
+
+	// append custom ANSI string that will be encrypted.
+	ANSI []string
+
+	// append custom UTF16 string that will be encrypted.
+	UTF16 []string
+
 	// append custom argument for loader template.
 	Arguments map[string]interface{}
+
+	// append custom switch for if statements.
+	Switches map[string]bool
 }
 
 // Context contains the output and context data in Inject and InjectRaw.
