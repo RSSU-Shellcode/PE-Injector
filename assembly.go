@@ -157,21 +157,36 @@ func (inj *Injector) relocateInstruction(src []byte, offset int64) []byte {
 }
 
 func (inj *Injector) disassembleLoader(loader []byte) [2]string {
+	var mode int
+	switch inj.arch {
+	case "386":
+		mode = 32
+	case "amd64":
+		mode = 64
+	}
+	output, err := printInstructions(loader, mode)
+	if err != nil {
+		panic(err)
+	}
+	return output
+}
+
+func printInstructions(src []byte, mode int) ([2]string, error) {
 	bin := strings.Builder{}
 	insts := strings.Builder{}
-	for len(loader) > 0 {
-		inst, err := inj.decodeInst(loader)
+	for len(src) > 0 {
+		inst, err := x86asm.Decode(src, mode)
 		if err != nil {
-			panic(err)
+			return [2]string{}, err
 		}
-		b := loader[:inst.Len]
-		bin.WriteString(printAssemblyBinary(inst, b))
+		b := src[:inst.Len]
+		bin.WriteString(printAssemblyBinary(&inst, b))
 		bin.Write([]byte("\r\n"))
-		insts.WriteString(printAssemblyInstruction(inst))
+		insts.WriteString(printAssemblyInstruction(&inst))
 		insts.Write([]byte("\r\n"))
-		loader = loader[inst.Len:]
+		src = src[inst.Len:]
 	}
-	return [2]string{bin.String(), insts.String()}
+	return [2]string{bin.String(), insts.String()}, nil
 }
 
 func printAssemblyBinary(inst *x86asm.Inst, b []byte) string {
