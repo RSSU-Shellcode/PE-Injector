@@ -2,29 +2,29 @@ package injector
 
 // Info contains the image analyze result.
 type Info struct {
-	Architecture string
-	IsDLL        bool
-	ImageSize    uint32
-	ImageBase    uint64
-	EntryPoint   uint32
-	Sections     []*Section
+	Architecture string     `toml:"architecture" json:"architecture"`
+	IsDLL        bool       `toml:"is_dll"       json:"is_dll"`
+	ImageSize    uint32     `toml:"image_size"   json:"image_size"`
+	ImageBase    uint64     `toml:"image_base"   json:"image_base"`
+	EntryPoint   uint32     `toml:"entry_point"  json:"entry_point"`
+	Sections     []*Section `toml:"sections"     json:"sections"`
 
-	HasAllProcedures       bool
-	HasVirtualAlloc        bool
-	HasVirtualFree         bool
-	HasVirtualProtect      bool
-	HasCreateThread        bool
-	HasWaitForSingleObject bool
-	HasLoadLibraryA        bool
-	HasLoadLibraryW        bool
-	HasGetProcAddress      bool
+	HasAllProcedures       bool `toml:"has_all_procedures"         json:"has_all_procedures"`
+	HasVirtualAlloc        bool `toml:"has_virtual_alloc"          json:"has_virtual_alloc"`
+	HasVirtualFree         bool `toml:"has_virtual_free"           json:"has_virtual_free"`
+	HasVirtualProtect      bool `toml:"has_virtual_protect"        json:"has_virtual_protect"`
+	HasCreateThread        bool `toml:"has_create_thread"          json:"has_create_thread"`
+	HasWaitForSingleObject bool `toml:"has_wait_for_single_object" json:"has_wait_for_single_object"`
+	HasLoadLibraryA        bool `toml:"has_load_library_a"         json:"has_load_library_a"`
+	HasLoadLibraryW        bool `toml:"has_load_library_w"         json:"has_load_library_w"`
+	HasGetProcAddress      bool `toml:"has_get_proc_address"       json:"has_get_proc_address"`
 
-	NumCodeCaves     int
-	HasSignature     bool
-	CanCreateSection bool
-	CanInjectJumper  bool
-	CanInjectLoader  bool
-	InjectLoaderRank int
+	NumCodeCaves     int  `toml:"num_code_caves"     json:"num_code_caves"`
+	HasSignature     bool `toml:"has_signature"      json:"has_signature"`
+	CanCreateSection bool `toml:"can_create_section" json:"can_create_section"`
+	CanInjectJumper  bool `toml:"can_inject_jumper"  json:"can_inject_jumper"`
+	CanInjectLoader  bool `toml:"can_inject_loader"  json:"can_inject_loader"`
+	InjectLoaderRank int  `toml:"inject_loader_rank" json:"inject_loader_rank"`
 }
 
 // Analyze is used to analyze the target pe image file that can be injected.
