@@ -841,24 +841,6 @@ func mergeBytes(b [][]byte) []byte {
 	return o
 }
 
-func (inj *Injector) disassembleLoader(loader []byte) [2]string {
-	bin := strings.Builder{}
-	insts := strings.Builder{}
-	for len(loader) > 0 {
-		inst, err := inj.decodeInst(loader)
-		if err != nil {
-			panic(err)
-		}
-		b := loader[:inst.Len]
-		bin.WriteString(printAssemblyBinary(inst, b))
-		bin.Write([]byte("\r\n"))
-		insts.WriteString(printAssemblyInstruction(inst))
-		insts.Write([]byte("\r\n"))
-		loader = loader[inst.Len:]
-	}
-	return [2]string{bin.String(), insts.String()}
-}
-
 func (inj *Injector) cleanup() {
 	inj.dup = nil
 	inj.img = nil
