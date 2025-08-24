@@ -7,22 +7,26 @@ import (
 
 // InspectOptions contains options about inspect loader template.
 type InspectOptions struct {
-	CodeCaveMode      bool
-	ExtendSectionMode bool
-	CreateSectionMode bool
+	CodeCaveMode      bool `toml:"code_cave_mode"      json:"code_cave_mode"`
+	ExtendSectionMode bool `toml:"extend_section_mode" json:"extend_section_mode"`
+	CreateSectionMode bool `toml:"create_section_mode" json:"create_section_mode"`
 
-	HasVirtualAlloc        bool
-	HasVirtualFree         bool
-	HasVirtualProtect      bool
-	HasCreateThread        bool
-	HasWaitForSingleObject bool
-	HasLoadLibraryA        bool
-
-	Arguments map[string]interface{}
+	HasVirtualAlloc        bool `toml:"has_virtual_alloc"          json:"has_virtual_alloc"`
+	HasVirtualFree         bool `toml:"has_virtual_free"           json:"has_virtual_free"`
+	HasVirtualProtect      bool `toml:"has_virtual_protect"        json:"has_virtual_protect"`
+	HasCreateThread        bool `toml:"has_create_thread"          json:"has_create_thread"`
+	HasWaitForSingleObject bool `toml:"has_wait_for_single_object" json:"has_wait_for_single_object"`
+	HasLoadLibraryA        bool `toml:"has_load_library_a"         json:"has_load_library_a"`
 }
 
 // InspectLoaderTemplate is used to test junk code template.
 func InspectLoaderTemplate(arch string, src string, opts *InspectOptions) (string, []byte, error) {
+	switch arch {
+	case "386":
+	case "amd64":
+	default:
+		return "", nil, fmt.Errorf("unsupported architecture: %s", arch)
+	}
 	injector := NewInjector()
 	injector.arch = arch
 	injector.opts = &Options{
@@ -31,8 +35,6 @@ func InspectLoaderTemplate(arch string, src string, opts *InspectOptions) (strin
 		ForceCodeCave:      opts.CodeCaveMode,
 		ForceExtendSection: opts.ExtendSectionMode,
 		ForceCreateSection: opts.CreateSectionMode,
-
-		Arguments: opts.Arguments,
 	}
 	injector.ctx = new(Context)
 	injector.dup = make([]byte, 16*1024)
@@ -120,6 +122,12 @@ func buildFakeIATList(opts *InspectOptions) []*iat {
 
 // InspectJunkCodeTemplate is used to test junk code template.
 func InspectJunkCodeTemplate(arch string, src string) (string, []byte, error) {
+	switch arch {
+	case "386":
+	case "amd64":
+	default:
+		return "", nil, fmt.Errorf("unsupported architecture: %s", arch)
+	}
 	injector := NewInjector()
 	injector.arch = arch
 	injector.opts = new(Options)
