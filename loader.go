@@ -89,8 +89,23 @@ type loaderCtx struct {
 	RegV map[string]string
 	RegN map[string]string
 
-	// custom arguments from options
+	// store custom encrypted integer
+	CIEnc map[string]uint64
+	CIKey map[string]uint64
+
+	// store custom encrypted string with ANSI
+	CAEnc map[string][]uint64
+	CAKey map[string][]uint64
+
+	// store custom encrypted string with UTF16
+	CWEnc map[string][]uint64
+	CWKey map[string][]uint64
+
+	// custom plaintext arguments from options
 	Args map[string]interface{}
+
+	// custom switch for if statements
+	Switches map[string]bool
 
 	// store procedure status
 	LackProcedure           bool
