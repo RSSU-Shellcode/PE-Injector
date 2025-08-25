@@ -23,11 +23,6 @@ var _ embed.FS
 const numInstForCopyPayload = 4
 
 const (
-	maxNumLoaderInstX86 = 350
-	maxNumLoaderInstX64 = 300
-)
-
-const (
 	codeCaveModeStub   = "{{STUB CodeCaveMode STUB}}"
 	reservedLoaderSize = 4096
 )
@@ -38,6 +33,11 @@ const (
 	paNewProtect     = "NewProtect"
 	paInfinite       = "Infinite"
 	paFreeType       = "FreeType"
+)
+
+const (
+	defaultMaxNumLoaderInstX86 = 350
+	defaultMaxNumLoaderInstX64 = 300
 )
 
 // The role of the payload loader is used to decrypt payload
@@ -102,7 +102,7 @@ type loaderCtx struct {
 	CWKey map[string][]uint64
 
 	// custom plaintext arguments from options
-	Args map[string]interface{}
+	Args map[string]any
 
 	// custom switch for if statements
 	Switches map[string]bool
@@ -158,7 +158,7 @@ type loaderCtx struct {
 	MemRegionSize int
 	PayloadOffset uint32
 	PayloadSize   int
-	PayloadKey    interface{}
+	PayloadKey    any
 
 	// mark the end of loader
 	EndOfLoader []byte
@@ -208,7 +208,6 @@ func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (strin
 		Reg:  inj.buildRandomRegisterMap(),
 		RegV: inj.buildVolatileRegisterMap(),
 		RegN: inj.buildNonvolatileRegisterMap(),
-		Args: inj.opts.Arguments,
 
 		PAData: make(map[string]uint64),
 		PAKey:  make(map[string]uint64),
@@ -281,6 +280,10 @@ func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (strin
 }
 
 func (inj *Injector) getLoaderX86() string {
+	tpl := inj.opts.Template
+	if tpl != nil {
+		return tpl.LoaderX86
+	}
 	if inj.opts.LoaderX86 != "" {
 		return inj.opts.LoaderX86
 	}
@@ -288,10 +291,30 @@ func (inj *Injector) getLoaderX86() string {
 }
 
 func (inj *Injector) getLoaderX64() string {
+	tpl := inj.opts.Template
+	if tpl != nil {
+		return tpl.LoaderX64
+	}
 	if inj.opts.LoaderX64 != "" {
 		return inj.opts.LoaderX64
 	}
 	return defaultLoaderX64
+}
+
+func (inj *Injector) getMaxNumInstX86() int {
+	tpl := inj.opts.Template
+	if tpl != nil {
+		return tpl.MaxNumInstX86
+	}
+	return defaultMaxNumLoaderInstX86
+}
+
+func (inj *Injector) getMaxNumInstX64() int {
+	tpl := inj.opts.Template
+	if tpl != nil {
+		return tpl.MaxNumInstX64
+	}
+	return defaultMaxNumLoaderInstX64
 }
 
 func (inj *Injector) buildRandomRegisterMap() map[string]string {
@@ -611,9 +634,9 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 	var maxLoaderSize int
 	switch inj.arch {
 	case "386":
-		maxLoaderSize = maxNumLoaderInstX86
+		maxLoaderSize = inj.getMaxNumInstX86()
 	case "amd64":
-		maxLoaderSize = maxNumLoaderInstX64
+		maxLoaderSize = inj.getMaxNumInstX64()
 	}
 	if maxLoaderSize > len(inj.caves) || inj.opts.ForceCreateSection {
 		if inj.opts.ForceCodeCave {
@@ -632,10 +655,10 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 	switch inj.arch {
 	case "386":
 		numCaves = (len(sc)/4 + 1) * numInstForCopyPayload
-		numCaves += maxNumLoaderInstX86
+		numCaves += maxLoaderSize
 	case "amd64":
 		numCaves = (len(sc)/8 + 1) * numInstForCopyPayload
-		numCaves += maxNumLoaderInstX64
+		numCaves += maxLoaderSize
 	}
 	if numCaves < len(inj.caves) {
 		return inj.useCodeCaveMode(ctx, sc, src), nil
