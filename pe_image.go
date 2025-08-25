@@ -23,11 +23,11 @@ var defaultSectionNames = []string{
 
 // Section contains the basic info of section.
 type Section struct {
-	Name            string
-	VirtualSize     uint32
-	VirtualAddress  uint32
-	SizeOfRawData   uint32
-	OffsetToRawData uint32
+	Name            string `toml:"name"               json:"name"`
+	VirtualAddress  uint32 `toml:"virtual_address"    json:"virtual_address"`
+	VirtualSize     uint32 `toml:"virtual_size"       json:"virtual_size"`
+	OffsetToRawData uint32 `toml:"offset_to_raw_data" json:"offset_to_raw_data"`
+	SizeOfRawData   uint32 `toml:"size_of_raw_data"   json:"size_of_raw_data"`
 }
 
 type iat struct {
