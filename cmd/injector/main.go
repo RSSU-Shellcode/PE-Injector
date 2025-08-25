@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/RSSU-Shellcode/PE-Injector"
 )
@@ -20,7 +21,7 @@ var (
 	raw   bool
 	jcx86 string
 	jcx64 string
-	args  string
+	tpl   string
 	opts  injector.Options
 )
 
@@ -31,7 +32,6 @@ func init() {
 	flag.StringVar(&out, "o", "", "set output pe image file path")
 	flag.BoolVar(&aye, "a", false, "analyze the pe image for inject")
 	flag.BoolVar(&raw, "raw", false, "inject shellcode without loader")
-	flag.StringVar(&args, "args", "", "set custom arguments for loader template from a json file")
 	flag.Uint64Var(&opts.Address, "addr", 0, "specify the target function address that will be hooked")
 	flag.BoolVar(&opts.NotSaveContext, "nsc", false, "not append instruction about save and restore context")
 	flag.BoolVar(&opts.NotCreateThread, "nct", false, "not create thread at the shellcode")
@@ -48,6 +48,7 @@ func init() {
 	flag.StringVar(&opts.LoaderX64, "ldr-x64", "", "specify the x64 loader template file path")
 	flag.StringVar(&jcx86, "junk-x86", "", "specify the x86 junk template directory path")
 	flag.StringVar(&jcx64, "junk-x64", "", "specify the x64 junk template directory path")
+	flag.StringVar(&tpl, "tpl", "", "use custom loader template config from a toml file")
 	flag.Parse()
 }
 
@@ -84,10 +85,10 @@ func main() {
 	opts.LoaderX64 = loadLoaderTemplate(opts.LoaderX64)
 	opts.JunkCodeX86 = loadJunkCodeTemplate(jcx86)
 	opts.JunkCodeX64 = loadJunkCodeTemplate(jcx64)
-	if args != "" {
-		data, err := os.ReadFile(args) // #nosec
+	if tpl != "" {
+		config, err := os.ReadFile(tpl) // #nosec
 		checkError(err)
-		err = json.Unmarshal(data, &opts.Arguments)
+		err = toml.Unmarshal(config, opts.Template)
 		checkError(err)
 	}
 
