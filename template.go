@@ -28,7 +28,7 @@ type Template struct {
 	UTF16 []string `toml:"utf16" json:"utf16"`
 
 	// append custom plain-text argument for loader template.
-	Arguments map[string]interface{} `toml:"arguments" json:"arguments"`
+	Arguments map[string]any `toml:"arguments" json:"arguments"`
 
 	// append custom switch for if statements in template.
 	Switches map[string]bool `toml:"switches" json:"switches"`
