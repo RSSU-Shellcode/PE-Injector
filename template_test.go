@@ -11,9 +11,95 @@ import (
 func TestTemplate(t *testing.T) {
 	loaderX86 := `
 .code32
+
+entry:
+  // check Integer
+  mov {{.Reg.ecx}}, {{hex .CIEnc.Const_1}}
+  xor {{.Reg.ecx}}, {{hex .CIKey.Const_1}}
+  cmp {{.Reg.ecx}}, 123
+  jne panic
+
+  mov {{.Reg.ecx}}, {{hex .CIEnc.Const_2}}
+  xor {{.Reg.ecx}}, {{hex .CIKey.Const_2}}
+  cmp {{.Reg.ecx}}, 456
+  jne panic
+
+  // check ANSI
+  mov {{.Reg.eax}}, {{index .CAEnc.ANSI_1 0}}
+  mov {{.Reg.ecx}}, {{index .CAKey.ANSI_1 0}}
+  xor {{.Reg.eax}}, {{.Reg.ecx}}
+  push {{.Reg.eax}}
+  mov {{.Reg.eax}}, {{index .CAEnc.ANSI_1 1}}
+  mov {{.Reg.ecx}}, {{index .CAKey.ANSI_1 1}}
+  xor {{.Reg.eax}}, {{.Reg.ecx}}
+  push {{.Reg.eax}}
+
+  // "ansi"
+  push 0x69736E61
+
+  // compare string
+  mov esi, esp
+  lea edi, [esp+4]
+  mov ecx, 4
+  cld
+  repe cmpsb
+  jnz panic
+
+  // check UTF-16
+  mov {{.Reg.eax}}, {{index .CWEnc.UTF16_1 0}}
+  mov {{.Reg.ecx}}, {{index .CWKey.UTF16_1 0}}
+  xor {{.Reg.eax}}, {{.Reg.ecx}}
+  push {{.Reg.eax}}
+  mov {{.Reg.eax}}, {{index .CWEnc.UTF16_1 1}}
+  mov {{.Reg.ecx}}, {{index .CWKey.UTF16_1 1}}
+  xor {{.Reg.eax}}, {{.Reg.ecx}}
+  push {{.Reg.eax}}
+  mov {{.Reg.eax}}, {{index .CWEnc.UTF16_1 2}}
+  mov {{.Reg.ecx}}, {{index .CWKey.UTF16_1 2}}
+  xor {{.Reg.eax}}, {{.Reg.ecx}}
+  push {{.Reg.eax}}
+
+  // "utf16"
+  push 0x00000036
+  push 0x00310066
+  push 0x00740075
+
+  // compare string
+  mov esi, esp
+  lea edi, [esp+3*4]
+  mov ecx, 10
+  cld
+  repe cmpsb
+  jnz panic
+
+  // check Arguments
+  mov {{.Reg.ecx}}, {{.Args.Arg_1}}
+  cmp {{.Reg.ecx}}, 123
+  jne panic
+  mov {{.Reg.ecx}}, {{.Args.Arg_2}}
+  cmp {{.Reg.ecx}}, 456
+  jne panic
+
+  // check Switches
+  {{if .Switches.Switch_1}}
+    jmp panic
+  {{end}}
+
+  {{if not .Switches.Switch_2}}
+    jmp panic
+  {{end}}
+
+  add esp, 9*4
+
+  // mark the end of loader
+  {{db .EndOfLoader}}
+
+panic:
+  int3
 `
 	loaderX64 := `
 .code64
+
 `
 	tpl := &Template{
 		LoaderX86:     loaderX86,
@@ -35,13 +121,13 @@ func TestTemplate(t *testing.T) {
 		},
 
 		Arguments: map[string]any{
-			"Arg_1": 123,
-			"Arg_2": "string1",
+			"Arg_1": uint16(123),
+			"Arg_2": uint32(456),
 		},
 
 		Switches: map[string]bool{
-			"Switch_1": true,
-			"Switch_2": false,
+			"Switch_1": false,
+			"Switch_2": true,
 		},
 	}
 
@@ -54,11 +140,11 @@ func TestTemplate(t *testing.T) {
 	t.Run("x86", func(t *testing.T) {
 		image, err := os.ReadFile("testdata/image_x86.dat")
 		require.NoError(t, err)
-		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
-		require.NoError(t, err)
+		payload := []byte("payload_x86")
 
-		ctx, err := injector.Inject(image, shellcode, opts)
+		ctx, err := injector.Inject(image, payload, opts)
 		require.NoError(t, err)
+		require.Equal(t, ModeCodeCave, ctx.Mode)
 		fmt.Println(ctx.Loader[0])
 		fmt.Println(ctx.Loader[1])
 
@@ -68,11 +154,11 @@ func TestTemplate(t *testing.T) {
 	t.Run("x64", func(t *testing.T) {
 		image, err := os.ReadFile("testdata/image_x64.dat")
 		require.NoError(t, err)
-		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
-		require.NoError(t, err)
+		payload := []byte("payload_x64")
 
-		ctx, err := injector.Inject(image, shellcode, opts)
+		ctx, err := injector.Inject(image, payload, opts)
 		require.NoError(t, err)
+		require.Equal(t, ModeCodeCave, ctx.Mode)
 		fmt.Println(ctx.Loader[0])
 		fmt.Println(ctx.Loader[1])
 
