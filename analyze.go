@@ -20,7 +20,7 @@ type Info struct {
 	HasGetProcAddress      bool `toml:"has_get_proc_address"       json:"has_get_proc_address"`
 
 	NumCodeCaves     int  `toml:"num_code_caves"     json:"num_code_caves"`
-	HasSignature     bool `toml:"has_signature"      json:"has_signature"`
+	ContainSignature bool `toml:"contain_signature"  json:"contain_signature"`
 	CanCreateSection bool `toml:"can_create_section" json:"can_create_section"`
 	CanInjectJumper  bool `toml:"can_inject_jumper"  json:"can_inject_jumper"`
 	CanInjectLoader  bool `toml:"can_inject_loader"  json:"can_inject_loader"`
@@ -85,9 +85,9 @@ func Analyze(image []byte) (*Info, error) {
 	var numLoaderInst int
 	switch injector.arch {
 	case "386":
-		numLoaderInst = maxNumLoaderInstX86
+		numLoaderInst = defaultMaxNumLoaderInstX86
 	case "amd64":
-		numLoaderInst = maxNumLoaderInstX64
+		numLoaderInst = defaultMaxNumLoaderInstX64
 	}
 	if numLoaderInst+8 > numCaves {
 		canInjectLoader = false
@@ -113,7 +113,7 @@ func Analyze(image []byte) (*Info, error) {
 		HasLoadLibraryW:        hasLoadLibraryW,
 		HasGetProcAddress:      hasGetProcAddress,
 		NumCodeCaves:           numCaves,
-		HasSignature:           injector.hasSignature,
+		ContainSignature:       injector.containSign,
 		CanCreateSection:       canCreateSection,
 		CanInjectJumper:        numCaves > 0,
 		CanInjectLoader:        canInjectLoader,
