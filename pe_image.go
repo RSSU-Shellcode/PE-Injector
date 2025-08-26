@@ -152,7 +152,7 @@ func (inj *Injector) removeSignature() {
 	dd.VirtualAddress = 0
 	dd.Size = 0
 	// store state for analyze
-	inj.hasSignature = true
+	inj.containSign = true
 }
 
 // extendSection is used to extend the last section for write data.
