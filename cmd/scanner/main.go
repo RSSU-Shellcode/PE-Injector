@@ -49,7 +49,7 @@ func main() {
 		if info.NumCodeCaves < minNumCaves {
 			return nil
 		}
-		if mustNotSign && info.HasSignature {
+		if mustNotSign && info.ContainSignature {
 			return nil
 		}
 		fmt.Println("found target:", path)
