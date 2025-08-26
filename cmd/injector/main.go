@@ -86,9 +86,12 @@ func main() {
 	opts.JunkCodeX86 = loadJunkCodeTemplate(jcx86)
 	opts.JunkCodeX64 = loadJunkCodeTemplate(jcx64)
 	if tpl != "" {
+		fmt.Println("use custom loader template")
 		config, err := os.ReadFile(tpl) // #nosec
 		checkError(err)
 		err = toml.Unmarshal(config, opts.Template)
+		checkError(err)
+		err = opts.Template.Check()
 		checkError(err)
 	}
 
@@ -167,6 +170,7 @@ func analyzeImage() {
 	fmt.Println("GetProcAddress:     ", info.HasGetProcAddress)
 	fmt.Println("================Injector================")
 	fmt.Println("NumCodeCaves:    ", info.NumCodeCaves)
+	fmt.Println("ContainSignature:", info.ContainSignature)
 	fmt.Println("CanCreateSection:", info.CanCreateSection)
 	fmt.Println("CanInjectJumper: ", info.CanInjectJumper)
 	fmt.Println("CanInjectLoader: ", info.CanInjectLoader)
