@@ -19,13 +19,13 @@ type Template struct {
 	MaxNumInstX64 int `toml:"max_num_inst_x64" json:"max_num_inst_x64"`
 
 	// append custom integer that will be encrypted.
-	Integer []uint64 `toml:"integer" json:"integer"`
+	Integer map[string]uint32 `toml:"integer" json:"integer"`
 
 	// append custom ANSI string that will be encrypted.
-	ANSI []string `toml:"ansi" json:"ansi"`
+	ANSI map[string]string `toml:"ansi" json:"ansi"`
 
 	// append custom UTF16 string that will be encrypted.
-	UTF16 []string `toml:"utf16" json:"utf16"`
+	UTF16 map[string]string `toml:"utf16" json:"utf16"`
 
 	// append custom plain-text argument for loader template.
 	Arguments map[string]any `toml:"arguments" json:"arguments"`
