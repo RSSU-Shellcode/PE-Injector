@@ -70,7 +70,7 @@ type Injector struct {
 	hdr64 *pe.OptionalHeader64
 
 	// restore before remove
-	hasSignature bool
+	containSign bool
 
 	// about process IAT
 	vm  []byte
