@@ -375,6 +375,9 @@ func (inj *Injector) assemble(src string) ([]byte, error) {
 	if strings.Contains(src, "<no value>") {
 		return nil, errors.New("invalid register in assembly source")
 	}
+	if strings.Contains(src, "<nil>") {
+		return nil, errors.New("invalid usage in assembly source")
+	}
 	return inj.engine.Assemble(src, 0)
 }
 
