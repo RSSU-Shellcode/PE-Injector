@@ -71,6 +71,7 @@ type Injector struct {
 
 	// restore before remove
 	containSign bool
+	containCFG  bool
 
 	// about process IAT
 	vm  []byte
@@ -424,6 +425,8 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.dup = bytes.Clone(image)
 	// remove the digital signature of the PE file
 	inj.removeSignature()
+	// remove the load config for disable Control Flow Guard
+	inj.removeLoadConfig()
 	// update context
 	inj.ctx = &Context{
 		Arch:  arch,
