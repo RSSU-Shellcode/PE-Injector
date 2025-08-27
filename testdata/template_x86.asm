@@ -3,12 +3,14 @@
 entry:
   // check Integer
   mov {{.Reg.ecx}}, {{hex .CIEnc.Const_1}}
-  xor {{.Reg.ecx}}, {{hex .CIKey.Const_1}}
+  mov {{.Reg.edx}}, {{hex .CIKey.Const_1}}
+  xor {{.Reg.ecx}},  {{.Reg.edx}}
   cmp {{.Reg.ecx}}, 123
   jne panic
 
   mov {{.Reg.ecx}}, {{hex .CIEnc.Const_2}}
-  xor {{.Reg.ecx}}, {{hex .CIKey.Const_2}}
+  mov {{.Reg.edx}}, {{hex .CIKey.Const_2}}
+  xor {{.Reg.ecx}},  {{.Reg.edx}}
   cmp {{.Reg.ecx}}, 456
   jne panic
 
