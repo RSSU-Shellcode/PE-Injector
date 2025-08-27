@@ -305,7 +305,7 @@ func (inj *Injector) getLoaderX64() string {
 	return defaultLoaderX64
 }
 
-func (inj *Injector) getMaxNumInstX86() int {
+func (inj *Injector) getMaxNumLoaderInstX86() int {
 	tpl := inj.opts.Template
 	if tpl != nil {
 		return tpl.MaxNumInstX86
@@ -313,7 +313,7 @@ func (inj *Injector) getMaxNumInstX86() int {
 	return defaultMaxNumLoaderInstX86
 }
 
-func (inj *Injector) getMaxNumInstX64() int {
+func (inj *Injector) getMaxNumLoaderInstX64() int {
 	tpl := inj.opts.Template
 	if tpl != nil {
 		return tpl.MaxNumInstX64
@@ -670,14 +670,14 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 	if counter > 1 {
 		return "", errors.New("invalid force mode with payload source")
 	}
-	var maxLoaderSize int
+	var maxNumLoaderInst int
 	switch inj.arch {
 	case "386":
-		maxLoaderSize = inj.getMaxNumInstX86()
+		maxNumLoaderInst = inj.getMaxNumLoaderInstX86()
 	case "amd64":
-		maxLoaderSize = inj.getMaxNumInstX64()
+		maxNumLoaderInst = inj.getMaxNumLoaderInstX64()
 	}
-	if maxLoaderSize > len(inj.caves) || inj.opts.ForceCreateSection {
+	if maxNumLoaderInst > len(inj.caves) || inj.opts.ForceCreateSection {
 		if inj.opts.ForceCodeCave {
 			return "", errors.New("not enough code caves for force code cave mode")
 		}
@@ -694,10 +694,10 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 	switch inj.arch {
 	case "386":
 		numCaves = (len(sc)/4 + 1) * numInstForCopyPayload
-		numCaves += maxLoaderSize
+		numCaves += maxNumLoaderInst
 	case "amd64":
 		numCaves = (len(sc)/8 + 1) * numInstForCopyPayload
-		numCaves += maxLoaderSize
+		numCaves += maxNumLoaderInst
 	}
 	if numCaves < len(inj.caves) {
 		return inj.useCodeCaveMode(ctx, sc, src), nil
@@ -759,7 +759,19 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
 	payload := inj.encryptPayload(ctx, sc)
 	randomOffset := uint32(inj.rand.Intn(2048)) // #nosec G115
-	scOffset := reservedLoaderSize + randomOffset
+	// calculate the loader size(approximation)
+	loaderSize := reservedLoaderSize
+	if !inj.opts.NoGarbage {
+		var maxNumInst int
+		switch inj.arch {
+		case "386":
+			maxNumInst = inj.getMaxNumLoaderInstX86()
+		case "amd64":
+			maxNumInst = inj.getMaxNumLoaderInstX64()
+		}
+		loaderSize += maxNumInst * 16
+	}
+	scOffset := uint32(loaderSize) + randomOffset
 	size := scOffset + uint32(len(payload)) // #nosec G115
 	section, err := inj.createSection(inj.opts.SectionName, size)
 	if err != nil {
