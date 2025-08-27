@@ -3,12 +3,14 @@
 entry:
   // check Integer
   mov {{.Reg.rcx}}, {{hex .CIEnc.Const_1}}
-  xor {{.Reg.rcx}}, {{hex .CIKey.Const_1}}
+  mov {{.Reg.rdx}}, {{hex .CIKey.Const_1}}
+  xor {{.Reg.rcx}}, {{.Reg.rdx}}
   cmp {{.Reg.rcx}}, 123
   jne panic
 
   mov {{.Reg.rcx}}, {{hex .CIEnc.Const_2}}
-  xor {{.Reg.rcx}}, {{hex .CIKey.Const_2}}
+  mov {{.Reg.rdx}}, {{hex .CIKey.Const_2}}
+  xor {{.Reg.rcx}}, {{.Reg.rdx}}
   cmp {{.Reg.rcx}}, 456
   jne panic
 
@@ -43,12 +45,13 @@ entry:
 
   // "utf16"
   push 0x00000036
-  push 0x00310066
-  push 0x00740075
+  xor {{.Reg.rax}}, {{.Reg.rax}}
+  mov {{.Reg.rax}}, 0x0031006600740075
+  push {{.Reg.rax}}
 
   // compare string
   mov rsi, rsp
-  lea rdi, [rsp+3*4]
+  lea rdi, [rsp+2*8]
   mov rcx, 10
   cld
   repe cmpsb
@@ -71,7 +74,7 @@ entry:
     jmp panic
   {{end}}
 
-  add rsp, 9*8
+  add rsp, 6*8
 
   // mark the end of loader
   {{db .EndOfLoader}}
