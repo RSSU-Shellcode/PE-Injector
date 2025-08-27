@@ -76,12 +76,18 @@ func (inj *Injector) saveContext() [][]byte {
 	insts := make([][]byte, 0, len(fp)+len(save))
 	for i := 0; i < len(fp); i++ {
 		insts = append(insts, bytes.Clone(fp[i]))
-		insts = append(insts, inj.garbageInst())
+		garbage := inj.garbageInst()
+		if len(garbage) > 0 {
+			insts = append(insts, garbage)
+		}
 	}
 	for i := 0; i < len(save); i++ {
 		selected := save[inj.contextSeq[i]]
 		insts = append(insts, bytes.Clone(selected))
-		insts = append(insts, inj.garbageInst())
+		garbage := inj.garbageInst()
+		if len(garbage) > 0 {
+			insts = append(insts, garbage)
+		}
 	}
 	return insts
 }
@@ -103,11 +109,17 @@ func (inj *Injector) restoreContext() [][]byte {
 	for i := len(restore) - 1; i >= 0; i-- {
 		selected := restore[inj.contextSeq[i]]
 		insts = append(insts, bytes.Clone(selected))
-		insts = append(insts, inj.garbageInst())
+		garbage := inj.garbageInst()
+		if len(garbage) > 0 {
+			insts = append(insts, garbage)
+		}
 	}
 	for i := 0; i < len(fp); i++ {
 		insts = append(insts, bytes.Clone(fp[i]))
-		insts = append(insts, inj.garbageInst())
+		garbage := inj.garbageInst()
+		if len(garbage) > 0 {
+			insts = append(insts, garbage)
+		}
 	}
 	return insts
 }
