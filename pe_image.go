@@ -155,6 +155,42 @@ func (inj *Injector) removeSignature() {
 	inj.containSign = true
 }
 
+func (inj *Injector) removeLoadConfig() {
+	var dataDirectory *[16]pe.DataDirectory
+	switch inj.arch {
+	case "386":
+		dataDirectory = &inj.hdr32.DataDirectory
+	case "amd64":
+		dataDirectory = &inj.hdr64.DataDirectory
+	}
+	dd := &dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG]
+	if dd.VirtualAddress == 0 || dd.Size == 0 {
+		return
+	}
+	// calculate the offset of the load config entry
+	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
+	fhOffset := peOffset + 4
+	hdrOffset := fhOffset + imageFileHeaderSize
+	var optHeaderSize uint32
+	switch inj.arch {
+	case "386":
+		optHeaderSize = 96
+	case "amd64":
+		optHeaderSize = 112
+	}
+	ddOffset := hdrOffset + optHeaderSize
+	cfgOffset := ddOffset + pe.IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG*imageDataDirectorySize
+	// erase the directory entry
+	ndd := bytes.Repeat([]byte{0x00}, imageDataDirectorySize)
+	copy(inj.dup[cfgOffset:], ndd)
+	// extendSection or createSection will read optional header
+	// so need overwrite these fields in data directory
+	dd.VirtualAddress = 0
+	dd.Size = 0
+	// store state for analyze
+	inj.containCFG = true
+}
+
 // extendSection is used to extend the last section for write data.
 // It will return the RVA about the start of written data.
 // #nosec G115
