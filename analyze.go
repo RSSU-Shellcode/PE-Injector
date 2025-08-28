@@ -21,6 +21,7 @@ type Info struct {
 
 	NumCodeCaves     int  `toml:"num_code_caves"     json:"num_code_caves"`
 	ContainSignature bool `toml:"contain_signature"  json:"contain_signature"`
+	ContainCFG       bool `toml:"contain_cfg"        json:"contain_cfg"`
 	CanCreateSection bool `toml:"can_create_section" json:"can_create_section"`
 	CanInjectJumper  bool `toml:"can_inject_jumper"  json:"can_inject_jumper"`
 	CanInjectLoader  bool `toml:"can_inject_loader"  json:"can_inject_loader"`
@@ -114,6 +115,7 @@ func Analyze(image []byte) (*Info, error) {
 		HasGetProcAddress:      hasGetProcAddress,
 		NumCodeCaves:           numCaves,
 		ContainSignature:       injector.containSign,
+		ContainCFG:             injector.containCFG,
 		CanCreateSection:       canCreateSection,
 		CanInjectJumper:        numCaves > 0,
 		CanInjectLoader:        canInjectLoader,
