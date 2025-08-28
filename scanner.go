@@ -1,6 +1,7 @@
 package injector
 
 import (
+	"debug/pe"
 	"errors"
 )
 
@@ -26,9 +27,24 @@ func (c *codeCave) Write(img, data []byte) {
 }
 
 func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
-	text := inj.img.Section(".text")
+	// search the first section with RX
+	var text *pe.Section
+	for _, section := range inj.img.Sections {
+		char := section.SectionHeader.Characteristics
+		if char&0x00000020 == 0 { // contains code
+			continue
+		}
+		if char&0x20000000 == 0 { // executable
+			continue
+		}
+		if char&0x40000000 == 0 { // readable
+			continue
+		}
+		text = section
+		break
+	}
 	if text == nil {
-		return nil, errors.New("cannot find .text section in image")
+		return nil, errors.New("cannot find RX section in image")
 	}
 	// record offset and calculate scan range
 	size := text.Size
@@ -36,7 +52,7 @@ func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 		size = text.VirtualSize
 	}
 	if size < 32*1024 {
-		return nil, errors.New(".text section too small")
+		return nil, errors.New("RX section too small")
 	}
 	section, err := text.Data()
 	if err != nil {
