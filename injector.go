@@ -135,6 +135,9 @@ type Options struct {
 	// It is only for Inject with ModeCreateSection.
 	NoGarbage bool `toml:"no_garbage" json:"no_garbage"`
 
+	// reserve load config directory for enable Control Flow Guard.
+	ReserveCFG bool `toml:"reserve_cfg" json:"reserve_cfg"`
+
 	// specify the new section name, the default is ".patch".
 	SectionName string `toml:"section_name" json:"section_name"`
 
@@ -408,6 +411,8 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.arch = arch
 	inj.size = len(image)
 	inj.dll = isDLL
+	// TODO check options
+
 	// scan code cave in image text section
 	caves, err := inj.scanCodeCave()
 	if err != nil {
@@ -482,7 +487,7 @@ func (inj *Injector) selectFirstCodeCave(targetRVA uint32) *codeCave {
 // hook target function for add a jmp to the first code cave
 // #nosec G115
 func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
-	offset := int(inj.rvaToOffset(".text", srcRVA))
+	offset := int(inj.rvaToOffset(srcRVA))
 	if offset+32 > len(inj.dup) {
 		return errors.New("hook target is overflow")
 	}
