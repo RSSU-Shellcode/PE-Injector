@@ -201,6 +201,49 @@ func (inj *Injector) removeLoadConfig() {
 	inj.containCFG = true
 }
 
+func (inj *Injector) overwriteChecksum() {
+	checksum := calculateChecksum(inj.dup)
+	// calculate the offset of the checksum field
+	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
+	fhOffset := peOffset + 4
+	hdrOffset := fhOffset + imageFileHeaderSize
+	sumOffset := int(hdrOffset + 64)
+	// overwrite checksum
+	buf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(buf, checksum)
+	copy(inj.dup[sumOffset:], buf)
+}
+
+func calculateChecksum(image []byte) uint32 {
+	// calculate the offset of the checksum field
+	peOffset := binary.LittleEndian.Uint32(image[imageDOSHeader-4:])
+	fhOffset := peOffset + 4
+	hdrOffset := fhOffset + imageFileHeaderSize
+	sumOffset := int(hdrOffset + 64)
+	// calculate pe image checksum
+	var sum uint64
+	for i := 0; i < len(image); i += 2 {
+		if i >= sumOffset && i < sumOffset+4 {
+			continue
+		}
+		var word uint16
+		if i+1 < len(image) {
+			word = binary.LittleEndian.Uint16(image[i:])
+		} else {
+			word = uint16(image[i])
+		}
+		sum += uint64(word)
+		if sum > 0xFFFFFFFF {
+			sum = (sum & 0xFFFF) + (sum >> 16)
+		}
+	}
+	sum = (sum & 0xFFFF) + (sum >> 16)
+	sum += sum >> 16
+	sum &= 0xFFFF
+	sum += uint64(len(image))
+	return uint32(sum & 0xFFFFFFFF)
+}
+
 // extendSection is used to extend the last section for write data.
 // It will return the RVA about the start of written data.
 // #nosec G115
