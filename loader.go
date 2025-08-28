@@ -771,8 +771,8 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string)
 		}
 		loaderSize += maxNumInst * 16
 	}
-	scOffset := uint32(loaderSize) + randomOffset
-	size := scOffset + uint32(len(payload)) // #nosec G115
+	scOffset := uint32(loaderSize) + randomOffset // #nosec G115
+	size := scOffset + uint32(len(payload))       // #nosec G115
 	section, err := inj.createSection(inj.opts.SectionName, size)
 	if err != nil {
 		return "", err
