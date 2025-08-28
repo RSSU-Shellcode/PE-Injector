@@ -411,8 +411,10 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.arch = arch
 	inj.size = len(image)
 	inj.dll = isDLL
-	// TODO check options
-
+	// check option conflict
+	if opts.ReserveCFG && !opts.NotCreateThread && !opts.NoShellcodeJumper {
+		return errors.New("cannot create thread with shellcode jumper when reserve CFG")
+	}
 	// scan code cave in image text section
 	caves, err := inj.scanCodeCave()
 	if err != nil {
