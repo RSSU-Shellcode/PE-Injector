@@ -128,6 +128,17 @@ func TestRemoveLoadConfig(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCalculateChecksum(t *testing.T) {
+	image, err := os.ReadFile("testdata/putty.dat")
+	require.NoError(t, err)
+	peFile, err := pe.NewFile(bytes.NewReader(image))
+	require.NoError(t, err)
+	hdr := peFile.OptionalHeader.(*pe.OptionalHeader64)
+
+	checksum := calculateChecksum(image)
+	require.Equal(t, hdr.CheckSum, checksum)
+}
+
 func TestExtendSection(t *testing.T) {
 	injector := NewInjector()
 
