@@ -5,15 +5,18 @@ import (
 	"debug/pe"
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
 const (
-	imageDOSHeader         = 64
-	imageFileHeaderSize    = 20
-	imageSectionHeaderSize = 40
-	imageDataDirectorySize = 4 + 4
-	importDirectorySize    = 5 * 4
-	reserveSectionSize     = 8
+	imageDOSHeader          = 64
+	imageFileHeaderSize     = 20
+	imageSectionHeaderSize  = 40
+	imageOptionHeaderSize32 = 96
+	imageOptionHeaderSize64 = 112
+	imageDataDirectorySize  = 4 + 4
+	importDirectorySize     = 5 * 4
+	reserveSectionSize      = 8
 )
 
 var defaultSectionNames = []string{
@@ -138,9 +141,9 @@ func (inj *Injector) removeSignature() {
 	var optHeaderSize uint32
 	switch inj.arch {
 	case "386":
-		optHeaderSize = 96
+		optHeaderSize = imageOptionHeaderSize32
 	case "amd64":
-		optHeaderSize = 112
+		optHeaderSize = imageOptionHeaderSize64
 	}
 	ddOffset := hdrOffset + optHeaderSize
 	secOffset := ddOffset + pe.IMAGE_DIRECTORY_ENTRY_SECURITY*imageDataDirectorySize
@@ -156,6 +159,9 @@ func (inj *Injector) removeSignature() {
 }
 
 func (inj *Injector) removeLoadConfig() {
+	if inj.opts.ReserveCFG {
+		return
+	}
 	var dataDirectory *[16]pe.DataDirectory
 	switch inj.arch {
 	case "386":
@@ -167,6 +173,10 @@ func (inj *Injector) removeLoadConfig() {
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
+	// erase the CFG table data
+	tableOffset := inj.rvaToOffset(dd.VirtualAddress)
+	etb := bytes.Repeat([]byte{0x00}, int(dd.Size))
+	copy(inj.dup[tableOffset:], etb)
 	// calculate the offset of the load config entry
 	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
 	fhOffset := peOffset + 4
@@ -174,9 +184,9 @@ func (inj *Injector) removeLoadConfig() {
 	var optHeaderSize uint32
 	switch inj.arch {
 	case "386":
-		optHeaderSize = 96
+		optHeaderSize = imageOptionHeaderSize32
 	case "amd64":
-		optHeaderSize = 112
+		optHeaderSize = imageOptionHeaderSize64
 	}
 	ddOffset := hdrOffset + optHeaderSize
 	cfgOffset := ddOffset + pe.IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG*imageDataDirectorySize
@@ -339,12 +349,15 @@ func (inj *Injector) rvaToVA(rva uint32) uint64 {
 	return uint64(base + int64(rva))
 }
 
-func (inj *Injector) rvaToOffset(section string, rva uint32) uint32 {
-	s := inj.img.Section(section)
-	if s == nil {
-		return 0
+func (inj *Injector) rvaToOffset(rva uint32) uint32 {
+	for _, section := range inj.img.Sections {
+		va := section.VirtualAddress
+		size := section.Size
+		if rva >= va && rva <= va+size {
+			return section.Offset + (rva - va)
+		}
 	}
-	return s.Offset + (rva - s.VirtualAddress)
+	panic(fmt.Sprintf("invalid rva: 0x%X", rva))
 }
 
 func extractString(section []byte, start uint64) string {
