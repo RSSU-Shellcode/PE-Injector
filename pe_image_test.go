@@ -11,7 +11,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadImage(t *testing.T) {
+func TestProcessEAT(t *testing.T) {
+	injector := NewInjector()
+
+	t.Run("x86", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/kernel32_x86.dat")
+		require.NoError(t, err)
+		err = injector.preprocess(image, nil)
+		require.NoError(t, err)
+
+		injector.loadImage(image)
+		for _, eat := range injector.eat {
+			fmt.Printf("%s 0x%X\n", eat.proc, eat.addr)
+		}
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/kernel32_x64.dat")
+		require.NoError(t, err)
+		err = injector.preprocess(image, nil)
+		require.NoError(t, err)
+
+		injector.loadImage(image)
+		for _, eat := range injector.eat {
+			fmt.Printf("%s 0x%X\n", eat.proc, eat.addr)
+		}
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
+}
+
+func TestProcessIAT(t *testing.T) {
 	injector := NewInjector()
 
 	t.Run("x86", func(t *testing.T) {
@@ -22,7 +53,7 @@ func TestLoadImage(t *testing.T) {
 
 		injector.loadImage(image)
 		for _, iat := range injector.iat {
-			fmt.Println(iat.dll, iat.proc, iat.addr)
+			fmt.Printf("%s %s 0x%X\n", iat.dll, iat.proc, iat.addr)
 		}
 	})
 
@@ -34,7 +65,7 @@ func TestLoadImage(t *testing.T) {
 
 		injector.loadImage(image)
 		for _, iat := range injector.iat {
-			fmt.Println(iat.dll, iat.proc, iat.addr)
+			fmt.Printf("%s %s 0x%X\n", iat.dll, iat.proc, iat.addr)
 		}
 	})
 
