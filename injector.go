@@ -254,6 +254,7 @@ func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
+	inj.overwriteChecksum()
 	inj.ctx.Loader = inj.disassembleLoader(loader)
 	inj.ctx.Output = inj.dup
 	return inj.ctx, nil
@@ -301,6 +302,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
 	}
+	inj.overwriteChecksum()
 	inj.ctx.Output = inj.dup
 	return inj.ctx, nil
 }
