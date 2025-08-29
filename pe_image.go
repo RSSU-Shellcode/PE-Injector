@@ -16,6 +16,7 @@ const (
 	imageOptionHeaderSize64 = 112
 	imageDataDirectorySize  = 4 + 4
 	importDirectorySize     = 5 * 4
+	exportDirectorySize     = 40
 	reserveSectionSize      = 8
 )
 
@@ -31,6 +32,11 @@ type Section struct {
 	VirtualSize     uint32 `toml:"virtual_size"       json:"virtual_size"`
 	OffsetToRawData uint32 `toml:"offset_to_raw_data" json:"offset_to_raw_data"`
 	SizeOfRawData   uint32 `toml:"size_of_raw_data"   json:"size_of_raw_data"`
+}
+
+type eat struct {
+	proc string
+	addr uint64
 }
 
 type iat struct {
@@ -54,7 +60,65 @@ func (inj *Injector) loadImage(image []byte) {
 		copy(dst, src)
 	}
 	inj.vm = vm
+	inj.processEAT()
 	inj.processIAT()
+}
+
+func (inj *Injector) processEAT() {
+	var (
+		dataDirectory [16]pe.DataDirectory
+		imageBase     uint64
+	)
+	switch inj.arch {
+	case "386":
+		dataDirectory = inj.hdr32.DataDirectory
+		imageBase = uint64(inj.hdr32.ImageBase)
+	case "amd64":
+		dataDirectory = inj.hdr64.DataDirectory
+		imageBase = inj.hdr64.ImageBase
+	}
+	dd := dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_EXPORT]
+	if dd.VirtualAddress == 0 || dd.Size == 0 {
+		return
+	}
+	if int(dd.VirtualAddress)+exportDirectorySize > len(inj.vm) {
+		return
+	}
+	ed := inj.vm[dd.VirtualAddress:]
+	numberOfNames := binary.LittleEndian.Uint32(ed[24:28])
+	addressOfFunctions := binary.LittleEndian.Uint32(ed[28:32])
+	addressOfNames := binary.LittleEndian.Uint32(ed[32:36])
+	addressOfNameOrdinals := binary.LittleEndian.Uint32(ed[36:40])
+	var list []*eat
+	for i := uint32(0); i < numberOfNames; i++ {
+		nameRVAOffset := int(addressOfNames + i*4)
+		if nameRVAOffset+4 > len(inj.vm) {
+			break
+		}
+		nameRVA := binary.LittleEndian.Uint32(inj.vm[nameRVAOffset : nameRVAOffset+4])
+		if nameRVA == 0 {
+			continue
+		}
+		funcName := extractString(inj.vm, uint64(nameRVA))
+		ordinalOffset := int(addressOfNameOrdinals + i*2)
+		if ordinalOffset+2 > len(inj.vm) {
+			break
+		}
+		ordinal := binary.LittleEndian.Uint16(inj.vm[ordinalOffset : ordinalOffset+2])
+		funcAddrOffset := int(addressOfFunctions) + int(ordinal)*4
+		if funcAddrOffset+4 > len(inj.vm) {
+			break
+		}
+		funcRVA := binary.LittleEndian.Uint32(inj.vm[funcAddrOffset : funcAddrOffset+4])
+		if funcRVA >= dd.VirtualAddress && funcRVA <= dd.VirtualAddress+dd.Size {
+			continue
+		}
+		list = append(list, &eat{
+			proc: funcName,
+			addr: imageBase + uint64(funcRVA),
+		})
+	}
+	inj.eat = list
 }
 
 func (inj *Injector) processIAT() {
@@ -66,6 +130,9 @@ func (inj *Injector) processIAT() {
 		dataDirectory = inj.hdr64.DataDirectory
 	}
 	dd := dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_IMPORT]
+	if dd.VirtualAddress == 0 || dd.Size == 0 {
+		return
+	}
 	table := inj.vm[dd.VirtualAddress:]
 	var list []*iat
 	for len(table) >= importDirectorySize {
