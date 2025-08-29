@@ -8,6 +8,7 @@ type Info struct {
 	ImageBase    uint64     `toml:"image_base"   json:"image_base"`
 	EntryPoint   uint32     `toml:"entry_point"  json:"entry_point"`
 	Sections     []*Section `toml:"sections"     json:"sections"`
+	Exports      []string   `toml:"exports"      json:"exports"`
 
 	HasAllProcedures       bool `toml:"has_all_procedures"         json:"has_all_procedures"`
 	HasVirtualAlloc        bool `toml:"has_virtual_alloc"          json:"has_virtual_alloc"`
@@ -66,6 +67,11 @@ func Analyze(image []byte) (*Info, error) {
 			OffsetToRawData: sh.Offset,
 		}
 	}
+	l = len(injector.eat)
+	exports := make([]string, l)
+	for i := 0; i < l; i++ {
+		exports[i] = injector.eat[i].proc
+	}
 	// check the procedure in IAT
 	hasLoadLibraryA := injector.getProcFromIAT("LoadLibraryA") != nil
 	hasLoadLibraryW := injector.getProcFromIAT("LoadLibraryW") != nil
@@ -104,6 +110,7 @@ func Analyze(image []byte) (*Info, error) {
 		ImageBase:              imageBase,
 		EntryPoint:             entryPoint,
 		Sections:               sections,
+		Exports:                exports,
 		HasAllProcedures:       !ctx.LackProcedure,
 		HasVirtualAlloc:        !ctx.LackVirtualAlloc,
 		HasVirtualFree:         !ctx.LackVirtualFree,
