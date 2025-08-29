@@ -73,8 +73,9 @@ type Injector struct {
 	containSign bool
 	containCFG  bool
 
-	// about process IAT
+	// about process EAT and IAT
 	vm  []byte
+	eat []*eat
 	iat []*iat
 
 	// about create section mode
