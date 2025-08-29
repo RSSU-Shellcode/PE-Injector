@@ -308,7 +308,7 @@ func calculateChecksum(image []byte) uint32 {
 	sum += sum >> 16
 	sum &= 0xFFFF
 	sum += uint64(len(image))
-	return uint32(sum & 0xFFFFFFFF)
+	return uint32(sum & 0xFFFFFFFF) // #nosec G115
 }
 
 // extendSection is used to extend the last section for write data.
