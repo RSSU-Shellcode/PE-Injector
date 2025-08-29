@@ -36,7 +36,7 @@ type Section struct {
 
 type eat struct {
 	proc string
-	addr uint64
+	addr uint32
 }
 
 type iat struct {
@@ -65,17 +65,12 @@ func (inj *Injector) loadImage(image []byte) {
 }
 
 func (inj *Injector) processEAT() {
-	var (
-		dataDirectory [16]pe.DataDirectory
-		imageBase     uint64
-	)
+	var dataDirectory [16]pe.DataDirectory
 	switch inj.arch {
 	case "386":
 		dataDirectory = inj.hdr32.DataDirectory
-		imageBase = uint64(inj.hdr32.ImageBase)
 	case "amd64":
 		dataDirectory = inj.hdr64.DataDirectory
-		imageBase = inj.hdr64.ImageBase
 	}
 	dd := dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_EXPORT]
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
@@ -115,7 +110,7 @@ func (inj *Injector) processEAT() {
 		}
 		list = append(list, &eat{
 			proc: funcName,
-			addr: imageBase + uint64(funcRVA),
+			addr: funcRVA,
 		})
 	}
 	inj.eat = list
