@@ -105,6 +105,12 @@ type Options struct {
 	// if it is zero, use the entry point.
 	Address uint64 `toml:"address" json:"address"`
 
+	// specify the target function in EAT that will
+	// be hooked, it not support forwarded.
+	// the hook target is usually not at the beginning
+	// of the function.
+	Function string `toml:"function" json:"function"`
+
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or
 	// register, you need set it with true.
@@ -314,11 +320,14 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 			err = errors.New(fmt.Sprint(r))
 		}
 	}()
-	targetRVA := inj.selectTargetRVA()
-	if targetRVA == 0 {
+	target, err := inj.selectTargetRVA()
+	if err != nil {
+		return err
+	}
+	if target == 0 {
 		return errors.New("hook target function address is zero")
 	}
-	first := inj.selectFirstCodeCave(targetRVA)
+	first := inj.selectFirstCodeCave(target)
 	var dstRVA uint32
 	if inj.section != nil {
 		dstRVA = inj.section.VirtualAddress
@@ -328,26 +337,25 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 		}
 		dstRVA = first.virtualAddr
 	}
-	err = inj.hook(targetRVA, dstRVA)
+	err = inj.hook(target, dstRVA)
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
-	inj.ctx.HookAddress = inj.rvaToVA(targetRVA)
 	err = inj.slice(shellcode)
 	if err != nil {
 		return err
 	}
 	if inj.section != nil {
 		inj.ctx.Mode = ModeCreateSection
-		inj.padding(shellcode, targetRVA)
+		inj.padding(shellcode, target)
 		return nil
 	}
 	if !raw {
-		return inj.insert(targetRVA, first)
+		return inj.insert(target, first)
 	}
 	// try to cove cave mode
 	inj.ctx.Mode = ModeCodeCave
-	err = inj.insert(targetRVA, first)
+	err = inj.insert(target, first)
 	if err == nil {
 		return nil
 	}
@@ -360,7 +368,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	if err != nil {
 		return err
 	}
-	inj.padding(shellcode, targetRVA)
+	inj.padding(shellcode, target)
 	return nil
 }
 
@@ -414,9 +422,9 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.arch = arch
 	inj.size = len(image)
 	inj.dll = isDLL
-	// check option conflict
-	if opts.ReserveCFG && !opts.NotCreateThread && !opts.NoShellcodeJumper {
-		return errors.New("cannot create thread with shellcode jumper when reserve CFG")
+	err = inj.checkOptionConflict(opts)
+	if err != nil {
+		return err
 	}
 	// scan code cave in image text section
 	caves, err := inj.scanCodeCave()
@@ -452,12 +460,32 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	return nil
 }
 
-func (inj *Injector) selectTargetRVA() uint32 {
-	if inj.opts.Address != 0 {
-		return inj.vaToRVA(inj.opts.Address)
+func (inj *Injector) checkOptionConflict(opts *Options) error {
+	if opts.Address != 0 && opts.Function != "" {
+		return errors.New("both Address and Function are specified")
+	}
+	if opts.ReserveCFG && !opts.NotCreateThread && !opts.NoShellcodeJumper {
+		return errors.New("cannot create thread with shellcode jumper when reserve CFG")
+	}
+	return nil
+}
+
+func (inj *Injector) selectTargetRVA() (uint32, error) {
+	address := inj.opts.Address
+	if address != 0 {
+		return inj.vaToRVA(address), nil
+	}
+	function := inj.opts.Function
+	if function != "" {
+		for _, eat := range inj.eat {
+			if eat.proc == function {
+				return eat.addr, nil
+			}
+		}
+		return 0, fmt.Errorf("failed to find export function: %s", function)
 	}
 	if inj.dll {
-		return 0
+		return 0, errors.New("must specify field Address or Function in DLL")
 	}
 	var entryPoint uint32
 	switch inj.arch {
@@ -466,14 +494,14 @@ func (inj *Injector) selectTargetRVA() uint32 {
 	case "amd64":
 		entryPoint = inj.hdr64.AddressOfEntryPoint
 	}
-	return entryPoint
+	return entryPoint, nil
 }
 
-func (inj *Injector) selectFirstCodeCave(targetRVA uint32) *codeCave {
+func (inj *Injector) selectFirstCodeCave(target uint32) *codeCave {
 	var first *codeCave
 	// search a cave near the target RVA
 	for i, cave := range inj.caves {
-		offset := int64(cave.virtualAddr) - int64(targetRVA)
+		offset := int64(cave.virtualAddr) - int64(target)
 		if offset <= 4096 && offset >= -4096 {
 			first = cave
 			inj.removeCodeCave(i)
@@ -522,6 +550,8 @@ func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
 	patch = append(patch, jmp...)
 	patch = append(patch, padding...)
 	copy(inj.dup[offset:], patch)
+	// update context
+	inj.ctx.HookAddress = inj.rvaToVA(srcRVA)
 	return nil
 }
 
