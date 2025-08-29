@@ -33,6 +33,7 @@ func init() {
 	flag.BoolVar(&aye, "a", false, "analyze the pe image for inject")
 	flag.BoolVar(&raw, "raw", false, "inject shellcode without loader")
 	flag.Uint64Var(&opts.Address, "addr", 0, "specify the target function address that will be hooked")
+	flag.StringVar(&opts.Function, "func", "", "specify the target function in EAT that will be hooked")
 	flag.BoolVar(&opts.NotSaveContext, "nsc", false, "not append instruction about save and restore context")
 	flag.BoolVar(&opts.NotCreateThread, "nct", false, "not create thread at the shellcode")
 	flag.BoolVar(&opts.NotWaitThread, "nwt", false, "not wait created thread at the shellcode")
