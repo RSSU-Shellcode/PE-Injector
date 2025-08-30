@@ -24,8 +24,8 @@ type Info struct {
 	ContainSignature bool `toml:"contain_signature"  json:"contain_signature"`
 	ContainCFG       bool `toml:"contain_cfg"        json:"contain_cfg"`
 	CanCreateSection bool `toml:"can_create_section" json:"can_create_section"`
-	CanInjectJumper  bool `toml:"can_inject_jumper"  json:"can_inject_jumper"`
 	CanInjectLoader  bool `toml:"can_inject_loader"  json:"can_inject_loader"`
+	CanInjectJumper  bool `toml:"can_inject_jumper"  json:"can_inject_jumper"`
 	InjectLoaderRank int  `toml:"inject_loader_rank" json:"inject_loader_rank"`
 }
 
@@ -124,8 +124,8 @@ func Analyze(image []byte) (*Info, error) {
 		ContainSignature:       injector.containSign,
 		ContainCFG:             injector.containCFG,
 		CanCreateSection:       canCreateSection,
-		CanInjectJumper:        numCaves > 0,
 		CanInjectLoader:        canInjectLoader,
+		CanInjectJumper:        numCaves > 0,
 		InjectLoaderRank:       injectLoaderRank,
 	}
 	err = injector.Close()
