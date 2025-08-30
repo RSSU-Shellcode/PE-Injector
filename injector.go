@@ -112,6 +112,10 @@ type Options struct {
 	// of the function.
 	Function string `toml:"function" json:"function"`
 
+	// not select a random instruction after target address that can be hooked.
+	// when Address is set or NotSaveContext, it will be ignored.
+	NotHookInstruction bool `toml:"not_hook_instruction" json:"not_hook_instruction"`
+
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or
 	// register, you need set it with true.
@@ -329,7 +333,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 		return errors.New("hook target function address is zero")
 	}
 	instOffset := inj.selectHookInstruction(int(inj.rvaToOffset(target)))
-	target = inj.offsetToRVA(uint32(instOffset))
+	target = inj.offsetToRVA(uint32(instOffset)) // #nosec G115
 	first := inj.selectFirstCodeCave(target)
 	var dstRVA uint32
 	if inj.section != nil {
@@ -501,9 +505,9 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 	return entryPoint, nil
 }
 
-// select a random instruction that can be hooked
+// select a random instruction that can be hooked.
 func (inj *Injector) selectHookInstruction(offset int) int {
-	if inj.abs || inj.opts.NotSaveContext {
+	if inj.abs || inj.opts.NotHookInstruction || inj.opts.NotSaveContext {
 		return offset
 	}
 	idx := 4 + inj.rand.Intn(40)
@@ -515,6 +519,16 @@ func (inj *Injector) selectHookInstruction(offset int) int {
 		inst, err := inj.decodeInst(inj.dup[offset : offset+32])
 		if err != nil {
 			break
+		}
+		// skip too small instructions for debug easily
+		if inst.Len < nearJumpSize {
+			offset += inst.Len
+			continue
+		}
+		// skip mov instruction for skip absolute address on x86
+		if inst.Op == x86asm.MOV {
+			offset += inst.Len
+			continue
 		}
 		// walk into the next instruction
 		if inst.Op == x86asm.JMP {
