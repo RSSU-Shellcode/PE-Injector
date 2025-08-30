@@ -320,7 +320,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 			err = errors.New(fmt.Sprint(r))
 		}
 	}()
-	target, err := inj.selectTargetRVA()
+	target, err := inj.selectHookTarget()
 	if err != nil {
 		return err
 	}
@@ -470,7 +470,7 @@ func (inj *Injector) checkOptionConflict(opts *Options) error {
 	return nil
 }
 
-func (inj *Injector) selectTargetRVA() (uint32, error) {
+func (inj *Injector) selectHookTarget() (uint32, error) {
 	address := inj.opts.Address
 	if address != 0 {
 		return inj.vaToRVA(address), nil
@@ -521,7 +521,7 @@ func (inj *Injector) selectFirstCodeCave(target uint32) *codeCave {
 // #nosec G115
 func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
 	offset := int(inj.rvaToOffset(srcRVA))
-	if offset+32 > len(inj.dup) {
+	if offset+32 > inj.size {
 		return errors.New("hook target is overflow")
 	}
 	insts, _ := inj.disassemble(inj.dup[offset : offset+32])
@@ -890,9 +890,14 @@ func mergeBytes(b [][]byte) []byte {
 func (inj *Injector) cleanup() {
 	inj.dup = nil
 	inj.img = nil
+	inj.containSign = false
+	inj.containCFG = false
 	inj.vm = nil
+	inj.eat = nil
+	inj.iat = nil
 	inj.section = nil
 	inj.segment = nil
+	inj.ccList = nil
 	inj.caves = nil
 }
 
