@@ -440,6 +440,73 @@ func TestSpecificAddress(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestSpecificFunction(t *testing.T) {
+	injector := NewInjector()
+
+	opts := &Options{
+		Function: "ExitProcess",
+	}
+
+	t.Run("loader", func(t *testing.T) {
+		t.Run("x86", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/kernel32_x86.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
+			require.NoError(t, err)
+
+			ctx, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			require.Equal(t, ModeCodeCave, ctx.Mode)
+		})
+
+		t.Run("x64", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/kernel32_x64.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+			require.NoError(t, err)
+
+			ctx, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			require.Equal(t, ModeCodeCave, ctx.Mode)
+		})
+	})
+
+	t.Run("raw", func(t *testing.T) {
+		t.Run("x86", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/kernel32_x86.dat")
+			require.NoError(t, err)
+			shellcode := []byte{
+				0x90,
+				0x66, 0x90,
+			}
+
+			ctx, err := injector.InjectRaw(image, shellcode, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			require.Equal(t, ModeCodeCave, ctx.Mode)
+		})
+
+		t.Run("x64", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/kernel32_x64.dat")
+			require.NoError(t, err)
+			shellcode := []byte{
+				0x90,
+				0x66, 0x90,
+			}
+
+			ctx, err := injector.InjectRaw(image, shellcode, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			require.Equal(t, ModeCodeCave, ctx.Mode)
+		})
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
+}
+
 func TestSpecificSeed(t *testing.T) {
 	injector := NewInjector()
 
