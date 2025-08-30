@@ -52,10 +52,15 @@ func main() {
 		if mustNotSign && info.ContainSignature {
 			return nil
 		}
-		fmt.Println("found target:", path)
+		fmt.Println(path)
 		fmt.Println("num code caves:    ", info.NumCodeCaves)
 		fmt.Println("can create section:", info.CanCreateSection)
-		fmt.Println("inject loader rank:", info.InjectLoaderRank)
+		fmt.Println("can inject loader: ", info.CanInjectLoader)
+		fmt.Println("can inject jumper: ", info.CanInjectJumper)
+		if info.CanInjectLoader {
+			fmt.Println("inject loader rank:", info.InjectLoaderRank)
+		}
+		fmt.Println()
 		return nil
 	})
 	if err != nil {
