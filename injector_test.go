@@ -101,6 +101,15 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
+	t.Run("reserve cfg", func(t *testing.T) {
+		opts := Options{
+			ReserveCFG:      true,
+			NotCreateThread: true,
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
 	err := injector.Close()
 	require.NoError(t, err)
 }
