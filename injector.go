@@ -62,6 +62,7 @@ type Injector struct {
 	arch string
 	dll  bool
 	size int
+	abs  bool
 	dup  []byte
 
 	// about pe image
@@ -327,6 +328,8 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	if target == 0 {
 		return errors.New("hook target function address is zero")
 	}
+	instOffset := inj.selectHookInstruction(int(inj.rvaToOffset(target)))
+	target = inj.offsetToRVA(uint32(instOffset))
 	first := inj.selectFirstCodeCave(target)
 	var dstRVA uint32
 	if inj.section != nil {
@@ -473,6 +476,7 @@ func (inj *Injector) checkOptionConflict(opts *Options) error {
 func (inj *Injector) selectHookTarget() (uint32, error) {
 	address := inj.opts.Address
 	if address != 0 {
+		inj.abs = true
 		return inj.vaToRVA(address), nil
 	}
 	function := inj.opts.Function
@@ -495,6 +499,49 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 		entryPoint = inj.hdr64.AddressOfEntryPoint
 	}
 	return entryPoint, nil
+}
+
+// select a random instruction that can be hooked
+func (inj *Injector) selectHookInstruction(offset int) int {
+	if inj.abs || inj.opts.NotSaveContext {
+		return offset
+	}
+	idx := 4 + inj.rand.Intn(40)
+	target := offset
+	for i := 0; i < 50; i++ {
+		if offset+32 > inj.size {
+			break
+		}
+		inst, err := inj.decodeInst(inj.dup[offset : offset+32])
+		if err != nil {
+			break
+		}
+		// walk into the next instruction
+		if inst.Op == x86asm.JMP {
+			offset += inst.Len + int(inst.Args[0].(x86asm.Rel))
+			continue
+		}
+		if inst.Op == x86asm.RET || inst.Op == x86asm.INT {
+			break
+		}
+		// stop when reach a judgement jump
+		if inst.PCRelOff != 0 {
+			if inst.Op != x86asm.CALL {
+				break
+			}
+			if inst.Len != 5 {
+				break
+			}
+		}
+		// set preselected target
+		target = offset
+		if i >= idx {
+			break
+		}
+		// decode next instruction
+		offset += inst.Len
+	}
+	return target
 }
 
 func (inj *Injector) selectFirstCodeCave(target uint32) *codeCave {
@@ -888,6 +935,7 @@ func mergeBytes(b [][]byte) []byte {
 }
 
 func (inj *Injector) cleanup() {
+	inj.abs = false
 	inj.dup = nil
 	inj.img = nil
 	inj.containSign = false
