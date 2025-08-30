@@ -454,6 +454,17 @@ func (inj *Injector) rvaToVA(rva uint32) uint64 {
 	return uint64(base + int64(rva))
 }
 
+func (inj *Injector) offsetToRVA(offset uint32) uint32 {
+	for _, section := range inj.img.Sections {
+		off := section.Offset
+		size := section.Size
+		if offset >= off && offset <= off+size {
+			return section.VirtualAddress + (offset - section.Offset)
+		}
+	}
+	panic(fmt.Sprintf("invalid offset: 0x%X", offset))
+}
+
 func (inj *Injector) rvaToOffset(rva uint32) uint32 {
 	for _, section := range inj.img.Sections {
 		va := section.VirtualAddress
