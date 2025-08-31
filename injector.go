@@ -506,11 +506,12 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 	return entryPoint, nil
 }
 
-// select a random instruction that can be hooked.
+//gocyclo:ignore
 func (inj *Injector) selectHookInstruction(offset int) int {
 	if inj.abs || inj.opts.NotHookInstruction || inj.opts.NotSaveContext {
 		return offset
 	}
+	// select a random instruction that can be hooked.
 	idx := 4 + inj.rand.Intn(40)
 	target := offset
 	for i := 0; i < 50; i++ {
@@ -559,9 +560,9 @@ func (inj *Injector) selectHookInstruction(offset int) int {
 	return target
 }
 
+// selectFirstCodeCave will try to search a cave near the target RVA.
 func (inj *Injector) selectFirstCodeCave(target uint32) *codeCave {
 	var first *codeCave
-	// search a cave near the target RVA
 	for i, cave := range inj.caves {
 		offset := int64(cave.virtualAddr) - int64(target)
 		if offset <= 4096 && offset >= -4096 {
