@@ -188,6 +188,7 @@ type Options struct {
 // Context contains the output and context data in Inject and InjectRaw.
 type Context struct {
 	Output []byte    `toml:"output" json:"output"`
+	Hook   []string  `toml:"hook"   json:"hook"`
 	Loader [2]string `toml:"loader" json:"loader"`
 
 	Arch  string `toml:"arch"   json:"arch"`
@@ -586,7 +587,7 @@ func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
 		return errors.New("hook target is overflow")
 	}
 	insts, _ := inj.disassemble(inj.dup[offset : offset+32])
-	numInst, totalSize, err := calcInstNumAndSize(insts)
+	numInst, totalSize, err := inj.calcInstNumAndSize(insts)
 	if err != nil {
 		return err
 	}
@@ -618,12 +619,14 @@ func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
 
 // calcInstNumAndSize is used to calculate the instruction number
 // and the total size that will be overwritten.
-func calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) {
+func (inj *Injector) calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) {
 	var (
 		num  int
 		size int
 	)
 	for i := 0; i < len(insts); i++ {
+		hook := strings.ToLower(insts[i].String())
+		inj.ctx.Hook = append(inj.ctx.Hook, hook)
 		num++
 		size += insts[i].Len
 		if size >= nearJumpSize {
