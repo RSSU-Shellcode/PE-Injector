@@ -106,6 +106,8 @@ func main() {
 		ctx, err = inj.Inject(image, shellcode, &opts)
 	}
 	checkError(err)
+
+	fmt.Println()
 	fmt.Println("==============Context===============")
 	fmt.Println("arch:", ctx.Arch)
 	fmt.Println("mode:", ctx.Mode)
@@ -120,7 +122,9 @@ func main() {
 	fmt.Println("erase shellcode: ", ctx.EraseShellcode)
 	fmt.Println("shellcode jumper:", ctx.ShellcodeJumper)
 	fmt.Println("has garbage:     ", ctx.HasGarbage)
-	fmt.Println("section name:    ", ctx.SectionName)
+	if ctx.Mode == injector.ModeCreateSection {
+		fmt.Println("section name:    ", ctx.SectionName)
+	}
 	fmt.Println()
 	fmt.Println("Procedure Complete: ", ctx.HasAllProcedures)
 	fmt.Println("VirtualAlloc:       ", ctx.HasVirtualAlloc)
@@ -135,7 +139,14 @@ func main() {
 	fmt.Println("num code caves:  ", ctx.NumCodeCaves)
 	fmt.Println("num loader insts:", ctx.NumLoaderInst)
 	fmt.Printf("hook address:     0x%X\n", ctx.HookAddress)
+
+	fmt.Println()
+	fmt.Println("================Hook================")
+	for i := 0; i < len(ctx.Hook); i++ {
+		fmt.Println("  ", ctx.Hook[i])
+	}
 	fmt.Println("====================================")
+	fmt.Println()
 
 	fmt.Printf("write output image to \"%s\"\n", out)
 	err = os.WriteFile(out, ctx.Output, 0600)
