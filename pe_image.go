@@ -34,6 +34,12 @@ type Section struct {
 	SizeOfRawData   uint32 `toml:"size_of_raw_data"   json:"size_of_raw_data"`
 }
 
+// Export contains export function address.
+type Export struct {
+	Name    string `toml:"name"    json:"name"`
+	Address uint64 `toml:"address" json:"address"`
+}
+
 type eat struct {
 	proc string
 	addr uint32
