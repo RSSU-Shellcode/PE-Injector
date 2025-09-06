@@ -8,7 +8,7 @@ type Info struct {
 	ImageBase    uint64     `toml:"image_base"   json:"image_base"`
 	EntryPoint   uint32     `toml:"entry_point"  json:"entry_point"`
 	Sections     []*Section `toml:"sections"     json:"sections"`
-	Exports      []string   `toml:"exports"      json:"exports"`
+	Exports      []*Export  `toml:"exports"      json:"exports"`
 
 	HasAllProcedures       bool `toml:"has_all_procedures"         json:"has_all_procedures"`
 	HasVirtualAlloc        bool `toml:"has_virtual_alloc"          json:"has_virtual_alloc"`
@@ -68,9 +68,13 @@ func Analyze(image []byte) (*Info, error) {
 		}
 	}
 	l = len(injector.eat)
-	exports := make([]string, l)
+	exports := make([]*Export, l)
 	for i := 0; i < l; i++ {
-		exports[i] = injector.eat[i].proc
+		eat := injector.eat[i]
+		exports[i] = &Export{
+			Name:    eat.proc,
+			Address: injector.rvaToVA(eat.addr),
+		}
 	}
 	// check the procedure in IAT
 	hasLoadLibraryA := injector.getProcFromIAT("LoadLibraryA") != nil
