@@ -17,7 +17,8 @@ var (
 	sc    string
 	hexSC bool
 	out   string
-	aye   bool
+	ana   bool
+	exp   bool
 	raw   bool
 	jcx86 string
 	jcx64 string
@@ -30,7 +31,8 @@ func init() {
 	flag.StringVar(&sc, "sc", "", "set input shellcode file path")
 	flag.BoolVar(&hexSC, "hex", false, "input shellcode with hex format")
 	flag.StringVar(&out, "o", "", "set output pe image file path")
-	flag.BoolVar(&aye, "a", false, "analyze the pe image for inject")
+	flag.BoolVar(&ana, "ana", false, "analyze the pe image for inject")
+	flag.BoolVar(&exp, "exp", false, "dump the pe image export functions")
 	flag.BoolVar(&raw, "raw", false, "inject shellcode without loader")
 	flag.Uint64Var(&opts.Address, "addr", 0, "specify the target function address that will be hooked")
 	flag.StringVar(&opts.Function, "func", "", "specify the target function in EAT that will be hooked")
@@ -60,8 +62,12 @@ func main() {
 		flag.Usage()
 		return
 	}
-	if aye {
+	if ana {
 		analyzeImage()
+		return
+	}
+	if exp {
+		dumpImageExports()
 		return
 	}
 	if out == "" {
@@ -191,6 +197,16 @@ func analyzeImage() {
 	fmt.Println("CanInjectLoader: ", info.CanInjectLoader)
 	fmt.Println("InjectLoaderRank:", info.InjectLoaderRank)
 	fmt.Println("========================================")
+}
+
+func dumpImageExports() {
+	image, err := os.ReadFile(img) // #nosec
+	checkError(err)
+	info, err := injector.Analyze(image)
+	checkError(err)
+	for _, export := range info.Exports {
+		fmt.Printf("0x%X  %s\n", export.Address, export.Name)
+	}
 }
 
 func loadLoaderTemplate(path string) string {
