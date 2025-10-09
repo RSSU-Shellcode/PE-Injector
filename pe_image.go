@@ -506,9 +506,15 @@ func extractString(section []byte, start uint64) string {
 }
 
 func alignFileOffset(size uint32) uint32 {
+	if size%0x200 == 0 {
+		return size
+	}
 	return (size/0x200 + 1) * 0x200
 }
 
 func alignMemoryRegion(size uint32) uint32 {
+	if size%0x1000 == 0 {
+		return size
+	}
 	return (size/0x1000 + 1) * 0x1000
 }
