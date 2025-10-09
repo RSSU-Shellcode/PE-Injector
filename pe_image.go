@@ -270,7 +270,17 @@ func (inj *Injector) removeLoadConfig() {
 }
 
 func (inj *Injector) overwriteChecksum() {
-	checksum := calculateChecksum(inj.dup)
+	var checksum uint32
+	switch inj.arch {
+	case "386":
+		checksum = inj.hdr32.CheckSum
+	case "amd64":
+		checksum = inj.hdr32.CheckSum
+	}
+	if checksum == 0 {
+		return
+	}
+	checksum = calculateChecksum(inj.dup)
 	// calculate the offset of the checksum field
 	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
 	fhOffset := peOffset + 4
