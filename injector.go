@@ -84,6 +84,9 @@ type Injector struct {
 	eat []*eat
 	iat []*iat
 
+	// try to extend text section
+	canTryExtend bool
+
 	// about create section mode
 	section *pe.SectionHeader
 
