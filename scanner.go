@@ -29,7 +29,7 @@ func (c *codeCave) Write(img, data []byte) {
 func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 	// search the first section with RX
 	var text *pe.Section
-	for _, section := range inj.img.Sections {
+	for idx, section := range inj.img.Sections {
 		char := section.SectionHeader.Characteristics
 		if char&0x00000020 == 0 { // contains code
 			continue
@@ -41,6 +41,10 @@ func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 			continue
 		}
 		text = section
+		// when the first section is RX, we can try to extend
+		if idx == 0 {
+			inj.canTryExtend = true
+		}
 		break
 	}
 	if text == nil {
@@ -59,9 +63,7 @@ func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 		return nil, err
 	}
 	section = section[:size-32]
-	// scan code caves
-	caves := inj.scanSection(section, text.VirtualAddress, text.Offset)
-	return caves, nil
+	return inj.scanSection(section, text.VirtualAddress, text.Offset), nil
 }
 
 // #nosec G115
