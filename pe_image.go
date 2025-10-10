@@ -10,6 +10,7 @@ import (
 
 const (
 	imageDOSHeader          = 64
+	imageNTSignatureSize    = 4
 	imageFileHeaderSize     = 20
 	imageSectionHeaderSize  = 40
 	imageOptionHeaderSize32 = 96
@@ -203,18 +204,7 @@ func (inj *Injector) removeSignature() {
 	// erase the signature at tail of image
 	inj.dup = inj.dup[:dd.VirtualAddress]
 	// calculate the offset of the security entry
-	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
-	fhOffset := peOffset + 4
-	hdrOffset := fhOffset + imageFileHeaderSize
-	var optHeaderSize uint32
-	switch inj.arch {
-	case "386":
-		optHeaderSize = imageOptionHeaderSize32
-	case "amd64":
-		optHeaderSize = imageOptionHeaderSize64
-	}
-	ddOffset := hdrOffset + optHeaderSize
-	secOffset := ddOffset + pe.IMAGE_DIRECTORY_ENTRY_SECURITY*imageDataDirectorySize
+	secOffset := inj.offDataDir + pe.IMAGE_DIRECTORY_ENTRY_SECURITY*imageDataDirectorySize
 	// erase the directory entry
 	ndd := bytes.Repeat([]byte{0x00}, imageDataDirectorySize)
 	copy(inj.dup[secOffset:], ndd)
@@ -246,18 +236,7 @@ func (inj *Injector) removeLoadConfig() {
 	etb := bytes.Repeat([]byte{0x00}, int(dd.Size))
 	copy(inj.dup[tableOffset:], etb)
 	// calculate the offset of the load config entry
-	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
-	fhOffset := peOffset + 4
-	hdrOffset := fhOffset + imageFileHeaderSize
-	var optHeaderSize uint32
-	switch inj.arch {
-	case "386":
-		optHeaderSize = imageOptionHeaderSize32
-	case "amd64":
-		optHeaderSize = imageOptionHeaderSize64
-	}
-	ddOffset := hdrOffset + optHeaderSize
-	cfgOffset := ddOffset + pe.IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG*imageDataDirectorySize
+	cfgOffset := inj.offDataDir + pe.IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG*imageDataDirectorySize
 	// erase the directory entry
 	ndd := bytes.Repeat([]byte{0x00}, imageDataDirectorySize)
 	copy(inj.dup[cfgOffset:], ndd)
@@ -282,10 +261,7 @@ func (inj *Injector) overwriteChecksum() {
 	}
 	checksum = calculateChecksum(inj.dup)
 	// calculate the offset of the checksum field
-	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
-	fhOffset := peOffset + 4
-	hdrOffset := fhOffset + imageFileHeaderSize
-	sumOffset := int(hdrOffset + 64)
+	sumOffset := int(inj.offOptHdr + 64)
 	// overwrite checksum
 	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, checksum)
@@ -294,10 +270,10 @@ func (inj *Injector) overwriteChecksum() {
 
 func calculateChecksum(image []byte) uint32 {
 	// calculate the offset of the checksum field
-	peOffset := binary.LittleEndian.Uint32(image[imageDOSHeader-4:])
-	fhOffset := peOffset + 4
-	hdrOffset := fhOffset + imageFileHeaderSize
-	sumOffset := int(hdrOffset + 64)
+	hdrOffset := binary.LittleEndian.Uint32(image[imageDOSHeader-4:])
+	fileHeader := hdrOffset + imageNTSignatureSize
+	optHeader := fileHeader + imageFileHeaderSize
+	sumOffset := int(optHeader + 64)
 	// calculate pe image checksum
 	var sum uint64
 	for i := 0; i < len(image); i += 2 {
@@ -327,10 +303,7 @@ func calculateChecksum(image []byte) uint32 {
 // #nosec G115
 func (inj *Injector) extendSection(data []byte) uint32 {
 	// calculate the offset of target data
-	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
-	fhOffset := peOffset + 4
-	hdrOffset := fhOffset + imageFileHeaderSize
-	sctOffset := hdrOffset + uint32(inj.img.SizeOfOptionalHeader)
+	sctOffset := inj.offOptHdr + uint32(inj.img.SizeOfOptionalHeader)
 	shOffset := sctOffset + uint32((inj.img.NumberOfSections-1)*imageSectionHeaderSize)
 	// adjust the last section header
 	last := new(pe.SectionHeader32)
@@ -364,7 +337,7 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 		hdr.SizeOfImage += uint32(padSize)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 	}
-	copy(inj.dup[hdrOffset:], buffer.Bytes())
+	copy(inj.dup[inj.offOptHdr:], buffer.Bytes())
 	// copy data to the extended section
 	dst := last.PointerToRawData + oldVirtualSize + reserveSectionSize
 	copy(inj.dup[dst:], data)
@@ -384,10 +357,7 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 	fSection := inj.img.Sections[0]
 	fhOffset := fSection.Offset
 	// calculate the offset about the end of last section header
-	peOffset := binary.LittleEndian.Uint32(inj.dup[imageDOSHeader-4:])
-	fHdrOffset := peOffset + 4
-	hdrOffset := fHdrOffset + imageFileHeaderSize
-	sctOffset := hdrOffset + uint32(inj.img.SizeOfOptionalHeader)
+	sctOffset := inj.offOptHdr + uint32(inj.img.SizeOfOptionalHeader)
 	shOffset := sctOffset + uint32((inj.img.NumberOfSections)*imageSectionHeaderSize)
 	if fhOffset-shOffset < imageSectionHeaderSize {
 		return nil, errors.New("not enough space for add a new section header")
@@ -420,7 +390,7 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 	fileHeader.NumberOfSections++
 	buffer.Reset()
 	_ = binary.Write(buffer, binary.LittleEndian, &fileHeader)
-	copy(inj.dup[fHdrOffset:], buffer.Bytes())
+	copy(inj.dup[inj.offFileHdr:], buffer.Bytes())
 	// adjust the size of image in optional header
 	buffer.Reset()
 	switch inj.arch {
@@ -433,7 +403,7 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 		hdr.SizeOfImage += uint32(len(newSection))
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 	}
-	copy(inj.dup[hdrOffset:], buffer.Bytes())
+	copy(inj.dup[inj.offOptHdr:], buffer.Bytes())
 	// update context
 	inj.ctx.SectionName = name
 	return &pe.SectionHeader{
