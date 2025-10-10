@@ -70,6 +70,11 @@ type Injector struct {
 	hdr32 *pe.OptionalHeader32
 	hdr64 *pe.OptionalHeader64
 
+	// common offset of image file
+	offFileHdr uint32
+	offOptHdr  uint32
+	offDataDir uint32
+
 	// restore before remove
 	containSign bool
 	containCFG  bool
@@ -430,6 +435,21 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.arch = arch
 	inj.size = len(image)
 	inj.dll = isDLL
+	// calculate common offset of image file
+	hdrOffset := binary.LittleEndian.Uint32(image[imageDOSHeader-4:])
+	fileHeader := hdrOffset + imageNTSignatureSize
+	optHeader := fileHeader + imageFileHeaderSize
+	var optHeaderSize uint32
+	switch inj.arch {
+	case "386":
+		optHeaderSize = imageOptionHeaderSize32
+	case "amd64":
+		optHeaderSize = imageOptionHeaderSize64
+	}
+	ddOffset := optHeader + optHeaderSize
+	inj.offFileHdr = fileHeader
+	inj.offOptHdr = optHeader
+	inj.offDataDir = ddOffset
 	err = inj.checkOptionConflict(opts)
 	if err != nil {
 		return err
