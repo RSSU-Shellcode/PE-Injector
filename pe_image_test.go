@@ -100,7 +100,8 @@ func TestRemoveSignature(t *testing.T) {
 	})
 
 	t.Run("extend section", func(t *testing.T) {
-		injector.extendSection(bytes.Repeat([]byte{0x10}, 4096))
+		_, err = injector.extendSection(bytes.Repeat([]byte{0x10}, 4096))
+		require.NoError(t, err)
 
 		check()
 	})
@@ -143,7 +144,8 @@ func TestRemoveLoadConfig(t *testing.T) {
 	})
 
 	t.Run("extend section", func(t *testing.T) {
-		injector.extendSection(bytes.Repeat([]byte{0x10}, 4096))
+		_, err = injector.extendSection(bytes.Repeat([]byte{0x10}, 4096))
+		require.NoError(t, err)
 
 		check()
 	})
@@ -181,7 +183,8 @@ func TestExtendSection(t *testing.T) {
 			require.NoError(t, err)
 
 			data := []byte("Hello Injector!")
-			rva := injector.extendSection(data)
+			rva, err := injector.extendSection(data)
+			require.NoError(t, err)
 			fmt.Printf("rva: 0x%X\n", rva)
 
 			output := injector.dup
@@ -201,7 +204,8 @@ func TestExtendSection(t *testing.T) {
 			require.NoError(t, err)
 
 			data := []byte("Hello Injector!")
-			rva := injector.extendSection(data)
+			rva, err := injector.extendSection(data)
+			require.NoError(t, err)
 			fmt.Printf("rva: 0x%X\n", rva)
 
 			output := injector.dup
@@ -223,7 +227,8 @@ func TestExtendSection(t *testing.T) {
 			require.NoError(t, err)
 
 			data := bytes.Repeat([]byte("Hello Injector!"), 1024)
-			rva := injector.extendSection(data)
+			rva, err := injector.extendSection(data)
+			require.NoError(t, err)
 			fmt.Printf("rva: 0x%X\n", rva)
 
 			output := injector.dup
@@ -243,7 +248,8 @@ func TestExtendSection(t *testing.T) {
 			require.NoError(t, err)
 
 			data := bytes.Repeat([]byte("Hello Injector!"), 1024)
-			rva := injector.extendSection(data)
+			rva, err := injector.extendSection(data)
+			require.NoError(t, err)
 			fmt.Printf("rva: 0x%X\n", rva)
 
 			output := injector.dup
