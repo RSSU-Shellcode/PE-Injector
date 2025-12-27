@@ -687,7 +687,7 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 		return inj.useCreateSectionMode(ctx, sc, src)
 	}
 	if inj.opts.ForceExtendSection {
-		return inj.useExtendSectionMode(ctx, sc, src), nil
+		return inj.useExtendSectionMode(ctx, sc, src)
 	}
 	// check can use code cave mode
 	var numCaves int
@@ -706,7 +706,7 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 	if inj.opts.ForceCodeCave {
 		return "", errors.New("not enough code caves for force code cave mode")
 	}
-	return inj.useExtendSectionMode(ctx, sc, src), nil
+	return inj.useExtendSectionMode(ctx, sc, src)
 }
 
 func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) string {
@@ -746,14 +746,17 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 	return strings.ReplaceAll(src, codeCaveModeStub, stub)
 }
 
-func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string) string {
+func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
 	payload := inj.encryptPayload(ctx, sc)
-	offset := inj.extendSection(payload)
+	offset, err := inj.extendSection(payload)
+	if err != nil {
+		return "", err
+	}
 	ctx.ExtendSection = true
 	ctx.PayloadOffset = offset
 	inj.ctx.Mode = ModeExtendSection
 	// remove the flag in assembly source
-	return strings.ReplaceAll(src, codeCaveModeStub, "")
+	return strings.ReplaceAll(src, codeCaveModeStub, ""), nil
 }
 
 func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
