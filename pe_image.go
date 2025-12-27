@@ -301,22 +301,27 @@ func calculateChecksum(image []byte) uint32 {
 // extendSection is used to extend the last section for write data.
 // It will return the RVA about the start of written data.
 // #nosec G115
-func (inj *Injector) extendSection(data []byte) uint32 {
+func (inj *Injector) extendSection(data []byte) (uint32, error) {
 	// calculate the offset of target data
 	sctOffset := inj.offOptHdr + uint32(inj.img.SizeOfOptionalHeader)
 	shOffset := sctOffset + uint32((inj.img.NumberOfSections-1)*imageSectionHeaderSize)
 	// adjust the last section header
 	last := new(pe.SectionHeader32)
 	_ = binary.Read(bytes.NewReader(inj.dup[shOffset:]), binary.LittleEndian, last)
+	// the section must be read only
+	if last.Characteristics&0xF0000000 != 0x40000000 {
+		return 0, fmt.Errorf("the last section is not read only")
+	}
 	// store old section header data
 	oldVirtualSize := last.VirtualSize
 	oldSizeOfRawData := last.SizeOfRawData
 	// adjust VirtualSize and SizeOfRawData
-	size := uint32(reserveSectionSize + len(data))
-	last.VirtualSize += size
-	last.SizeOfRawData = alignFileOffset(min(last.VirtualSize, last.SizeOfRawData) + size)
+	setSize := uint32(reserveSectionSize + len(data))
+	newSize := alignFileOffset(min(last.VirtualSize, last.SizeOfRawData) + setSize)
+	last.VirtualSize += setSize
+	last.SizeOfRawData = newSize
 	// add padding data if last section need extend raw data
-	padSize := int64(last.SizeOfRawData) - int64(oldSizeOfRawData)
+	padSize := int64(newSize) - int64(oldSizeOfRawData)
 	if padSize > 0 {
 		pad := make([]byte, padSize)
 		inj.dup = append(inj.dup, pad...)
@@ -350,9 +355,12 @@ func (inj *Injector) extendSection(data []byte) uint32 {
 	}
 	copy(inj.dup[inj.offOptHdr:], optHdr)
 	// copy data to the extended section
-	dst := last.PointerToRawData + oldVirtualSize + reserveSectionSize
+	dst := last.PointerToRawData + oldSizeOfRawData + reserveSectionSize
 	copy(inj.dup[dst:], data)
-	return last.VirtualAddress + oldVirtualSize + reserveSectionSize
+	rva := last.VirtualAddress + oldVirtualSize + reserveSectionSize
+	// update context
+	inj.ctx.SectionName = inj.img.Sections[len(inj.img.Sections)-1].Name
+	return rva, nil
 }
 
 // createSection is used to create a new section after the last section.
@@ -402,27 +410,38 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 	copy(inj.dup[inj.offFileHdr:], buffer.Bytes())
 	// adjust the size of image in optional header
 	buffer.Reset()
+	var optHdr []byte
 	switch inj.arch {
 	case "386":
 		hdr := *inj.hdr32
 		hdr.SizeOfImage += uint32(len(newSection))
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
+		// process data directory
+		optHdr = buffer.Bytes()
+		sz := int(hdr.NumberOfRvaAndSizes * imageDataDirectorySize)
+		optHdr = optHdr[:len(optHdr)-16*imageDataDirectorySize+sz]
 	case "amd64":
 		hdr := *inj.hdr64
 		hdr.SizeOfImage += uint32(len(newSection))
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
+		// process data directory
+		optHdr = buffer.Bytes()
+		sz := int(hdr.NumberOfRvaAndSizes * imageDataDirectorySize)
+		optHdr = optHdr[:len(optHdr)-16*imageDataDirectorySize+sz]
 	}
-	copy(inj.dup[inj.offOptHdr:], buffer.Bytes())
-	// update context
-	inj.ctx.SectionName = name
-	return &pe.SectionHeader{
+	copy(inj.dup[inj.offOptHdr:], optHdr)
+	// return new section information
+	nsh := pe.SectionHeader{
 		Name:            name,
 		VirtualSize:     sh.VirtualSize,
 		VirtualAddress:  sh.VirtualAddress,
 		Size:            sh.SizeOfRawData,
 		Offset:          sh.PointerToRawData,
 		Characteristics: sh.Characteristics,
-	}, nil
+	}
+	// update context
+	inj.ctx.SectionName = name
+	return &nsh, nil
 }
 
 // #nosec G115
