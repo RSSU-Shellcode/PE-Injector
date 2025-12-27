@@ -6,7 +6,7 @@ type Info struct {
 	IsDLL        bool       `toml:"is_dll"       json:"is_dll"`
 	ImageSize    uint32     `toml:"image_size"   json:"image_size"`
 	ImageBase    uint64     `toml:"image_base"   json:"image_base"`
-	EntryPoint   uint32     `toml:"entry_point"  json:"entry_point"`
+	EntryPoint   uint64     `toml:"entry_point"  json:"entry_point"`
 	Sections     []*Section `toml:"sections"     json:"sections"`
 	Exports      []*Export  `toml:"exports"      json:"exports"`
 
@@ -41,19 +41,19 @@ func Analyze(image []byte) (*Info, error) {
 		arch       string
 		imageSize  uint32
 		imageBase  uint64
-		entryPoint uint32
+		entryPoint uint64
 	)
 	switch injector.arch {
 	case "386":
 		arch = "x86"
 		imageSize = injector.hdr32.SizeOfImage
 		imageBase = uint64(injector.hdr32.ImageBase)
-		entryPoint = injector.hdr32.AddressOfEntryPoint
+		entryPoint = imageBase + uint64(injector.hdr32.AddressOfEntryPoint)
 	case "amd64":
 		arch = "x64"
 		imageSize = injector.hdr64.SizeOfImage
 		imageBase = injector.hdr64.ImageBase
-		entryPoint = injector.hdr64.AddressOfEntryPoint
+		entryPoint = imageBase + uint64(injector.hdr64.AddressOfEntryPoint)
 	}
 	l := len(injector.img.Sections)
 	sections := make([]*Section, l)
