@@ -355,7 +355,8 @@ func (inj *Injector) extendSection(data []byte) (uint32, error) {
 	}
 	copy(inj.dup[inj.offOptHdr:], optHdr)
 	// copy data to the extended section
-	dst := last.PointerToRawData + oldSizeOfRawData + reserveSectionSize
+	ptrOff := min(oldVirtualSize, oldSizeOfRawData)
+	dst := last.PointerToRawData + ptrOff + reserveSectionSize
 	copy(inj.dup[dst:], data)
 	rva := last.VirtualAddress + oldVirtualSize + reserveSectionSize
 	// update context
