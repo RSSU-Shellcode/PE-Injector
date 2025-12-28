@@ -12,18 +12,31 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		return nil, errors.New("the first section without RX")
 	}
 	output := make([]byte, len(inj.dup)+int(size))
-	// copy DOS stub and FileHeader
-
+	// copy all data before the first section data
+	copy(output, inj.dup[:inj.img.Sections[0].Offset])
 	// adjust the text section header
 	shOffset := inj.offOptHdr + uint32(inj.img.SizeOfOptionalHeader)
 	text := new(pe.SectionHeader32)
 	_ = binary.Read(bytes.NewReader(inj.dup[shOffset:]), binary.LittleEndian, text)
-	text.VirtualSize += alignMemoryRegion(size)
+	text.VirtualSize += size
 	text.SizeOfRawData += alignFileOffset(size)
 	// overwrite the text section
 	buffer := bytes.NewBuffer(nil)
 	_ = binary.Write(buffer, binary.LittleEndian, text)
-	copy(inj.dup[shOffset:], buffer.Bytes())
+	copy(output[shOffset:], buffer.Bytes())
+	// adjust other section headers
+	prev := text
+	for i := 1; i < len(inj.img.Sections); i++ {
+		shOffset += imageSectionHeaderSize
+		section := new(pe.SectionHeader32)
+		_ = binary.Read(bytes.NewReader(inj.dup[shOffset:]), binary.LittleEndian, section)
+		section.VirtualAddress = prev.VirtualAddress + alignFileOffset(prev.VirtualSize)
+		section.PointerToRawData += alignFileOffset(size)
+		// rewrite section header
+		buffer.Reset()
+		_ = binary.Write(buffer, binary.LittleEndian, text)
+		copy(output[shOffset:], buffer.Bytes())
+	}
 	// adjust the size of image in optional header
 	buffer.Reset()
 	switch inj.arch {
@@ -38,7 +51,6 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		hdr.SizeOfImage += alignMemoryRegion(size)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 	}
-	copy(inj.dup[inj.offOptHdr:], buffer.Bytes())
-
+	copy(output[inj.offOptHdr:], buffer.Bytes())
 	return output, nil
 }
