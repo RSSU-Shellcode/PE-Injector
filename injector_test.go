@@ -466,7 +466,7 @@ func TestSpecificFunction(t *testing.T) {
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeCodeCave, ctx.Mode)
+			require.Equal(t, ModeExtendSection, ctx.Mode)
 		})
 
 		t.Run("x64", func(t *testing.T) {
