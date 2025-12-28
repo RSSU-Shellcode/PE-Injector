@@ -16,7 +16,7 @@ func TestExtendTextSection(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		output, err := injector.extendTextSection(1024)
+		output, err := injector.extendTextSection(8192)
 		require.NoError(t, err)
 
 		os.WriteFile("F:\\output.exe", output, 0644)
@@ -28,7 +28,7 @@ func TestExtendTextSection(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		output, err := injector.extendTextSection(1024)
+		output, err := injector.extendTextSection(8192)
 		require.NoError(t, err)
 
 		os.WriteFile("F:\\output.exe", output, 0644)
