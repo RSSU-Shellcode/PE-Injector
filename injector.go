@@ -31,6 +31,8 @@ import (
 // The loader and shellcode body are all injected to a new section.
 // It will change the .text section, create a new section, adjust
 // the FileHeader.NumberOfSections and OptionalHeader.SizeOfImage
+//
+// All the modes will not adjust the size of .text section.
 
 // these modes are used to display the mode that injector used.
 const (
