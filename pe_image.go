@@ -343,7 +343,7 @@ func (inj *Injector) extendSection(data []byte) (uint32, error) {
 		// process data directory
 		optHdr = buffer.Bytes()
 		sz := int(hdr.NumberOfRvaAndSizes * imageDataDirectorySize)
-		optHdr = optHdr[:len(optHdr)-16*imageDataDirectorySize+sz]
+		optHdr = optHdr[:imageOptionHeaderSize32+sz]
 	case "amd64":
 		hdr := *inj.hdr64
 		hdr.SizeOfImage += uint32(padSize)
@@ -351,7 +351,7 @@ func (inj *Injector) extendSection(data []byte) (uint32, error) {
 		// process data directory
 		optHdr = buffer.Bytes()
 		sz := int(hdr.NumberOfRvaAndSizes * imageDataDirectorySize)
-		optHdr = optHdr[:len(optHdr)-16*imageDataDirectorySize+sz]
+		optHdr = optHdr[:imageOptionHeaderSize64+sz]
 	}
 	copy(inj.dup[inj.offOptHdr:], optHdr)
 	// copy data to the extended section
@@ -420,7 +420,7 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 		// process data directory
 		optHdr = buffer.Bytes()
 		sz := int(hdr.NumberOfRvaAndSizes * imageDataDirectorySize)
-		optHdr = optHdr[:len(optHdr)-16*imageDataDirectorySize+sz]
+		optHdr = optHdr[:imageOptionHeaderSize32+sz]
 	case "amd64":
 		hdr := *inj.hdr64
 		hdr.SizeOfImage += uint32(len(newSection))
@@ -428,7 +428,7 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 		// process data directory
 		optHdr = buffer.Bytes()
 		sz := int(hdr.NumberOfRvaAndSizes * imageDataDirectorySize)
-		optHdr = optHdr[:len(optHdr)-16*imageDataDirectorySize+sz]
+		optHdr = optHdr[:imageOptionHeaderSize64+sz]
 	}
 	copy(inj.dup[inj.offOptHdr:], optHdr)
 	// return new section information
