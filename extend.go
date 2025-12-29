@@ -15,6 +15,40 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 	output := make([]byte, len(inj.dup)+int(size))
 	// copy all data before the first section data
 	copy(output, inj.dup[:inj.img.Sections[0].Offset])
+	// preprocess NT Headers
+	for _, step := range []func(output []byte, size uint32){
+		inj.adjustOptionalHeader,
+		inj.adjustSectionHeaders,
+		inj.adjustDataDirectory,
+	} {
+		step(output, size)
+	}
+	return output, nil
+}
+
+func (inj *Injector) adjustOptionalHeader(output []byte, size uint32) {
+	buffer := bytes.NewBuffer(nil)
+	var optHdr []byte
+	switch inj.arch {
+	case "386":
+		hdr := *inj.hdr32
+		hdr.SizeOfCode += alignFileOffset(size)
+		hdr.SizeOfImage += alignMemoryRegion(size)
+		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
+		// ignore data directory
+		optHdr = buffer.Bytes()[:imageOptionHeaderSize32]
+	case "amd64":
+		hdr := *inj.hdr64
+		hdr.SizeOfCode += alignFileOffset(size)
+		hdr.SizeOfImage += alignMemoryRegion(size)
+		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
+		// ignore data directory
+		optHdr = buffer.Bytes()[:imageOptionHeaderSize64]
+	}
+	copy(output[inj.offOptHdr:], optHdr)
+}
+
+func (inj *Injector) adjustSectionHeaders(output []byte, size uint32) {
 	// adjust the text section header
 	shOffset := inj.offOptHdr + uint32(inj.img.SizeOfOptionalHeader)
 	text := new(pe.SectionHeader32)
@@ -46,7 +80,9 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		// update previous section
 		prev = section
 	}
-	// adjust data directory
+}
+
+func (inj *Injector) adjustDataDirectory(output []byte, size uint32) {
 	for i := uint32(0); i < inj.numDataDir; i++ {
 		dd := new(pe.DataDirectory)
 		offset := inj.offDataDir + i*imageDataDirectorySize
@@ -56,29 +92,8 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		}
 		dd.VirtualAddress += alignMemoryRegion(size)
 		// rewrite data directory
-		buffer.Reset()
+		buffer := bytes.NewBuffer(nil)
 		_ = binary.Write(buffer, binary.LittleEndian, dd)
 		copy(output[offset:], buffer.Bytes())
 	}
-	// adjust the size of image in optional header
-	buffer.Reset()
-	var optHdr []byte
-	switch inj.arch {
-	case "386":
-		hdr := *inj.hdr32
-		hdr.SizeOfCode += alignFileOffset(size)
-		hdr.SizeOfImage += alignMemoryRegion(size)
-		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
-		// ignore data directory
-		optHdr = buffer.Bytes()[:imageOptionHeaderSize32]
-	case "amd64":
-		hdr := *inj.hdr64
-		hdr.SizeOfCode += alignFileOffset(size)
-		hdr.SizeOfImage += alignMemoryRegion(size)
-		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
-		// ignore data directory
-		optHdr = buffer.Bytes()[:imageOptionHeaderSize64]
-	}
-	copy(output[inj.offOptHdr:], optHdr)
-	return output, nil
 }
