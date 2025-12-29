@@ -72,7 +72,9 @@ type Injector struct {
 	hdr32 *pe.OptionalHeader32
 	hdr64 *pe.OptionalHeader64
 
+	// about data directory
 	numDataDir uint32
+	dataDir    [16]pe.DataDirectory
 
 	// common offset of image file
 	offFileHdr uint32
@@ -433,10 +435,12 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		arch = "386"
 		inj.hdr32 = peFile.OptionalHeader.(*pe.OptionalHeader32)
 		inj.numDataDir = inj.hdr32.NumberOfRvaAndSizes
+		inj.dataDir = inj.hdr32.DataDirectory
 	case pe.IMAGE_FILE_MACHINE_AMD64:
 		arch = "amd64"
 		inj.hdr64 = peFile.OptionalHeader.(*pe.OptionalHeader64)
 		inj.numDataDir = inj.hdr64.NumberOfRvaAndSizes
+		inj.dataDir = inj.hdr64.DataDirectory
 	default:
 		return errors.New("unknown pe image architecture type")
 	}
