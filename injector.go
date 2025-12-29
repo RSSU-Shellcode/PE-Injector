@@ -521,7 +521,7 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 	if function != "" {
 		for _, eat := range inj.eat {
 			if eat.proc == function {
-				return eat.addr, nil
+				return eat.rva, nil
 			}
 		}
 		return 0, fmt.Errorf("failed to find export function: %s", function)
