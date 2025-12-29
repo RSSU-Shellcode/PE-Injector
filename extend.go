@@ -143,21 +143,59 @@ func (inj *Injector) adjustImportDescriptor(output []byte, size uint32) {
 	srcTable := inj.dup[offset:]
 	dstTable := output[offset+size:]
 	for {
-		descriptor := &importDescriptor{}
-		_ = binary.Read(bytes.NewReader(srcTable), binary.LittleEndian, descriptor)
-		if descriptor.OriginalFirstThunk == 0 {
+		srcDesc := &importDescriptor{}
+		_ = binary.Read(bytes.NewReader(srcTable), binary.LittleEndian, srcDesc)
+		if srcDesc.OriginalFirstThunk == 0 {
 			break
 		}
-		descriptor.Name += size
-		descriptor.OriginalFirstThunk += alignMemoryRegion(size)
-		descriptor.FirstThunk += alignMemoryRegion(size)
+		dstDesc := &importDescriptor{
+			OriginalFirstThunk: srcDesc.OriginalFirstThunk + alignMemoryRegion(size),
+			TimeDateStamp:      srcDesc.TimeDateStamp,
+			ForwarderChain:     srcDesc.ForwarderChain,
+			Name:               srcDesc.Name + size,
+			FirstThunk:         srcDesc.FirstThunk + alignMemoryRegion(size),
+		}
 		// rewrite import descriptor
 		buffer := bytes.NewBuffer(nil)
-		_ = binary.Write(buffer, binary.LittleEndian, descriptor)
+		_ = binary.Write(buffer, binary.LittleEndian, dstDesc)
 		copy(dstTable, buffer.Bytes())
-		// adjust thunk
-
-		// update src and dst
+		// adjust thunk data
+		off := inj.rvaToOffset(srcDesc.OriginalFirstThunk)
+		srcD := inj.dup[off:]
+		dstD := output[off+size:]
+		for len(srcD) > 0 {
+			var stop bool
+			switch inj.arch {
+			case "386":
+				val := binary.LittleEndian.Uint32(srcD[0:4])
+				srcD = srcD[4:]
+				if val == 0 {
+					stop = true
+					break
+				}
+				if val&0x80000000 == 0 {
+					val += alignMemoryRegion(size)
+					binary.LittleEndian.PutUint32(dstD, val)
+				}
+				dstD = dstD[4:]
+			case "amd64":
+				val := binary.LittleEndian.Uint64(srcD[0:8])
+				srcD = srcD[8:]
+				if val == 0 {
+					stop = true
+					break
+				}
+				if val&0x8000000000000000 == 0 {
+					val += uint64(alignMemoryRegion(size))
+					binary.LittleEndian.PutUint64(dstD, val)
+				}
+				dstD = dstD[8:]
+			}
+			if stop {
+				break
+			}
+		}
+		// update src and dst table
 		srcTable = srcTable[importDescriptorSize:]
 		dstTable = dstTable[importDescriptorSize:]
 	}
