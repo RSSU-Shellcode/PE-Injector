@@ -16,7 +16,7 @@ const (
 	imageOptionHeaderSize32 = 96
 	imageOptionHeaderSize64 = 112
 	imageDataDirectorySize  = 4 + 4
-	importDirectorySize     = 5 * 4
+	importDescriptorSize    = 5 * 4
 	exportDirectorySize     = 40
 	reserveSectionSize      = 8
 )
@@ -52,6 +52,14 @@ type iat struct {
 	addr uint64
 }
 
+type importDescriptor struct {
+	OriginalFirstThunk uint32
+	TimeDateStamp      uint32
+	ForwarderChain     uint32
+	Name               uint32
+	FirstThunk         uint32
+}
+
 func (inj *Injector) loadImage(image []byte) {
 	var size uint32
 	switch inj.arch {
@@ -72,14 +80,7 @@ func (inj *Injector) loadImage(image []byte) {
 }
 
 func (inj *Injector) processEAT() {
-	var dataDirectory [16]pe.DataDirectory
-	switch inj.arch {
-	case "386":
-		dataDirectory = inj.hdr32.DataDirectory
-	case "amd64":
-		dataDirectory = inj.hdr64.DataDirectory
-	}
-	dd := dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_EXPORT]
+	dd := inj.dataDir[pe.IMAGE_DIRECTORY_ENTRY_EXPORT]
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
@@ -124,28 +125,20 @@ func (inj *Injector) processEAT() {
 }
 
 func (inj *Injector) processIAT() {
-	var dataDirectory [16]pe.DataDirectory
-	switch inj.arch {
-	case "386":
-		dataDirectory = inj.hdr32.DataDirectory
-	case "amd64":
-		dataDirectory = inj.hdr64.DataDirectory
-	}
-	dd := dataDirectory[pe.IMAGE_DIRECTORY_ENTRY_IMPORT]
+	dd := inj.dataDir[pe.IMAGE_DIRECTORY_ENTRY_IMPORT]
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
 	table := inj.vm[dd.VirtualAddress:]
 	var list []*iat
-	for len(table) >= importDirectorySize {
-		originalFirstThunk := binary.LittleEndian.Uint32(table[0:4])
-		name := binary.LittleEndian.Uint32(table[12:16])
-		firstThunk := binary.LittleEndian.Uint32(table[16:20])
-		if originalFirstThunk == 0 {
+	for len(table) >= importDescriptorSize {
+		desc := &importDescriptor{}
+		_ = binary.Read(bytes.NewReader(table), binary.LittleEndian, desc)
+		if desc.OriginalFirstThunk == 0 {
 			break
 		}
-		dll := extractString(inj.vm, uint64(name))
-		d := inj.vm[originalFirstThunk:]
+		dll := extractString(inj.vm, uint64(desc.Name))
+		d := inj.vm[desc.OriginalFirstThunk:]
 		for len(d) > 0 {
 			var (
 				proc string
@@ -160,9 +153,9 @@ func (inj *Injector) processIAT() {
 				}
 				if va&0x80000000 == 0 {
 					proc = extractString(inj.vm, uint64(va+2))
-					addr = uint64(firstThunk)
+					addr = uint64(desc.FirstThunk)
 				}
-				firstThunk += 4
+				desc.FirstThunk += 4
 			case "amd64":
 				va := binary.LittleEndian.Uint64(d[0:8])
 				d = d[8:]
@@ -171,9 +164,9 @@ func (inj *Injector) processIAT() {
 				}
 				if va&0x8000000000000000 == 0 {
 					proc = extractString(inj.vm, va+2)
-					addr = uint64(firstThunk)
+					addr = uint64(desc.FirstThunk)
 				}
-				firstThunk += 8
+				desc.FirstThunk += 8
 			}
 			if proc == "" {
 				break
@@ -184,7 +177,7 @@ func (inj *Injector) processIAT() {
 				addr: addr,
 			})
 		}
-		table = table[20:]
+		table = table[importDescriptorSize:]
 	}
 	inj.iat = list
 }
@@ -205,7 +198,7 @@ func (inj *Injector) removeSignature() {
 	inj.dup = inj.dup[:dd.VirtualAddress]
 	// calculate the offset of the security entry
 	secOffset := inj.offDataDir + pe.IMAGE_DIRECTORY_ENTRY_SECURITY*imageDataDirectorySize
-	// erase the directory entry
+	// erase the data directory entry
 	ndd := bytes.Repeat([]byte{0x00}, imageDataDirectorySize)
 	copy(inj.dup[secOffset:], ndd)
 	// extendSection or createSection will read optional header
@@ -237,7 +230,7 @@ func (inj *Injector) removeLoadConfig() {
 	copy(inj.dup[tableOffset:], etb)
 	// calculate the offset of the load config entry
 	cfgOffset := inj.offDataDir + pe.IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG*imageDataDirectorySize
-	// erase the directory entry
+	// erase the data directory entry
 	ndd := bytes.Repeat([]byte{0x00}, imageDataDirectorySize)
 	copy(inj.dup[cfgOffset:], ndd)
 	// extendSection or createSection will read optional header
