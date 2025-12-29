@@ -24,6 +24,7 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		inj.adjustOptionalHeader,
 		inj.adjustSectionHeaders,
 		inj.adjustDataDirectory,
+		inj.adjustImportDescriptor,
 	} {
 		step(output, size)
 	}
@@ -55,7 +56,6 @@ func (inj *Injector) checkAlignment() error {
 }
 
 func (inj *Injector) adjustOptionalHeader(output []byte, size uint32) {
-	buffer := bytes.NewBuffer(nil)
 	var optHdr []byte
 	switch inj.arch {
 	case "386":
@@ -63,6 +63,7 @@ func (inj *Injector) adjustOptionalHeader(output []byte, size uint32) {
 		hdr.AddressOfEntryPoint += size
 		hdr.SizeOfCode += size
 		hdr.SizeOfImage += alignMemoryRegion(size)
+		buffer := bytes.NewBuffer(nil)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 		// ignore data directory
 		optHdr = buffer.Bytes()[:imageOptionHeaderSize32]
@@ -71,6 +72,7 @@ func (inj *Injector) adjustOptionalHeader(output []byte, size uint32) {
 		hdr.AddressOfEntryPoint += size
 		hdr.SizeOfCode += size
 		hdr.SizeOfImage += alignMemoryRegion(size)
+		buffer := bytes.NewBuffer(nil)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 		// ignore data directory
 		optHdr = buffer.Bytes()[:imageOptionHeaderSize64]
@@ -132,6 +134,31 @@ func (inj *Injector) adjustEAT() {
 
 }
 
-func (inj *Injector) adjustIAT() {
+func (inj *Injector) adjustImportDescriptor(output []byte, size uint32) {
+	dd := inj.dataDir[pe.IMAGE_DIRECTORY_ENTRY_IMPORT]
+	if dd.VirtualAddress == 0 || dd.Size == 0 {
+		return
+	}
+	offset := inj.rvaToOffset(dd.VirtualAddress)
+	srcTable := inj.dup[offset:]
+	dstTable := output[offset+size:]
+	for {
+		descriptor := &importDescriptor{}
+		_ = binary.Read(bytes.NewReader(srcTable), binary.LittleEndian, descriptor)
+		if descriptor.OriginalFirstThunk == 0 {
+			break
+		}
+		descriptor.Name += size
+		descriptor.OriginalFirstThunk += alignMemoryRegion(size)
+		descriptor.FirstThunk += alignMemoryRegion(size)
+		// rewrite import descriptor
+		buffer := bytes.NewBuffer(nil)
+		_ = binary.Write(buffer, binary.LittleEndian, descriptor)
+		copy(dstTable, buffer.Bytes())
+		// adjust thunk
 
+		// update src and dst
+		srcTable = srcTable[importDescriptorSize:]
+		dstTable = dstTable[importDescriptorSize:]
+	}
 }
