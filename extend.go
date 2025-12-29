@@ -11,6 +11,10 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 	if !inj.canTryExtend {
 		return nil, errors.New("the first section without RX")
 	}
+	err := inj.checkAlignment()
+	if err != nil {
+		return nil, err
+	}
 	size = alignFileOffset(size)
 	output := make([]byte, len(inj.dup)+int(size))
 	// copy all data before the first section data
@@ -26,20 +30,46 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 	return output, nil
 }
 
+func (inj *Injector) checkAlignment() error {
+	var (
+		sectionAlignment uint32
+		fileAlignment    uint32
+	)
+	switch inj.arch {
+	case "386":
+		hdr := *inj.hdr32
+		sectionAlignment = hdr.SectionAlignment
+		fileAlignment = hdr.FileAlignment
+	case "amd64":
+		hdr := *inj.hdr64
+		sectionAlignment = hdr.SectionAlignment
+		fileAlignment = hdr.FileAlignment
+	}
+	if sectionAlignment != 4096 {
+		return errors.New("invalid section alignment")
+	}
+	if fileAlignment != 512 {
+		return errors.New("invalid file alignment")
+	}
+	return nil
+}
+
 func (inj *Injector) adjustOptionalHeader(output []byte, size uint32) {
 	buffer := bytes.NewBuffer(nil)
 	var optHdr []byte
 	switch inj.arch {
 	case "386":
 		hdr := *inj.hdr32
-		hdr.SizeOfCode += alignFileOffset(size)
+		hdr.AddressOfEntryPoint += size
+		hdr.SizeOfCode += size
 		hdr.SizeOfImage += alignMemoryRegion(size)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 		// ignore data directory
 		optHdr = buffer.Bytes()[:imageOptionHeaderSize32]
 	case "amd64":
 		hdr := *inj.hdr64
-		hdr.SizeOfCode += alignFileOffset(size)
+		hdr.AddressOfEntryPoint += size
+		hdr.SizeOfCode += size
 		hdr.SizeOfImage += alignMemoryRegion(size)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 		// ignore data directory
@@ -96,4 +126,12 @@ func (inj *Injector) adjustDataDirectory(output []byte, size uint32) {
 		_ = binary.Write(buffer, binary.LittleEndian, dd)
 		copy(output[offset:], buffer.Bytes())
 	}
+}
+
+func (inj *Injector) adjustEAT() {
+
+}
+
+func (inj *Injector) adjustIAT() {
+
 }
