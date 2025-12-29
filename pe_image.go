@@ -43,13 +43,13 @@ type Export struct {
 
 type eat struct {
 	proc string
-	addr uint32
+	rva  uint32
 }
 
 type iat struct {
 	dll  string
 	proc string
-	addr uint64
+	rva  uint32
 }
 
 type importDescriptor struct {
@@ -88,6 +88,7 @@ func (inj *Injector) processEAT() {
 		return
 	}
 	ed := inj.vm[dd.VirtualAddress:]
+	// TODO replace to structure
 	numberOfNames := binary.LittleEndian.Uint32(ed[24:28])
 	addressOfFunctions := binary.LittleEndian.Uint32(ed[28:32])
 	addressOfNames := binary.LittleEndian.Uint32(ed[32:36])
@@ -118,7 +119,7 @@ func (inj *Injector) processEAT() {
 		}
 		list = append(list, &eat{
 			proc: funcName,
-			addr: funcRVA,
+			rva:  funcRVA,
 		})
 	}
 	inj.eat = list
@@ -142,39 +143,42 @@ func (inj *Injector) processIAT() {
 		for len(d) > 0 {
 			var (
 				proc string
-				addr uint64
+				rva  uint32
+				stop bool
 			)
 			switch inj.arch {
 			case "386":
-				va := binary.LittleEndian.Uint32(d[0:4])
+				val := binary.LittleEndian.Uint32(d[0:4])
 				d = d[4:]
-				if va == 0 {
+				if val == 0 {
+					stop = true
 					break
 				}
-				if va&0x80000000 == 0 {
-					proc = extractString(inj.vm, uint64(va+2))
-					addr = uint64(desc.FirstThunk)
+				if val&0x80000000 == 0 {
+					proc = extractString(inj.vm, uint64(val+2))
+					rva = desc.FirstThunk
 				}
 				desc.FirstThunk += 4
 			case "amd64":
-				va := binary.LittleEndian.Uint64(d[0:8])
+				val := binary.LittleEndian.Uint64(d[0:8])
 				d = d[8:]
-				if va == 0 {
+				if val == 0 {
+					stop = true
 					break
 				}
-				if va&0x8000000000000000 == 0 {
-					proc = extractString(inj.vm, va+2)
-					addr = uint64(desc.FirstThunk)
+				if val&0x8000000000000000 == 0 {
+					proc = extractString(inj.vm, val+2)
+					rva = desc.FirstThunk
 				}
 				desc.FirstThunk += 8
 			}
-			if proc == "" {
+			if stop {
 				break
 			}
 			list = append(list, &iat{
 				dll:  dll,
 				proc: proc,
-				addr: addr,
+				rva:  rva,
 			})
 		}
 		table = table[importDescriptorSize:]
@@ -484,14 +488,14 @@ func (inj *Injector) rvaToOffset(rva uint32) uint32 {
 	panic(fmt.Sprintf("invalid rva: 0x%X", rva))
 }
 
-func extractString(section []byte, start uint64) string {
-	l := uint64(len(section))
-	if start >= l {
+func extractString(vm []byte, rva uint64) string {
+	l := uint64(len(vm))
+	if rva >= l {
 		return ""
 	}
-	for end := start; end < l; end++ {
-		if section[end] == 0 {
-			return string(section[start:end])
+	for end := rva; end < l; end++ {
+		if vm[end] == 0 {
+			return string(vm[rva:end])
 		}
 	}
 	return ""
