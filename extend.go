@@ -51,7 +51,10 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		dd := new(pe.DataDirectory)
 		offset := inj.offDataDir + i*imageDataDirectorySize
 		_ = binary.Read(bytes.NewReader(inj.dup[offset:]), binary.LittleEndian, dd)
-		dd.VirtualAddress += alignMemoryRegion(size) // TODO think more
+		if dd.VirtualAddress == 0 {
+			continue
+		}
+		dd.VirtualAddress += alignMemoryRegion(size)
 		// rewrite data directory
 		buffer.Reset()
 		_ = binary.Write(buffer, binary.LittleEndian, dd)
@@ -66,19 +69,15 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		hdr.SizeOfCode += alignFileOffset(size)
 		hdr.SizeOfImage += alignMemoryRegion(size)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
-		// process data directory
-		optHdr = buffer.Bytes()
-		sz := int(inj.numDataDir * imageDataDirectorySize)
-		optHdr = optHdr[:imageOptionHeaderSize32+sz]
+		// ignore data directory
+		optHdr = buffer.Bytes()[:imageOptionHeaderSize32]
 	case "amd64":
 		hdr := *inj.hdr64
 		hdr.SizeOfCode += alignFileOffset(size)
 		hdr.SizeOfImage += alignMemoryRegion(size)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
-		// process data directory
-		optHdr = buffer.Bytes()
-		sz := int(inj.numDataDir * imageDataDirectorySize)
-		optHdr = optHdr[:imageOptionHeaderSize64+sz]
+		// ignore data directory
+		optHdr = buffer.Bytes()[:imageOptionHeaderSize64]
 	}
 	copy(output[inj.offOptHdr:], optHdr)
 	return output, nil
