@@ -25,6 +25,7 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		inj.adjustSectionHeaders,
 		inj.adjustDataDirectory,
 		inj.adjustImportDescriptor,
+		inj.adjustBaseRelocation,
 	} {
 		step(output, size)
 	}
@@ -198,5 +199,34 @@ func (inj *Injector) adjustImportDescriptor(output []byte, size uint32) {
 		// update src and dst table
 		srcTable = srcTable[importDescriptorSize:]
 		dstTable = dstTable[importDescriptorSize:]
+	}
+}
+
+func (inj *Injector) adjustBaseRelocation(output []byte, size uint32) {
+	dd := inj.dataDir[pe.IMAGE_DIRECTORY_ENTRY_BASERELOC]
+	if dd.VirtualAddress == 0 || dd.Size == 0 {
+		return
+	}
+	offset := inj.rvaToOffset(dd.VirtualAddress)
+	srcTable := inj.dup[offset:]
+	dstTable := output[offset+size:]
+	for {
+		srcReloc := &baseRelocation{}
+		_ = binary.Read(bytes.NewReader(srcTable), binary.LittleEndian, srcReloc)
+		if srcReloc.VirtualAddress == 0 {
+			break
+		}
+		dstReloc := &baseRelocation{
+			VirtualAddress: srcReloc.VirtualAddress + alignMemoryRegion(size),
+			SizeOfBlock:    srcReloc.SizeOfBlock,
+		}
+		// rewrite import descriptor
+		buffer := bytes.NewBuffer(nil)
+		_ = binary.Write(buffer, binary.LittleEndian, dstReloc)
+		copy(dstTable, buffer.Bytes())
+
+		// update src and dst table
+		srcTable = srcTable[baseRelocationSize:]
+		dstTable = dstTable[baseRelocationSize:]
 	}
 }
