@@ -22,7 +22,7 @@ func TestProcessEAT(t *testing.T) {
 
 		injector.loadImage(image)
 		for _, eat := range injector.eat {
-			fmt.Printf("%s 0x%X\n", eat.proc, eat.addr)
+			fmt.Printf("%s 0x%X\n", eat.proc, eat.rva)
 		}
 	})
 
@@ -34,7 +34,7 @@ func TestProcessEAT(t *testing.T) {
 
 		injector.loadImage(image)
 		for _, eat := range injector.eat {
-			fmt.Printf("%s 0x%X\n", eat.proc, eat.addr)
+			fmt.Printf("%s 0x%X\n", eat.proc, eat.rva)
 		}
 	})
 
@@ -53,7 +53,7 @@ func TestProcessIAT(t *testing.T) {
 
 		injector.loadImage(image)
 		for _, iat := range injector.iat {
-			fmt.Printf("%s %s 0x%X\n", iat.dll, iat.proc, iat.addr)
+			fmt.Printf("%s %s 0x%X\n", iat.dll, iat.proc, iat.rva)
 		}
 	})
 
@@ -65,7 +65,7 @@ func TestProcessIAT(t *testing.T) {
 
 		injector.loadImage(image)
 		for _, iat := range injector.iat {
-			fmt.Printf("%s %s 0x%X\n", iat.dll, iat.proc, iat.addr)
+			fmt.Printf("%s %s 0x%X\n", iat.dll, iat.proc, iat.rva)
 		}
 	})
 
