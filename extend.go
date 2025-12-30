@@ -220,13 +220,28 @@ func (inj *Injector) adjustBaseRelocation(output []byte, size uint32) {
 			VirtualAddress: srcReloc.VirtualAddress + alignMemoryRegion(size),
 			SizeOfBlock:    srcReloc.SizeOfBlock,
 		}
-		// rewrite import descriptor
+		// rewrite base relocation
 		buffer := bytes.NewBuffer(nil)
 		_ = binary.Write(buffer, binary.LittleEndian, dstReloc)
 		copy(dstTable, buffer.Bytes())
-
-		// update src and dst table
+		// adjust reloc data
 		srcTable = srcTable[baseRelocationSize:]
 		dstTable = dstTable[baseRelocationSize:]
+		for i := uint32(0); i < (srcReloc.SizeOfBlock-8)/2; i++ {
+			reloc := binary.LittleEndian.Uint16(srcTable[i*2:])
+			typ := reloc >> 12
+			off := reloc & 0x0FFF
+			switch typ {
+			case relBasedAbsolute:
+
+			case relBasedHighlow:
+
+			case relBasedDir64:
+
+			}
+		}
+		// update src and dst table
+		srcTable = srcTable[srcReloc.SizeOfBlock:]
+		dstTable = dstTable[srcReloc.SizeOfBlock:]
 	}
 }
