@@ -38,19 +38,19 @@ func Analyze(image []byte) (*Info, error) {
 	}
 	// read pe image basic information
 	var (
-		arch       string
-		imageSize  uint32
-		imageBase  uint64
-		entryPoint uint64
+		architecture string
+		imageSize    uint32
+		imageBase    uint64
+		entryPoint   uint64
 	)
 	switch injector.arch {
 	case "386":
-		arch = "x86"
+		architecture = "x86"
 		imageSize = injector.hdr32.SizeOfImage
 		imageBase = uint64(injector.hdr32.ImageBase)
 		entryPoint = imageBase + uint64(injector.hdr32.AddressOfEntryPoint)
 	case "amd64":
-		arch = "x64"
+		architecture = "x64"
 		imageSize = injector.hdr64.SizeOfImage
 		imageBase = injector.hdr64.ImageBase
 		entryPoint = imageBase + uint64(injector.hdr64.AddressOfEntryPoint)
@@ -73,7 +73,7 @@ func Analyze(image []byte) (*Info, error) {
 		eat := injector.eat[i]
 		exports[i] = &Export{
 			Name:    eat.proc,
-			Address: injector.rvaToVA(eat.addr),
+			Address: injector.rvaToVA(eat.rva),
 		}
 	}
 	// check the procedure in IAT
@@ -108,7 +108,7 @@ func Analyze(image []byte) (*Info, error) {
 		injectLoaderRank = calcInjectLoaderRank(ctx)
 	}
 	info := Info{
-		Architecture:           arch,
+		Architecture:           architecture,
 		IsDLL:                  injector.dll,
 		ImageSize:              imageSize,
 		ImageBase:              imageBase,
