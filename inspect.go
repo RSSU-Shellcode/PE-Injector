@@ -67,54 +67,54 @@ func buildFakeIATList(cfg *InspectConfig) []*iat {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "VirtualAlloc",
-			addr: 0x2000,
+			rva:  0x2000,
 		})
 	}
 	if cfg.HasVirtualFree {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "VirtualFree",
-			addr: 0x3000,
+			rva:  0x3000,
 		})
 	}
 	if cfg.HasVirtualProtect {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "VirtualProtect",
-			addr: 0x4000,
+			rva:  0x4000,
 		})
 	}
 	if cfg.HasCreateThread {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "CreateThread",
-			addr: 0x5000,
+			rva:  0x5000,
 		})
 	}
 	if cfg.HasWaitForSingleObject {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "WaitForSingleObject",
-			addr: 0x6000,
+			rva:  0x6000,
 		})
 	}
 	if cfg.HasLoadLibraryA {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "LoadLibraryA",
-			addr: 0x7000,
+			rva:  0x7000,
 		})
 	} else {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "LoadLibraryW",
-			addr: 0x7000,
+			rva:  0x7000,
 		})
 	}
 	list = append(list, &iat{
 		dll:  "kernel32.dll",
 		proc: "GetProcAddress",
-		addr: 0x8000,
+		rva:  0x8000,
 	})
 	return list
 }
