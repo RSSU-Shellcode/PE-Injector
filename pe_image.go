@@ -12,13 +12,16 @@ const (
 	imageDOSHeader          = 64
 	imageNTSignatureSize    = 4
 	imageFileHeaderSize     = 20
-	imageSectionHeaderSize  = 40
 	imageOptionHeaderSize32 = 96
 	imageOptionHeaderSize64 = 112
 	imageDataDirectorySize  = 4 + 4
-	importDescriptorSize    = 5 * 4
-	exportDirectorySize     = 40
-	reserveSectionSize      = 8
+	imageSectionHeaderSize  = 40
+
+	exportDirectorySize  = 40
+	importDescriptorSize = 5 * 4
+	baseRelocationSize   = 2 * 4
+
+	reserveSectionSize = 8
 )
 
 var defaultSectionNames = []string{
@@ -58,6 +61,11 @@ type importDescriptor struct {
 	ForwarderChain     uint32
 	Name               uint32
 	FirstThunk         uint32
+}
+
+type baseRelocation struct {
+	VirtualAddress uint32
+	SizeOfBlock    uint32
 }
 
 func (inj *Injector) loadImage(image []byte) {
