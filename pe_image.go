@@ -21,6 +21,10 @@ const (
 	importDescriptorSize = 5 * 4
 	baseRelocationSize   = 2 * 4
 
+	relBasedAbsolute = 0
+	relBasedHighlow  = 3
+	relBasedDir64    = 10
+
 	reserveSectionSize = 8
 )
 
