@@ -141,13 +141,13 @@ type loaderCtx struct {
 	PAKey  map[string]uint64
 
 	// store procedure IAT offset
-	LoadLibrary         uint64
-	GetProcAddress      uint64
-	VirtualAlloc        uint64
-	VirtualFree         uint64
-	VirtualProtect      uint64
-	CreateThread        uint64
-	WaitForSingleObject uint64
+	LoadLibrary         uint32
+	GetProcAddress      uint32
+	VirtualAlloc        uint32
+	VirtualFree         uint32
+	VirtualProtect      uint32
+	CreateThread        uint32
+	WaitForSingleObject uint32
 
 	// information of write payload
 	CodeCave      bool
@@ -407,7 +407,7 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 	WaitForSingleObject := inj.getProcFromIAT("WaitForSingleObject")
 	var lackProcedure bool
 	if VirtualAlloc != nil {
-		ctx.VirtualAlloc = VirtualAlloc.addr
+		ctx.VirtualAlloc = VirtualAlloc.rva
 	} else {
 		ctx.LackVirtualAlloc = true
 		lackProcedure = true
@@ -415,7 +415,7 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 	if !inj.opts.NotEraseShellcode {
 		if !(!inj.opts.NotCreateThread && inj.opts.NotWaitThread) {
 			if VirtualFree != nil {
-				ctx.VirtualFree = VirtualFree.addr
+				ctx.VirtualFree = VirtualFree.rva
 			} else {
 				ctx.LackVirtualFree = true
 				lackProcedure = true
@@ -424,14 +424,14 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 		}
 	}
 	if VirtualProtect != nil {
-		ctx.VirtualProtect = VirtualProtect.addr
+		ctx.VirtualProtect = VirtualProtect.rva
 	} else {
 		ctx.LackVirtualProtect = true
 		lackProcedure = true
 	}
 	if !inj.opts.NotCreateThread {
 		if CreateThread != nil {
-			ctx.CreateThread = CreateThread.addr
+			ctx.CreateThread = CreateThread.rva
 		} else {
 			ctx.LackCreateThread = true
 			lackProcedure = true
@@ -439,7 +439,7 @@ func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
 		ctx.NeedCreateThread = true
 		if !inj.opts.NotWaitThread {
 			if WaitForSingleObject != nil {
-				ctx.WaitForSingleObject = WaitForSingleObject.addr
+				ctx.WaitForSingleObject = WaitForSingleObject.rva
 			} else {
 				ctx.LackWaitForSingleObject = true
 				lackProcedure = true
@@ -465,12 +465,12 @@ func (inj *Injector) findProcForLack(ctx *loaderCtx) error {
 		return errors.New("proc GetProcAddress is not exist in IAT")
 	}
 	if LoadLibraryA != nil {
-		ctx.LoadLibrary = LoadLibraryA.addr
+		ctx.LoadLibrary = LoadLibraryA.rva
 	} else {
-		ctx.LoadLibrary = LoadLibraryW.addr
+		ctx.LoadLibrary = LoadLibraryW.rva
 		ctx.LoadLibraryWOnly = true
 	}
-	ctx.GetProcAddress = GetProcAddress.addr
+	ctx.GetProcAddress = GetProcAddress.rva
 	return nil
 }
 
