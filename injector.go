@@ -23,7 +23,7 @@ import (
 //
 // 2. extend section
 // The loader is injected to code caves.
-// The shellcode body is injected to the last extended section.
+// The shellcode body is injected to the last section(extended).
 // It will change the .text section, adjust the last section
 // header and the OptionalHeader.SizeOfImage
 //
@@ -63,7 +63,7 @@ type Injector struct {
 	opts *Options
 	arch string
 	dll  bool
-	size int
+	size uint32
 	abs  bool
 	dup  []byte
 
@@ -347,8 +347,8 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	if target == 0 {
 		return errors.New("hook target function address is zero")
 	}
-	instOffset := inj.selectHookInstruction(int(inj.rvaToOffset(target)))
-	target = inj.offsetToRVA(uint32(instOffset)) // #nosec G115
+	instFOA := inj.selectHookInstruction(inj.rvaToFOA(target))
+	target = inj.foaToRVA(instFOA) // #nosec G115
 	first := inj.selectFirstCodeCave(target)
 	var dstRVA uint32
 	if inj.section != nil {
@@ -446,7 +446,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	}
 	inj.img = peFile
 	inj.arch = arch
-	inj.size = len(image)
+	inj.size = uint32(len(image))
 	inj.dll = isDLL
 	// calculate common offset of image file
 	hdrOffset := binary.LittleEndian.Uint32(image[imageDOSHeader-4:])
@@ -540,34 +540,34 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 }
 
 //gocyclo:ignore
-func (inj *Injector) selectHookInstruction(offset int) int {
+func (inj *Injector) selectHookInstruction(foa uint32) uint32 {
 	if inj.abs || inj.opts.NotHookInstruction || inj.opts.NotSaveContext {
-		return offset
+		return foa
 	}
 	// select a random instruction that can be hooked.
 	idx := 4 + inj.rand.Intn(40)
-	target := offset
+	target := foa
 	for i := 0; i < 50; i++ {
-		if offset+32 > inj.size {
+		if foa+32 > inj.size {
 			break
 		}
-		inst, err := inj.decodeInst(inj.dup[offset : offset+32])
+		inst, err := inj.decodeInst(inj.dup[foa : foa+32])
 		if err != nil {
 			break
 		}
 		// skip too small instructions for debug easily
 		if inst.Len < nearJumpSize {
-			offset += inst.Len
+			foa += uint32(inst.Len)
 			continue
 		}
 		// skip mov instruction for skip absolute address on x86
 		if inst.Op == x86asm.MOV {
-			offset += inst.Len
+			foa += uint32(inst.Len)
 			continue
 		}
 		// walk into the next instruction
 		if inst.Op == x86asm.JMP {
-			offset += inst.Len + int(inst.Args[0].(x86asm.Rel))
+			foa += uint32(inst.Len + int(inst.Args[0].(x86asm.Rel)))
 			continue
 		}
 		if inst.Op == x86asm.RET || inst.Op == x86asm.INT {
@@ -583,12 +583,12 @@ func (inj *Injector) selectHookInstruction(offset int) int {
 			}
 		}
 		// set preselected target
-		target = offset
+		target = foa
 		if i >= idx {
 			break
 		}
 		// decode next instruction
-		offset += inst.Len
+		foa += uint32(inst.Len)
 	}
 	return target
 }
@@ -616,25 +616,25 @@ func (inj *Injector) selectFirstCodeCave(target uint32) *codeCave {
 // hook target function for add a jmp to the first code cave
 // #nosec G115
 func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
-	offset := int(inj.rvaToOffset(srcRVA))
-	if offset+32 > inj.size {
+	foa := inj.rvaToFOA(srcRVA)
+	if foa+32 > inj.size {
 		return errors.New("hook target is overflow")
 	}
-	insts, _ := inj.disassemble(inj.dup[offset : offset+32])
+	insts, _ := inj.disassemble(inj.dup[foa : foa+32])
 	numInst, totalSize, err := inj.calcInstNumAndSize(insts)
 	if err != nil {
 		return err
 	}
 	// backup original instruction that will be hooked
-	var off int
+	var off uint32
 	original := make([][]byte, numInst)
 	for i := 0; i < numInst; i++ {
 		original[i] = make([]byte, insts[i].Len)
-		copy(original[i], inj.dup[offset+off:])
-		off += insts[i].Len
+		copy(original[i], inj.dup[foa+off:])
+		off += uint32(insts[i].Len)
 	}
 	inj.oriInst = original
-	// record the next instruction offset
+	// record the next instruction rva
 	inj.retRVA = srcRVA + uint32(totalSize)
 	// build a patch for jump to the first code cave
 	jmp := make([]byte, nearJumpSize)
@@ -645,7 +645,7 @@ func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
 	patch := make([]byte, 0, totalSize)
 	patch = append(patch, jmp...)
 	patch = append(patch, padding...)
-	copy(inj.dup[offset:], patch)
+	copy(inj.dup[foa:], patch)
 	// update context
 	inj.ctx.HookAddress = inj.rvaToVA(srcRVA)
 	return nil
