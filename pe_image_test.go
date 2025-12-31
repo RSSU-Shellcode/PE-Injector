@@ -20,7 +20,6 @@ func TestProcessEAT(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		injector.loadImage(image)
 		for _, eat := range injector.eat {
 			fmt.Printf("%s 0x%X\n", eat.proc, eat.rva)
 		}
@@ -32,7 +31,6 @@ func TestProcessEAT(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		injector.loadImage(image)
 		for _, eat := range injector.eat {
 			fmt.Printf("%s 0x%X\n", eat.proc, eat.rva)
 		}
@@ -51,7 +49,6 @@ func TestProcessIAT(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		injector.loadImage(image)
 		for _, iat := range injector.iat {
 			fmt.Printf("%s %s 0x%X\n", iat.dll, iat.proc, iat.rva)
 		}
@@ -63,7 +60,6 @@ func TestProcessIAT(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		injector.loadImage(image)
 		for _, iat := range injector.iat {
 			fmt.Printf("%s %s 0x%X\n", iat.dll, iat.proc, iat.rva)
 		}
