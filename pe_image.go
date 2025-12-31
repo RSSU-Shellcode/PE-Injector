@@ -251,9 +251,9 @@ func (inj *Injector) removeLoadConfig() {
 		return
 	}
 	// erase the CFG table data
-	tableOffset := inj.rvaToOffset(dd.VirtualAddress)
+	tableFOA := inj.rvaToFOA(dd.VirtualAddress)
 	etb := bytes.Repeat([]byte{0x00}, int(dd.Size))
-	copy(inj.dup[tableOffset:], etb)
+	copy(inj.dup[tableFOA:], etb)
 	// calculate the offset of the load config entry
 	cfgOffset := inj.offDataDir + pe.IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG*imageDataDirectorySize
 	// erase the data directory entry
@@ -488,7 +488,7 @@ func (inj *Injector) rvaToVA(rva uint32) uint64 {
 	return uint64(base + int64(rva))
 }
 
-func (inj *Injector) offsetToRVA(offset uint32) uint32 {
+func (inj *Injector) foaToRVA(offset uint32) uint32 {
 	for _, section := range inj.img.Sections {
 		off := section.Offset
 		size := section.Size
@@ -499,7 +499,7 @@ func (inj *Injector) offsetToRVA(offset uint32) uint32 {
 	panic(fmt.Sprintf("invalid offset: 0x%X", offset))
 }
 
-func (inj *Injector) rvaToOffset(rva uint32) uint32 {
+func (inj *Injector) rvaToFOA(rva uint32) uint32 {
 	for _, section := range inj.img.Sections {
 		va := section.VirtualAddress
 		size := section.Size
