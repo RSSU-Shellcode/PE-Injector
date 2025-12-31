@@ -59,6 +59,20 @@ type iat struct {
 	rva  uint32
 }
 
+type exportDirectory struct {
+	Characteristics       uint32
+	TimeDateStamp         uint32
+	MajorVersion          uint16
+	MinorVersion          uint16
+	Name                  uint32
+	Base                  uint32
+	NumberOfFunctions     uint32
+	NumberOfNames         uint32
+	AddressOfFunctions    uint32
+	AddressOfNames        uint32
+	AddressOfNameOrdinals uint32
+}
+
 type importDescriptor struct {
 	OriginalFirstThunk uint32
 	TimeDateStamp      uint32
@@ -99,15 +113,11 @@ func (inj *Injector) processEAT() {
 	if int(dd.VirtualAddress)+exportDirectorySize > len(inj.vm) {
 		return
 	}
-	ed := inj.vm[dd.VirtualAddress:]
-	// TODO replace to structure
-	numberOfNames := binary.LittleEndian.Uint32(ed[24:28])
-	addressOfFunctions := binary.LittleEndian.Uint32(ed[28:32])
-	addressOfNames := binary.LittleEndian.Uint32(ed[32:36])
-	addressOfNameOrdinals := binary.LittleEndian.Uint32(ed[36:40])
+	directory := &exportDirectory{}
+	_ = binary.Read(bytes.NewReader(inj.vm[dd.VirtualAddress:]), binary.LittleEndian, directory)
 	var list []*eat
-	for i := uint32(0); i < numberOfNames; i++ {
-		nameRVAOffset := int(addressOfNames + i*4)
+	for i := uint32(0); i < directory.NumberOfNames; i++ {
+		nameRVAOffset := int(directory.AddressOfNames + i*4)
 		if nameRVAOffset+4 > len(inj.vm) {
 			break
 		}
@@ -116,12 +126,12 @@ func (inj *Injector) processEAT() {
 			continue
 		}
 		funcName := extractString(inj.vm, uint64(nameRVA))
-		ordinalOffset := int(addressOfNameOrdinals + i*2)
+		ordinalOffset := int(directory.AddressOfNameOrdinals + i*2)
 		if ordinalOffset+2 > len(inj.vm) {
 			break
 		}
 		ordinal := binary.LittleEndian.Uint16(inj.vm[ordinalOffset : ordinalOffset+2])
-		funcAddrOffset := int(addressOfFunctions) + int(ordinal)*4
+		funcAddrOffset := int(directory.AddressOfFunctions) + int(ordinal)*4
 		if funcAddrOffset+4 > len(inj.vm) {
 			break
 		}
@@ -142,11 +152,11 @@ func (inj *Injector) processIAT() {
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
-	table := inj.vm[dd.VirtualAddress:]
+	descriptors := inj.vm[dd.VirtualAddress:]
 	var list []*iat
-	for len(table) >= importDescriptorSize {
+	for len(descriptors) >= importDescriptorSize {
 		desc := &importDescriptor{}
-		_ = binary.Read(bytes.NewReader(table), binary.LittleEndian, desc)
+		_ = binary.Read(bytes.NewReader(descriptors), binary.LittleEndian, desc)
 		if desc.OriginalFirstThunk == 0 {
 			break
 		}
@@ -193,7 +203,7 @@ func (inj *Injector) processIAT() {
 				rva:  rva,
 			})
 		}
-		table = table[importDescriptorSize:]
+		descriptors = descriptors[importDescriptorSize:]
 	}
 	inj.iat = list
 }
