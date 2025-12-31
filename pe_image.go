@@ -17,7 +17,7 @@ const (
 	imageDataDirectorySize  = 4 + 4
 	imageSectionHeaderSize  = 40
 
-	exportDirectorySize  = 40
+	exportDirectorySize  = 10 * 4
 	importDescriptorSize = 5 * 4
 	baseRelocationSize   = 2 * 4
 
@@ -86,23 +86,15 @@ type baseRelocation struct {
 	SizeOfBlock    uint32
 }
 
-func (inj *Injector) loadImage(image []byte) {
-	var size uint32
-	switch inj.arch {
-	case "386":
-		size = inj.hdr32.SizeOfImage
-	case "amd64":
-		size = inj.hdr64.SizeOfImage
-	}
-	vm := make([]byte, size)
-	for _, section := range inj.img.Sections {
-		dst := vm[section.VirtualAddress:]
-		src := image[section.Offset : section.Offset+section.Size]
-		copy(dst, src)
-	}
-	inj.vm = vm
+func (inj *Injector) loadImage() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprint(r))
+		}
+	}()
 	inj.processEAT()
 	inj.processIAT()
+	return nil
 }
 
 func (inj *Injector) processEAT() {
@@ -110,32 +102,20 @@ func (inj *Injector) processEAT() {
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
-	if int(dd.VirtualAddress)+exportDirectorySize > len(inj.vm) {
-		return
-	}
 	directory := &exportDirectory{}
-	_ = binary.Read(bytes.NewReader(inj.vm[dd.VirtualAddress:]), binary.LittleEndian, directory)
+	_ = binary.Read(bytes.NewReader(inj.getFileSliceByRVA(dd.VirtualAddress)), binary.LittleEndian, directory)
 	var list []*eat
 	for i := uint32(0); i < directory.NumberOfNames; i++ {
-		nameRVAOffset := int(directory.AddressOfNames + i*4)
-		if nameRVAOffset+4 > len(inj.vm) {
-			break
-		}
-		nameRVA := binary.LittleEndian.Uint32(inj.vm[nameRVAOffset : nameRVAOffset+4])
+		nameRVAOffset := directory.AddressOfNames + i*4
+		nameRVA := binary.LittleEndian.Uint32(inj.getFileSliceByRVA(nameRVAOffset))
 		if nameRVA == 0 {
 			continue
 		}
-		funcName := extractString(inj.vm, uint64(nameRVA))
-		ordinalOffset := int(directory.AddressOfNameOrdinals + i*2)
-		if ordinalOffset+2 > len(inj.vm) {
-			break
-		}
-		ordinal := binary.LittleEndian.Uint16(inj.vm[ordinalOffset : ordinalOffset+2])
-		funcAddrOffset := int(directory.AddressOfFunctions) + int(ordinal)*4
-		if funcAddrOffset+4 > len(inj.vm) {
-			break
-		}
-		funcRVA := binary.LittleEndian.Uint32(inj.vm[funcAddrOffset : funcAddrOffset+4])
+		funcName := inj.extractString(nameRVA)
+		ordinalOffset := directory.AddressOfNameOrdinals + i*2
+		ordinal := binary.LittleEndian.Uint16(inj.getFileSliceByRVA(ordinalOffset))
+		funcAddrOffset := directory.AddressOfFunctions + uint32(ordinal*4)
+		funcRVA := binary.LittleEndian.Uint32(inj.getFileSliceByRVA(funcAddrOffset))
 		if funcRVA >= dd.VirtualAddress && funcRVA <= dd.VirtualAddress+dd.Size {
 			continue
 		}
@@ -152,7 +132,7 @@ func (inj *Injector) processIAT() {
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
-	descriptors := inj.vm[dd.VirtualAddress:]
+	descriptors := inj.getFileSliceByRVA(dd.VirtualAddress)
 	var list []*iat
 	for len(descriptors) >= importDescriptorSize {
 		desc := &importDescriptor{}
@@ -160,8 +140,8 @@ func (inj *Injector) processIAT() {
 		if desc.OriginalFirstThunk == 0 {
 			break
 		}
-		dll := extractString(inj.vm, uint64(desc.Name))
-		d := inj.vm[desc.OriginalFirstThunk:]
+		dll := inj.extractString(desc.Name)
+		d := inj.getFileSliceByRVA(desc.OriginalFirstThunk)
 		for len(d) > 0 {
 			var (
 				proc string
@@ -177,7 +157,7 @@ func (inj *Injector) processIAT() {
 					break
 				}
 				if val&0x80000000 == 0 {
-					proc = extractString(inj.vm, uint64(val+2))
+					proc = inj.extractString(val + 2)
 					rva = desc.FirstThunk
 				}
 				desc.FirstThunk += 4
@@ -189,7 +169,7 @@ func (inj *Injector) processIAT() {
 					break
 				}
 				if val&0x8000000000000000 == 0 {
-					proc = extractString(inj.vm, val+2)
+					proc = inj.extractString(uint32(val + 2))
 					rva = desc.FirstThunk
 				}
 				desc.FirstThunk += 8
@@ -510,14 +490,15 @@ func (inj *Injector) rvaToFOA(rva uint32) uint32 {
 	panic(fmt.Sprintf("invalid rva: 0x%X", rva))
 }
 
-func extractString(vm []byte, rva uint64) string {
-	l := uint64(len(vm))
-	if rva >= l {
-		return ""
-	}
-	for end := rva; end < l; end++ {
-		if vm[end] == 0 {
-			return string(vm[rva:end])
+func (inj *Injector) getFileSliceByRVA(rva uint32) []byte {
+	return inj.dup[inj.rvaToFOA(rva):]
+}
+
+func (inj *Injector) extractString(rva uint32) string {
+	foa := inj.rvaToFOA(rva)
+	for end := foa; end < inj.size; end++ {
+		if inj.dup[end] == 0 {
+			return string(inj.dup[foa:end])
 		}
 	}
 	return ""
