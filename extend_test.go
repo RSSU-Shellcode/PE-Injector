@@ -16,10 +16,10 @@ func TestExtendTextSection(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		output, err := injector.extendTextSection(8192)
+		output, err := injector.extendTextSection(1427)
 		require.NoError(t, err)
 
-		os.WriteFile("F:\\output.exe", output, 0644)
+		testExecuteImage(t, "testdata/extended_x86.exe", output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -28,10 +28,10 @@ func TestExtendTextSection(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		output, err := injector.extendTextSection(8192)
+		output, err := injector.extendTextSection(7433)
 		require.NoError(t, err)
 
-		os.WriteFile("F:\\output.exe", output, 0644)
+		testExecuteImage(t, "testdata/extended_x64.exe", output)
 	})
 
 	err := injector.Close()
