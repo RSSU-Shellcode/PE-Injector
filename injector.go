@@ -86,7 +86,6 @@ type Injector struct {
 	containCFG  bool
 
 	// about process EAT and IAT
-	vm  []byte
 	eat []*eat
 	iat []*iat
 
@@ -467,25 +466,29 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	if err != nil {
 		return err
 	}
+	// make duplicate for make output image
+	inj.dup = bytes.Clone(image)
+	// load image basic information
+	err = inj.loadImage()
+	if err != nil {
+		return fmt.Errorf("failed to load image: %s", err)
+	}
 	// scan code cave in image text section
 	caves, err := inj.scanCodeCave()
 	if err != nil {
 		return fmt.Errorf("failed to scan code cave: %s", err)
 	}
 	inj.caves = caves
-	inj.loadImage(image)
+	// remove the digital signature of the PE file
+	inj.removeSignature()
+	// remove the load config for disable Control Flow Guard
+	inj.removeLoadConfig()
 	// set random seed
 	seed := opts.RandSeed
 	if seed == 0 {
 		seed = inj.rand.Int63()
 	}
 	inj.rand.Seed(seed)
-	// make duplicate for make output image
-	inj.dup = bytes.Clone(image)
-	// remove the digital signature of the PE file
-	inj.removeSignature()
-	// remove the load config for disable Control Flow Guard
-	inj.removeLoadConfig()
 	// update context
 	inj.ctx = &Context{
 		Arch:  arch,
@@ -991,7 +994,6 @@ func (inj *Injector) cleanup() {
 	inj.img = nil
 	inj.containSign = false
 	inj.containCFG = false
-	inj.vm = nil
 	inj.eat = nil
 	inj.iat = nil
 	inj.section = nil
