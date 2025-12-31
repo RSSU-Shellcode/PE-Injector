@@ -142,9 +142,9 @@ func (inj *Injector) adjustImportDescriptor(output []byte, extSize, vaOffset uin
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
-	offset := inj.rvaToOffset(dd.VirtualAddress)
-	srcTable := inj.dup[offset:]
-	dstTable := output[offset+extSize:]
+	foa := inj.rvaToFOA(dd.VirtualAddress)
+	srcTable := inj.dup[foa:]
+	dstTable := output[foa+extSize:]
 	for {
 		srcDesc := &importDescriptor{}
 		_ = binary.Read(bytes.NewReader(srcTable), binary.LittleEndian, srcDesc)
@@ -163,7 +163,7 @@ func (inj *Injector) adjustImportDescriptor(output []byte, extSize, vaOffset uin
 		_ = binary.Write(buffer, binary.LittleEndian, dstDesc)
 		copy(dstTable, buffer.Bytes())
 		// adjust thunk data
-		off := inj.rvaToOffset(srcDesc.OriginalFirstThunk)
+		off := inj.rvaToFOA(srcDesc.OriginalFirstThunk)
 		srcD := inj.dup[off:]
 		dstD := output[off+extSize:]
 		for len(srcD) > 0 {
@@ -209,9 +209,9 @@ func (inj *Injector) adjustBaseRelocation(output []byte, extSize, vaOffset uint3
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
-	offset := inj.rvaToOffset(dd.VirtualAddress)
-	srcTable := inj.dup[offset:]
-	dstTable := output[offset+extSize:]
+	foa := inj.rvaToFOA(dd.VirtualAddress)
+	srcTable := inj.dup[foa:]
+	dstTable := output[foa+extSize:]
 	for {
 		srcReloc := &baseRelocation{}
 		_ = binary.Read(bytes.NewReader(srcTable), binary.LittleEndian, srcReloc)
@@ -239,12 +239,12 @@ func (inj *Injector) adjustBaseRelocation(output []byte, extSize, vaOffset uint3
 				switch typ {
 				case relBasedAbsolute:
 				case relBasedHighlow:
-					o := inj.rvaToOffset(srcReloc.VirtualAddress + uint32(off))
+					o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
 					addr := binary.LittleEndian.Uint32(inj.dup[o:])
 					addr += extSize
 					binary.LittleEndian.PutUint32(output[o+extSize:], addr)
 				case relBasedDir64:
-					o := inj.rvaToOffset(srcReloc.VirtualAddress + uint32(off))
+					o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
 					addr := binary.LittleEndian.Uint64(inj.dup[o:])
 					addr += uint64(extSize)
 					binary.LittleEndian.PutUint64(output[o+extSize:], addr)
@@ -269,12 +269,12 @@ func (inj *Injector) adjustBaseRelocation(output []byte, extSize, vaOffset uint3
 				switch typ {
 				case relBasedAbsolute:
 				case relBasedHighlow:
-					o := inj.rvaToOffset(srcReloc.VirtualAddress + uint32(off))
+					o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
 					addr := binary.LittleEndian.Uint32(inj.dup[o:])
 					addr += vaOffset
 					binary.LittleEndian.PutUint32(output[o+vaOffset:], addr)
 				case relBasedDir64:
-					o := inj.rvaToOffset(srcReloc.VirtualAddress + uint32(off))
+					o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
 					addr := binary.LittleEndian.Uint64(inj.dup[o:])
 					addr += uint64(vaOffset)
 					binary.LittleEndian.PutUint64(output[o+vaOffset:], addr)
