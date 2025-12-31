@@ -11,31 +11,29 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 	if !inj.canTryExtend {
 		return nil, errors.New("the first section without RX")
 	}
-	err := inj.checkAlignment()
+	err := inj.checkImageAlignment()
 	if err != nil {
 		return nil, err
 	}
-	text := inj.img.Sections[0]
-	// calculate actual extend file size and virtual address offset
-	extSize := alignFileOffset(size)
-	vaOffset := alignMemoryRegion(text.VirtualSize+extSize) - alignMemoryRegion(text.VirtualSize)
 	// copy all data before the first section data
-	output := make([]byte, len(inj.dup)+int(extSize))
+	size = alignMemoryRegion(size)
+	text := inj.img.Sections[0]
+	output := make([]byte, len(inj.dup)+int(size))
 	copy(output, inj.dup[:text.Offset])
-	// preprocess NT Headers
-	for _, step := range []func(output []byte, extSize, vaOffset uint32){
+	// extend the first section
+	for _, step := range []func(output []byte, size uint32){
 		inj.adjustOptionalHeader,
 		inj.adjustSectionHeaders,
 		inj.adjustDataDirectory,
 		inj.adjustImportDescriptor,
 		inj.adjustBaseRelocation,
 	} {
-		step(output, extSize, vaOffset)
+		step(output, size)
 	}
 	return output, nil
 }
 
-func (inj *Injector) checkAlignment() error {
+func (inj *Injector) checkImageAlignment() error {
 	var (
 		sectionAlignment uint32
 		fileAlignment    uint32
@@ -59,23 +57,23 @@ func (inj *Injector) checkAlignment() error {
 	return nil
 }
 
-func (inj *Injector) adjustOptionalHeader(output []byte, extSize, vaOffset uint32) {
+func (inj *Injector) adjustOptionalHeader(output []byte, size uint32) {
 	var optHdr []byte
 	switch inj.arch {
 	case "386":
 		hdr := *inj.hdr32
-		hdr.AddressOfEntryPoint += extSize
-		hdr.SizeOfCode += extSize
-		hdr.SizeOfImage += vaOffset
+		hdr.AddressOfEntryPoint += size
+		hdr.SizeOfCode += size
+		hdr.SizeOfImage += size
 		buffer := bytes.NewBuffer(nil)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 		// ignore data directory
 		optHdr = buffer.Bytes()[:imageOptionHeaderSize32]
 	case "amd64":
 		hdr := *inj.hdr64
-		hdr.AddressOfEntryPoint += extSize
-		hdr.SizeOfCode += extSize
-		hdr.SizeOfImage += vaOffset
+		hdr.AddressOfEntryPoint += size
+		hdr.SizeOfCode += size
+		hdr.SizeOfImage += size
 		buffer := bytes.NewBuffer(nil)
 		_ = binary.Write(buffer, binary.LittleEndian, &hdr)
 		// ignore data directory
@@ -84,17 +82,17 @@ func (inj *Injector) adjustOptionalHeader(output []byte, extSize, vaOffset uint3
 	copy(output[inj.offOptHdr:], optHdr)
 }
 
-func (inj *Injector) adjustSectionHeaders(output []byte, extSize, vaOffset uint32) {
+func (inj *Injector) adjustSectionHeaders(output []byte, size uint32) {
 	// adjust the text section header
 	shOffset := inj.offOptHdr + uint32(inj.img.SizeOfOptionalHeader)
 	text := new(pe.SectionHeader32)
 	_ = binary.Read(bytes.NewReader(inj.dup[shOffset:]), binary.LittleEndian, text)
 	// copy text section data
 	textPtr := text.PointerToRawData
-	copy(output[textPtr+extSize:], inj.dup[textPtr:textPtr+text.SizeOfRawData])
+	copy(output[textPtr+size:], inj.dup[textPtr:textPtr+text.SizeOfRawData])
 	// adjust section size
-	text.VirtualSize += extSize
-	text.SizeOfRawData += extSize
+	text.VirtualSize += size
+	text.SizeOfRawData += size
 	// overwrite the text section
 	buffer := bytes.NewBuffer(nil)
 	_ = binary.Write(buffer, binary.LittleEndian, text)
@@ -106,10 +104,10 @@ func (inj *Injector) adjustSectionHeaders(output []byte, extSize, vaOffset uint3
 		_ = binary.Read(bytes.NewReader(inj.dup[shOffset:]), binary.LittleEndian, section)
 		// copy section data
 		ptr := section.PointerToRawData
-		copy(output[ptr+extSize:], inj.dup[ptr:ptr+section.SizeOfRawData])
+		copy(output[ptr+size:], inj.dup[ptr:ptr+section.SizeOfRawData])
 		// adjust section size
-		section.VirtualAddress += vaOffset
-		section.PointerToRawData += extSize
+		section.VirtualAddress += size
+		section.PointerToRawData += size
 		// overwrite section header
 		buffer.Reset()
 		_ = binary.Write(buffer, binary.LittleEndian, section)
@@ -117,7 +115,7 @@ func (inj *Injector) adjustSectionHeaders(output []byte, extSize, vaOffset uint3
 	}
 }
 
-func (inj *Injector) adjustDataDirectory(output []byte, _, vaOffset uint32) {
+func (inj *Injector) adjustDataDirectory(output []byte, size uint32) {
 	for i := uint32(0); i < inj.numDataDir; i++ {
 		dd := new(pe.DataDirectory)
 		offset := inj.offDataDir + i*imageDataDirectorySize
@@ -125,7 +123,7 @@ func (inj *Injector) adjustDataDirectory(output []byte, _, vaOffset uint32) {
 		if dd.VirtualAddress == 0 {
 			continue
 		}
-		dd.VirtualAddress += vaOffset
+		dd.VirtualAddress += size
 		// rewrite data directory
 		buffer := bytes.NewBuffer(nil)
 		_ = binary.Write(buffer, binary.LittleEndian, dd)
@@ -137,35 +135,35 @@ func (inj *Injector) adjustEAT() {
 
 }
 
-func (inj *Injector) adjustImportDescriptor(output []byte, extSize, vaOffset uint32) {
+func (inj *Injector) adjustImportDescriptor(output []byte, size uint32) {
 	dd := inj.dataDir[pe.IMAGE_DIRECTORY_ENTRY_IMPORT]
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
 	foa := inj.rvaToFOA(dd.VirtualAddress)
-	srcTable := inj.dup[foa:]
-	dstTable := output[foa+extSize:]
+	src := inj.dup[foa:]
+	dst := output[foa+size:]
 	for {
 		srcDesc := &importDescriptor{}
-		_ = binary.Read(bytes.NewReader(srcTable), binary.LittleEndian, srcDesc)
+		_ = binary.Read(bytes.NewReader(src), binary.LittleEndian, srcDesc)
 		if srcDesc.OriginalFirstThunk == 0 {
 			break
 		}
 		dstDesc := &importDescriptor{
-			OriginalFirstThunk: srcDesc.OriginalFirstThunk + vaOffset,
+			OriginalFirstThunk: srcDesc.OriginalFirstThunk + size,
 			TimeDateStamp:      srcDesc.TimeDateStamp,
 			ForwarderChain:     srcDesc.ForwarderChain,
-			Name:               srcDesc.Name + vaOffset,
-			FirstThunk:         srcDesc.FirstThunk + vaOffset,
+			Name:               srcDesc.Name + size,
+			FirstThunk:         srcDesc.FirstThunk + size,
 		}
 		// rewrite import descriptor
 		buffer := bytes.NewBuffer(nil)
 		_ = binary.Write(buffer, binary.LittleEndian, dstDesc)
-		copy(dstTable, buffer.Bytes())
+		copy(dst, buffer.Bytes())
 		// adjust thunk data
 		off := inj.rvaToFOA(srcDesc.OriginalFirstThunk)
 		srcD := inj.dup[off:]
-		dstD := output[off+extSize:]
+		dstD := output[off+size:]
 		for len(srcD) > 0 {
 			var stop bool
 			switch inj.arch {
@@ -177,7 +175,7 @@ func (inj *Injector) adjustImportDescriptor(output []byte, extSize, vaOffset uin
 					break
 				}
 				if val&0x80000000 == 0 {
-					val += vaOffset
+					val += size
 					binary.LittleEndian.PutUint32(dstD, val)
 				}
 				dstD = dstD[4:]
@@ -189,7 +187,7 @@ func (inj *Injector) adjustImportDescriptor(output []byte, extSize, vaOffset uin
 					break
 				}
 				if val&0x8000000000000000 == 0 {
-					val += uint64(vaOffset)
+					val += uint64(size)
 					binary.LittleEndian.PutUint64(dstD, val)
 				}
 				dstD = dstD[8:]
@@ -198,92 +196,55 @@ func (inj *Injector) adjustImportDescriptor(output []byte, extSize, vaOffset uin
 				break
 			}
 		}
-		// update src and dst table
-		srcTable = srcTable[importDescriptorSize:]
-		dstTable = dstTable[importDescriptorSize:]
+		// update src and dst
+		src = src[importDescriptorSize:]
+		dst = dst[importDescriptorSize:]
 	}
 }
 
-func (inj *Injector) adjustBaseRelocation(output []byte, extSize, vaOffset uint32) {
+func (inj *Injector) adjustBaseRelocation(output []byte, size uint32) {
 	dd := inj.dataDir[pe.IMAGE_DIRECTORY_ENTRY_BASERELOC]
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
 	foa := inj.rvaToFOA(dd.VirtualAddress)
-	srcTable := inj.dup[foa:]
-	dstTable := output[foa+extSize:]
+	src := inj.dup[foa:]
+	dst := output[foa+size:]
 	for {
 		srcReloc := &baseRelocation{}
-		_ = binary.Read(bytes.NewReader(srcTable), binary.LittleEndian, srcReloc)
+		_ = binary.Read(bytes.NewReader(src), binary.LittleEndian, srcReloc)
 		if srcReloc.VirtualAddress == 0 {
 			break
 		}
-
-		text := inj.img.Sections[0]
-
-		if srcReloc.VirtualAddress >= text.VirtualAddress && srcReloc.VirtualAddress < text.VirtualAddress+text.VirtualSize {
-
-			dstReloc := &baseRelocation{
-				VirtualAddress: srcReloc.VirtualAddress + extSize,
-				SizeOfBlock:    srcReloc.SizeOfBlock,
-			}
-			// rewrite base relocation
-			buffer := bytes.NewBuffer(nil)
-			_ = binary.Write(buffer, binary.LittleEndian, dstReloc)
-			copy(dstTable, buffer.Bytes())
-			// adjust reloc entry
-			for i := uint32(0); i < (srcReloc.SizeOfBlock-baseRelocationSize)/2; i++ {
-				reloc := binary.LittleEndian.Uint16(srcTable[baseRelocationSize+i*2:])
-				typ := reloc >> 12
-				off := reloc & 0x0FFF
-				switch typ {
-				case relBasedAbsolute:
-				case relBasedHighlow:
-					o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
-					addr := binary.LittleEndian.Uint32(inj.dup[o:])
-					addr += extSize
-					binary.LittleEndian.PutUint32(output[o+extSize:], addr)
-				case relBasedDir64:
-					o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
-					addr := binary.LittleEndian.Uint64(inj.dup[o:])
-					addr += uint64(extSize)
-					binary.LittleEndian.PutUint64(output[o+extSize:], addr)
-				}
-			}
-
-		} else {
-
-			dstReloc := &baseRelocation{
-				VirtualAddress: srcReloc.VirtualAddress + vaOffset,
-				SizeOfBlock:    srcReloc.SizeOfBlock,
-			}
-			// rewrite base relocation
-			buffer := bytes.NewBuffer(nil)
-			_ = binary.Write(buffer, binary.LittleEndian, dstReloc)
-			copy(dstTable, buffer.Bytes())
-			// adjust reloc entry
-			for i := uint32(0); i < (srcReloc.SizeOfBlock-baseRelocationSize)/2; i++ {
-				reloc := binary.LittleEndian.Uint16(srcTable[baseRelocationSize+i*2:])
-				typ := reloc >> 12
-				off := reloc & 0x0FFF
-				switch typ {
-				case relBasedAbsolute:
-				case relBasedHighlow:
-					o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
-					addr := binary.LittleEndian.Uint32(inj.dup[o:])
-					addr += vaOffset
-					binary.LittleEndian.PutUint32(output[o+vaOffset:], addr)
-				case relBasedDir64:
-					o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
-					addr := binary.LittleEndian.Uint64(inj.dup[o:])
-					addr += uint64(vaOffset)
-					binary.LittleEndian.PutUint64(output[o+vaOffset:], addr)
-				}
+		dstReloc := &baseRelocation{
+			VirtualAddress: srcReloc.VirtualAddress + size,
+			SizeOfBlock:    srcReloc.SizeOfBlock,
+		}
+		// rewrite base relocation
+		buffer := bytes.NewBuffer(nil)
+		_ = binary.Write(buffer, binary.LittleEndian, dstReloc)
+		copy(dst, buffer.Bytes())
+		// adjust reloc entry
+		for i := uint32(0); i < (srcReloc.SizeOfBlock-baseRelocationSize)/2; i++ {
+			reloc := binary.LittleEndian.Uint16(src[baseRelocationSize+i*2:])
+			typ := reloc >> 12
+			off := reloc & 0x0FFF
+			switch typ {
+			case relBasedAbsolute:
+			case relBasedHighlow:
+				o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
+				addr := binary.LittleEndian.Uint32(inj.dup[o:])
+				addr += size
+				binary.LittleEndian.PutUint32(output[o+size:], addr)
+			case relBasedDir64:
+				o := inj.rvaToFOA(srcReloc.VirtualAddress + uint32(off))
+				addr := binary.LittleEndian.Uint64(inj.dup[o:])
+				addr += uint64(size)
+				binary.LittleEndian.PutUint64(output[o+size:], addr)
 			}
 		}
-
-		// update src and dst table
-		srcTable = srcTable[srcReloc.SizeOfBlock:]
-		dstTable = dstTable[srcReloc.SizeOfBlock:]
+		// update src and dst
+		src = src[srcReloc.SizeOfBlock:]
+		dst = dst[srcReloc.SizeOfBlock:]
 	}
 }
