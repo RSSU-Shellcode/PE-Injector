@@ -72,6 +72,10 @@ type Injector struct {
 	hdr32 *pe.OptionalHeader32
 	hdr64 *pe.OptionalHeader64
 
+	// about image alignment
+	sectionAlign uint32
+	fileAlign    uint32
+
 	// about data directory
 	numDataDir uint32
 	dataDir    [16]pe.DataDirectory
@@ -433,11 +437,15 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	case pe.IMAGE_FILE_MACHINE_I386:
 		arch = "386"
 		inj.hdr32 = peFile.OptionalHeader.(*pe.OptionalHeader32)
+		inj.sectionAlign = inj.hdr32.SectionAlignment
+		inj.fileAlign = inj.hdr32.FileAlignment
 		inj.numDataDir = inj.hdr32.NumberOfRvaAndSizes
 		inj.dataDir = inj.hdr32.DataDirectory
 	case pe.IMAGE_FILE_MACHINE_AMD64:
 		arch = "amd64"
 		inj.hdr64 = peFile.OptionalHeader.(*pe.OptionalHeader64)
+		inj.sectionAlign = inj.hdr64.SectionAlignment
+		inj.fileAlign = inj.hdr64.FileAlignment
 		inj.numDataDir = inj.hdr64.NumberOfRvaAndSizes
 		inj.dataDir = inj.hdr64.DataDirectory
 	default:
