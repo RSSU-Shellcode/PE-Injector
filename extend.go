@@ -24,8 +24,8 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 	// extend the first section
 	for _, step := range []func(output []byte, size uint32){
 		inj.adjustOptionalHeader,
-		inj.adjustSectionHeaders,
 		inj.adjustDataDirectory,
+		inj.adjustSectionHeader,
 		inj.adjustImportDescriptor,
 		inj.adjustBaseRelocation,
 	} {
@@ -83,7 +83,21 @@ func (inj *Injector) adjustOptionalHeader(output []byte, size uint32) {
 	copy(output[inj.offOptHdr:], optHdr)
 }
 
-func (inj *Injector) adjustSectionHeaders(output []byte, size uint32) {
+func (inj *Injector) adjustDataDirectory(output []byte, size uint32) {
+	for i := uint32(0); i < inj.numDataDir; i++ {
+		dd := new(pe.DataDirectory)
+		offset := inj.offDataDir + i*imageDataDirectorySize
+		readStruct(inj.dup[offset:], dd)
+		if dd.VirtualAddress == 0 {
+			continue
+		}
+		dd.VirtualAddress += size
+		// rewrite data directory
+		writeStruct(output[offset:], dd)
+	}
+}
+
+func (inj *Injector) adjustSectionHeader(output []byte, size uint32) {
 	// adjust the text section header
 	shOffset := inj.offOptHdr + uint32(inj.img.SizeOfOptionalHeader)
 	text := new(pe.SectionHeader32)
@@ -109,20 +123,6 @@ func (inj *Injector) adjustSectionHeaders(output []byte, size uint32) {
 		section.PointerToRawData += size
 		// overwrite section header
 		writeStruct(output[shOffset:], section)
-	}
-}
-
-func (inj *Injector) adjustDataDirectory(output []byte, size uint32) {
-	for i := uint32(0); i < inj.numDataDir; i++ {
-		dd := new(pe.DataDirectory)
-		offset := inj.offDataDir + i*imageDataDirectorySize
-		readStruct(inj.dup[offset:], dd)
-		if dd.VirtualAddress == 0 {
-			continue
-		}
-		dd.VirtualAddress += size
-		// rewrite data directory
-		writeStruct(output[offset:], dd)
 	}
 }
 
