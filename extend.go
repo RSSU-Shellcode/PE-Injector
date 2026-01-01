@@ -153,7 +153,23 @@ func (inj *Injector) adjustExportDirectory(output []byte, size uint32) {
 	}
 	writeStruct(dst, dstDir)
 	// overwrite export function address
-
+	for i := uint32(0); i < srcDir.NumberOfFunctions; i++ {
+		off := inj.rvaToFOA(srcDir.AddressOfFunctions + i*4)
+		srcD := inj.dup[off:]
+		dstD := output[off+size:]
+		funcRVA := binary.LittleEndian.Uint32(srcD)
+		funcRVA += size
+		binary.LittleEndian.PutUint32(dstD, funcRVA)
+	}
+	// overwrite export function names
+	for i := uint32(0); i < srcDir.NumberOfNames; i++ {
+		off := inj.rvaToFOA(srcDir.AddressOfNames + i*4)
+		srcD := inj.dup[off:]
+		dstD := output[off+size:]
+		nameRVA := binary.LittleEndian.Uint32(srcD)
+		nameRVA += size
+		binary.LittleEndian.PutUint32(dstD, nameRVA)
+	}
 }
 
 func (inj *Injector) adjustImportDescriptor(output []byte, size uint32) {
