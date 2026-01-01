@@ -103,19 +103,19 @@ func (inj *Injector) processEAT() {
 		return
 	}
 	directory := &exportDirectory{}
-	inj.readStruct(inj.getFileSliceByRVA(dd.VirtualAddress), directory)
+	readStruct(inj.getFileDataByRVA(dd.VirtualAddress), directory)
 	var list []*eat
 	for i := uint32(0); i < directory.NumberOfNames; i++ {
 		nameRVAOffset := directory.AddressOfNames + i*4
-		nameRVA := binary.LittleEndian.Uint32(inj.getFileSliceByRVA(nameRVAOffset))
+		nameRVA := binary.LittleEndian.Uint32(inj.getFileDataByRVA(nameRVAOffset))
 		if nameRVA == 0 {
 			continue
 		}
 		funcName := inj.extractString(nameRVA)
 		ordinalOffset := directory.AddressOfNameOrdinals + i*2
-		ordinal := binary.LittleEndian.Uint16(inj.getFileSliceByRVA(ordinalOffset))
+		ordinal := binary.LittleEndian.Uint16(inj.getFileDataByRVA(ordinalOffset))
 		funcAddrOffset := directory.AddressOfFunctions + uint32(ordinal*4)
-		funcRVA := binary.LittleEndian.Uint32(inj.getFileSliceByRVA(funcAddrOffset))
+		funcRVA := binary.LittleEndian.Uint32(inj.getFileDataByRVA(funcAddrOffset))
 		if funcRVA >= dd.VirtualAddress && funcRVA <= dd.VirtualAddress+dd.Size {
 			continue
 		}
@@ -132,16 +132,16 @@ func (inj *Injector) processIAT() {
 	if dd.VirtualAddress == 0 || dd.Size == 0 {
 		return
 	}
-	descriptors := inj.getFileSliceByRVA(dd.VirtualAddress)
+	descriptors := inj.getFileDataByRVA(dd.VirtualAddress)
 	var list []*iat
 	for len(descriptors) >= importDescriptorSize {
 		desc := &importDescriptor{}
-		inj.readStruct(descriptors, desc)
+		readStruct(descriptors, desc)
 		if desc.OriginalFirstThunk == 0 {
 			break
 		}
 		dll := inj.extractString(desc.Name)
-		d := inj.getFileSliceByRVA(desc.OriginalFirstThunk)
+		d := inj.getFileDataByRVA(desc.OriginalFirstThunk)
 		for len(d) > 0 {
 			var (
 				proc string
@@ -306,7 +306,7 @@ func (inj *Injector) extendSection(data []byte) (uint32, error) {
 	shOffset := sctOffset + uint32((inj.img.NumberOfSections-1)*imageSectionHeaderSize)
 	// adjust the last section header
 	last := new(pe.SectionHeader32)
-	_ = binary.Read(bytes.NewReader(inj.dup[shOffset:]), binary.LittleEndian, last)
+	readStruct(inj.dup[shOffset:], last)
 	// the section must be read only
 	if last.Characteristics&0xF0000000 != 0x40000000 {
 		return 0, fmt.Errorf("the last section is not read only")
@@ -328,11 +328,9 @@ func (inj *Injector) extendSection(data []byte) (uint32, error) {
 		padSize = 0
 	}
 	// overwrite the last section
-	buffer := bytes.NewBuffer(nil)
-	_ = binary.Write(buffer, binary.LittleEndian, last)
-	copy(inj.dup[shOffset:], buffer.Bytes())
+	writeStruct(inj.dup[shOffset:], last)
 	// adjust the size of image in optional header
-	buffer.Reset()
+	buffer := bytes.NewBuffer(nil)
 	var optHdr []byte
 	switch inj.arch {
 	case "386":
@@ -387,7 +385,7 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 	}
 	lastOffset := shOffset - imageSectionHeaderSize
 	last := new(pe.SectionHeader32)
-	_ = binary.Read(bytes.NewReader(inj.dup[lastOffset:]), binary.LittleEndian, last)
+	readStruct(inj.dup[lastOffset:], last)
 	sh := &pe.SectionHeader32{
 		VirtualSize:      size,
 		VirtualAddress:   last.VirtualAddress + alignMemoryRegion(last.VirtualSize),
@@ -396,20 +394,16 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 		Characteristics:  0x60000020, // RX
 	}
 	copy(sh.Name[:], name)
-	buffer := bytes.NewBuffer(nil)
-	_ = binary.Write(buffer, binary.LittleEndian, sh)
-	copy(inj.dup[shOffset:], buffer.Bytes())
+	writeStruct(inj.dup[shOffset:], sh)
 	// append data to the tail
 	newSection := bytes.Repeat([]byte{0}, int(sh.SizeOfRawData))
 	inj.dup = append(inj.dup, newSection...)
 	// adjust the file header
 	fileHeader := inj.img.FileHeader
 	fileHeader.NumberOfSections++
-	buffer.Reset()
-	_ = binary.Write(buffer, binary.LittleEndian, &fileHeader)
-	copy(inj.dup[inj.offFileHdr:], buffer.Bytes())
+	writeStruct(inj.dup[inj.offFileHdr:], &fileHeader)
 	// adjust the size of image in optional header
-	buffer.Reset()
+	buffer := bytes.NewBuffer(nil)
 	var optHdr []byte
 	switch inj.arch {
 	case "386":
@@ -490,18 +484,8 @@ func (inj *Injector) rvaToFOA(rva uint32) uint32 {
 	panic(fmt.Sprintf("invalid rva: 0x%X", rva))
 }
 
-func (inj *Injector) getFileSliceByRVA(rva uint32) []byte {
+func (inj *Injector) getFileDataByRVA(rva uint32) []byte {
 	return inj.dup[inj.rvaToFOA(rva):]
-}
-
-func (inj *Injector) readStruct(src []byte, val interface{}) {
-	_ = binary.Read(bytes.NewBuffer(src), binary.LittleEndian, val)
-}
-
-func (inj *Injector) writeStruct(dst []byte, val interface{}) {
-	buf := bytes.NewBuffer(nil)
-	_ = binary.Write(buf, binary.LittleEndian, val)
-	copy(dst, buf.Bytes())
 }
 
 func (inj *Injector) extractString(rva uint32) string {
@@ -512,6 +496,16 @@ func (inj *Injector) extractString(rva uint32) string {
 		}
 	}
 	return ""
+}
+
+func readStruct(src []byte, val interface{}) {
+	_ = binary.Read(bytes.NewBuffer(src), binary.LittleEndian, val)
+}
+
+func writeStruct(dst []byte, val interface{}) {
+	buf := bytes.NewBuffer(nil)
+	_ = binary.Write(buf, binary.LittleEndian, val)
+	copy(dst, buf.Bytes())
 }
 
 func alignFileOffset(size uint32) uint32 {
