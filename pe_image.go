@@ -103,7 +103,7 @@ func (inj *Injector) processEAT() {
 		return
 	}
 	directory := &exportDirectory{}
-	_ = binary.Read(bytes.NewReader(inj.getFileSliceByRVA(dd.VirtualAddress)), binary.LittleEndian, directory)
+	inj.readStruct(inj.getFileSliceByRVA(dd.VirtualAddress), directory)
 	var list []*eat
 	for i := uint32(0); i < directory.NumberOfNames; i++ {
 		nameRVAOffset := directory.AddressOfNames + i*4
@@ -136,7 +136,7 @@ func (inj *Injector) processIAT() {
 	var list []*iat
 	for len(descriptors) >= importDescriptorSize {
 		desc := &importDescriptor{}
-		_ = binary.Read(bytes.NewReader(descriptors), binary.LittleEndian, desc)
+		inj.readStruct(descriptors, desc)
 		if desc.OriginalFirstThunk == 0 {
 			break
 		}
@@ -492,6 +492,16 @@ func (inj *Injector) rvaToFOA(rva uint32) uint32 {
 
 func (inj *Injector) getFileSliceByRVA(rva uint32) []byte {
 	return inj.dup[inj.rvaToFOA(rva):]
+}
+
+func (inj *Injector) readStruct(src []byte, val interface{}) {
+	_ = binary.Read(bytes.NewBuffer(src), binary.LittleEndian, val)
+}
+
+func (inj *Injector) writeStruct(dst []byte, val interface{}) {
+	buf := bytes.NewBuffer(nil)
+	_ = binary.Write(buf, binary.LittleEndian, val)
+	copy(dst, buf.Bytes())
 }
 
 func (inj *Injector) extractString(rva uint32) string {
