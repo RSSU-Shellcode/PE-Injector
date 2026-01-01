@@ -169,7 +169,7 @@ func (inj *Injector) processIAT() {
 					break
 				}
 				if val&0x8000000000000000 == 0 {
-					proc = inj.extractString(uint32(val + 2))
+					proc = inj.extractString(uint32(val + 2)) // #nosec G115
 					rva = desc.FirstThunk
 				}
 				desc.FirstThunk += 8
