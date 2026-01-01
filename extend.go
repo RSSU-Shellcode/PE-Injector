@@ -26,6 +26,7 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 		inj.adjustOptionalHeader,
 		inj.adjustDataDirectory,
 		inj.adjustSectionHeader,
+		inj.adjustExportDirectory,
 		inj.adjustImportDescriptor,
 		inj.adjustBaseRelocation,
 	} {
@@ -126,7 +127,32 @@ func (inj *Injector) adjustSectionHeader(output []byte, size uint32) {
 	}
 }
 
-func (inj *Injector) adjustEAT() {
+func (inj *Injector) adjustExportDirectory(output []byte, size uint32) {
+	dd := inj.dataDir[pe.IMAGE_DIRECTORY_ENTRY_EXPORT]
+	if dd.VirtualAddress == 0 || dd.Size == 0 {
+		return
+	}
+	foa := inj.rvaToFOA(dd.VirtualAddress)
+	src := inj.dup[foa:]
+	dst := output[foa+size:]
+	// overwrite export directory
+	srcDir := &exportDirectory{}
+	readStruct(src, srcDir)
+	dstDir := &exportDirectory{
+		Characteristics:       srcDir.Characteristics,
+		TimeDateStamp:         srcDir.TimeDateStamp,
+		MajorVersion:          srcDir.MajorVersion,
+		MinorVersion:          srcDir.MinorVersion,
+		Name:                  srcDir.Name + size,
+		Base:                  srcDir.Base,
+		NumberOfFunctions:     srcDir.NumberOfFunctions,
+		NumberOfNames:         srcDir.NumberOfNames,
+		AddressOfFunctions:    srcDir.AddressOfFunctions + size,
+		AddressOfNames:        srcDir.AddressOfNames + size,
+		AddressOfNameOrdinals: srcDir.AddressOfNameOrdinals + size,
+	}
+	writeStruct(dst, dstDir)
+	// overwrite export function address
 
 }
 
