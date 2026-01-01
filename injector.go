@@ -445,7 +445,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	}
 	inj.img = peFile
 	inj.arch = arch
-	inj.size = uint32(len(image))
+	inj.size = uint32(len(image)) // #nosec G115
 	inj.dll = isDLL
 	// calculate common offset of image file
 	hdrOffset := binary.LittleEndian.Uint32(image[imageDOSHeader-4:])
@@ -570,7 +570,7 @@ func (inj *Injector) selectHookInstruction(foa uint32) uint32 {
 		}
 		// walk into the next instruction
 		if inst.Op == x86asm.JMP {
-			foa += uint32(inst.Len + int(inst.Args[0].(x86asm.Rel)))
+			foa += uint32(inst.Len + int(inst.Args[0].(x86asm.Rel))) // #nosec G115
 			continue
 		}
 		if inst.Op == x86asm.RET || inst.Op == x86asm.INT {
