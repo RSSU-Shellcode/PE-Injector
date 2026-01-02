@@ -204,40 +204,40 @@ type Options struct {
 
 // Context contains the output and context data in Inject and InjectRaw.
 type Context struct {
-	Output []byte `toml:"output" json:"output"`
+	Output []byte `json:"output"`
 
-	Hook []string `toml:"hook" json:"hook"`
+	Hook []string `json:"hook"`
 
-	LoaderHex  string `toml:"loader_hex"  json:"loader_hex"`
-	LoaderInst string `toml:"loader_inst" json:"loader_inst"`
+	LoaderHex  string `json:"loader_hex"`
+	LoaderInst string `json:"loader_inst"`
 
-	Arch  string `toml:"arch"   json:"arch"`
-	Mode  string `toml:"mode"   json:"mode"`
-	IsDLL bool   `toml:"is_dll" json:"is_dll"`
-	IsRaw bool   `toml:"is_raw" json:"is_raw"`
-	Seed  int64  `toml:"seed"   json:"seed"`
+	Arch  string `json:"arch"`
+	Mode  string `json:"mode"`
+	IsDLL bool   `json:"is_dll"`
+	IsRaw bool   `json:"is_raw"`
+	Seed  int64  `json:"seed"`
 
-	SaveContext     bool   `toml:"save_context"     json:"save_context"`
-	CreateThread    bool   `toml:"create_thread"    json:"create_thread"`
-	WaitThread      bool   `toml:"wait_thread"      json:"wait_thread"`
-	EraseShellcode  bool   `toml:"erase_shellcode"  json:"erase_shellcode"`
-	ShellcodeJumper bool   `toml:"shellcode_jumper" json:"shellcode_jumper"`
-	HasGarbage      bool   `toml:"has_garbage"      json:"has_garbage"`
-	SectionName     string `toml:"section_name"     json:"section_name"`
+	SaveContext     bool   `json:"save_context"`
+	CreateThread    bool   `json:"create_thread"`
+	WaitThread      bool   `json:"wait_thread"`
+	EraseShellcode  bool   `json:"erase_shellcode"`
+	ShellcodeJumper bool   `json:"shellcode_jumper"`
+	HasGarbage      bool   `json:"has_garbage"`
+	SectionName     string `json:"section_name"`
 
-	HasAllProcedures       bool `toml:"has_all_procedures"         json:"has_all_procedures"`
-	HasVirtualAlloc        bool `toml:"has_virtual_alloc"          json:"has_virtual_alloc"`
-	HasVirtualFree         bool `toml:"has_virtual_free"           json:"has_virtual_free"`
-	HasVirtualProtect      bool `toml:"has_virtual_protect"        json:"has_virtual_protect"`
-	HasCreateThread        bool `toml:"has_create_thread"          json:"has_create_thread"`
-	HasWaitForSingleObject bool `toml:"has_wait_for_single_object" json:"has_wait_for_single_object"`
-	HasLoadLibraryA        bool `toml:"has_load_library_a"         json:"has_load_library_a"`
-	HasLoadLibraryW        bool `toml:"has_load_library_w"         json:"has_load_library_w"`
-	HasGetProcAddress      bool `toml:"has_get_proc_address"       json:"has_get_proc_address"`
+	HasAllProcedures       bool `json:"has_all_procedures"`
+	HasVirtualAlloc        bool `json:"has_virtual_alloc"`
+	HasVirtualFree         bool `json:"has_virtual_free"`
+	HasVirtualProtect      bool `json:"has_virtual_protect"`
+	HasCreateThread        bool `json:"has_create_thread"`
+	HasWaitForSingleObject bool `json:"has_wait_for_single_object"`
+	HasLoadLibraryA        bool `json:"has_load_library_a"`
+	HasLoadLibraryW        bool `json:"has_load_library_w"`
+	HasGetProcAddress      bool `json:"has_get_proc_address"`
 
-	NumCodeCaves  int    `toml:"num_code_caves"  json:"num_code_caves"`
-	NumLoaderInst int    `toml:"num_loader_inst" json:"num_loader_inst"`
-	HookAddress   uint64 `toml:"hook_address"    json:"hook_address"`
+	NumCodeCaves  int    `json:"num_code_caves"`
+	NumLoaderInst int    `json:"num_loader_inst"`
+	HookAddress   uint64 `json:"hook_address"`
 }
 
 // NewInjector is used to create a simple PE injector.

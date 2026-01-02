@@ -34,17 +34,17 @@ var defaultSectionNames = []string{
 
 // Section contains the basic info of section.
 type Section struct {
-	Name            string `toml:"name"               json:"name"`
-	VirtualAddress  uint32 `toml:"virtual_address"    json:"virtual_address"`
-	VirtualSize     uint32 `toml:"virtual_size"       json:"virtual_size"`
-	OffsetToRawData uint32 `toml:"offset_to_raw_data" json:"offset_to_raw_data"`
-	SizeOfRawData   uint32 `toml:"size_of_raw_data"   json:"size_of_raw_data"`
+	Name            string `json:"name"`
+	VirtualAddress  uint32 `json:"virtual_address"`
+	VirtualSize     uint32 `json:"virtual_size"`
+	OffsetToRawData uint32 `json:"offset_to_raw_data"`
+	SizeOfRawData   uint32 `json:"size_of_raw_data"`
 }
 
 // Export contains export function address.
 type Export struct {
-	Name    string `toml:"name"    json:"name"`
-	Address uint64 `toml:"address" json:"address"`
+	Name    string `json:"name"`
+	Address uint64 `json:"address"`
 }
 
 type eat struct {
