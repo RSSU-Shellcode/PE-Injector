@@ -15,9 +15,9 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// align the size to memory region align size
+	// align the size to section alignment size
 	// for adjust other section data easily
-	size = alignMemoryRegion(size)
+	size = inj.alignSection(size)
 	// copy all data before the first section data
 	output := make([]byte, len(inj.dup)+int(size))
 	copy(output, inj.dup[:inj.img.Sections[0].Offset])
@@ -36,25 +36,11 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 }
 
 func (inj *Injector) checkImageAlignment() error {
-	var (
-		sectionAlignment uint32
-		fileAlignment    uint32
-	)
-	switch inj.arch {
-	case "386":
-		hdr := inj.hdr32
-		sectionAlignment = hdr.SectionAlignment
-		fileAlignment = hdr.FileAlignment
-	case "amd64":
-		hdr := inj.hdr64
-		sectionAlignment = hdr.SectionAlignment
-		fileAlignment = hdr.FileAlignment
+	if inj.sectionAlign < inj.fileAlign {
+		return errors.New("section alignment is less than file alignment")
 	}
-	if sectionAlignment != 4096 {
-		return errors.New("invalid section alignment")
-	}
-	if fileAlignment != 512 {
-		return errors.New("invalid file alignment")
+	if inj.sectionAlign%inj.fileAlign != 0 {
+		return errors.New("section alignment is not aligned to file alignment")
 	}
 	return nil
 }
@@ -161,7 +147,7 @@ func (inj *Injector) adjustExportDirectory(output []byte, size uint32) {
 		funcRVA += size
 		binary.LittleEndian.PutUint32(dstD, funcRVA)
 	}
-	// overwrite export function names
+	// overwrite export function name
 	for i := uint32(0); i < srcDir.NumberOfNames; i++ {
 		off := inj.rvaToFOA(srcDir.AddressOfNames + i*4)
 		srcD := inj.dup[off:]
