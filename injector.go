@@ -206,8 +206,10 @@ type Options struct {
 type Context struct {
 	Output []byte `toml:"output" json:"output"`
 
-	Hook   []string  `toml:"hook"   json:"hook"`
-	Loader [2]string `toml:"loader" json:"loader"`
+	Hook []string `toml:"hook" json:"hook"`
+
+	LoaderHex  string `toml:"loader_hex"  json:"loader_hex"`
+	LoaderInst string `toml:"loader_inst" json:"loader_inst"`
 
 	Arch  string `toml:"arch"   json:"arch"`
 	Mode  string `toml:"mode"   json:"mode"`
@@ -286,8 +288,11 @@ func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, err
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
 	inj.overwriteChecksum()
-	inj.ctx.Loader = inj.disassembleLoader(loader)
 	inj.ctx.Output = inj.dup
+	// record loader assembly
+	binHex, insts := inj.disassembleLoader(loader)
+	inj.ctx.LoaderHex = binHex
+	inj.ctx.LoaderInst = insts
 	return inj.ctx, nil
 }
 
