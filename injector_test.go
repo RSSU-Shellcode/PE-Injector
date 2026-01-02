@@ -467,6 +467,9 @@ func TestSpecificFunction(t *testing.T) {
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeExtendSection, ctx.Mode)
+
+			err = os.WriteFile("testdata/injected_x86.dll", ctx.Output, 0600)
+			require.NoError(t, err)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -479,6 +482,9 @@ func TestSpecificFunction(t *testing.T) {
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCodeCave, ctx.Mode)
+
+			err = os.WriteFile("testdata/injected_x64.dll", ctx.Output, 0600)
+			require.NoError(t, err)
 		})
 	})
 
@@ -495,6 +501,9 @@ func TestSpecificFunction(t *testing.T) {
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCodeCave, ctx.Mode)
+
+			err = os.WriteFile("testdata/injected_x86.dll", ctx.Output, 0600)
+			require.NoError(t, err)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -509,6 +518,9 @@ func TestSpecificFunction(t *testing.T) {
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
 			require.Equal(t, ModeCodeCave, ctx.Mode)
+
+			err = os.WriteFile("testdata/injected_x64.dll", ctx.Output, 0600)
+			require.NoError(t, err)
 		})
 	})
 
