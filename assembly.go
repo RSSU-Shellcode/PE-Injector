@@ -156,7 +156,7 @@ func (inj *Injector) relocateInstruction(src []byte, offset int64) []byte {
 	return output
 }
 
-func (inj *Injector) disassembleLoader(loader []byte) [2]string {
+func (inj *Injector) disassembleLoader(loader []byte) (string, string) {
 	var mode int
 	switch inj.arch {
 	case "386":
@@ -164,32 +164,32 @@ func (inj *Injector) disassembleLoader(loader []byte) [2]string {
 	case "amd64":
 		mode = 64
 	}
-	output, err := printInstructions(loader, mode)
+	binHex, insts, err := printInstructions(loader, mode)
 	if err != nil {
 		panic(err)
 	}
-	return output
+	return binHex, insts
 }
 
-func printInstructions(src []byte, mode int) ([2]string, error) {
-	bin := strings.Builder{}
+func printInstructions(src []byte, mode int) (string, string, error) {
+	binHex := strings.Builder{}
 	insts := strings.Builder{}
 	for len(src) > 0 {
 		inst, err := x86asm.Decode(src, mode)
 		if err != nil {
-			return [2]string{}, err
+			return "", "", err
 		}
 		b := src[:inst.Len]
-		bin.WriteString(printAssemblyBinary(&inst, b))
-		bin.Write([]byte("\r\n"))
+		binHex.WriteString(printAssemblyBinHex(&inst, b))
+		binHex.Write([]byte("\r\n"))
 		insts.WriteString(printAssemblyInstruction(&inst))
 		insts.Write([]byte("\r\n"))
 		src = src[inst.Len:]
 	}
-	return [2]string{bin.String(), insts.String()}, nil
+	return binHex.String(), insts.String(), nil
 }
 
-func printAssemblyBinary(inst *x86asm.Inst, b []byte) string {
+func printAssemblyBinHex(inst *x86asm.Inst, b []byte) string {
 	var bin strings.Builder
 	switch {
 	case inst.PCRelOff != 0:
