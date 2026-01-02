@@ -67,8 +67,8 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
 		require.Equal(t, mode, ctx.Mode)
-		fmt.Println(ctx.Loader[0])
-		fmt.Println(ctx.Loader[1])
+		fmt.Println(ctx.LoaderHex)
+		fmt.Println(ctx.LoaderInst)
 
 		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 	})
@@ -87,8 +87,8 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
 		require.Equal(t, mode, ctx.Mode)
-		fmt.Println(ctx.Loader[0])
-		fmt.Println(ctx.Loader[1])
+		fmt.Println(ctx.LoaderHex)
+		fmt.Println(ctx.LoaderInst)
 
 		testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 	})
