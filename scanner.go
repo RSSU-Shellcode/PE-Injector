@@ -55,7 +55,7 @@ func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 	if text.VirtualSize < size {
 		size = text.VirtualSize
 	}
-	if size < 32*1024 {
+	if size < 512 {
 		return nil, errors.New("RX section too small")
 	}
 	section, err := text.Data()
