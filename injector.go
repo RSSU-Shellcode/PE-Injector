@@ -353,7 +353,17 @@ func (inj *Injector) ExtendTextSection(image []byte, size uint32) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	return inj.extendTextSection(size)
+	output, err := inj.extendTextSection(size)
+	if err != nil {
+		return nil, err
+	}
+	// preprocess again for overwrite checksum
+	err = inj.preprocess(output, nil)
+	if err != nil {
+		return nil, err
+	}
+	inj.overwriteChecksum()
+	return inj.dup, nil
 }
 
 func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
