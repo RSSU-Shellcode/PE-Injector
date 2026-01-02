@@ -204,7 +204,8 @@ type Options struct {
 
 // Context contains the output and context data in Inject and InjectRaw.
 type Context struct {
-	Output []byte    `toml:"output" json:"output"`
+	Output []byte `toml:"output" json:"output"`
+
 	Hook   []string  `toml:"hook"   json:"hook"`
 	Loader [2]string `toml:"loader" json:"loader"`
 
@@ -337,6 +338,19 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	return inj.ctx, nil
 }
 
+// ExtendTextSection is used to try to extend text section.
+func (inj *Injector) ExtendTextSection(image []byte, size uint32) ([]byte, error) {
+	if size == 0 {
+		return bytes.Clone(image), nil
+	}
+	defer inj.cleanup()
+	err := inj.preprocess(image, nil)
+	if err != nil {
+		return nil, err
+	}
+	return inj.extendTextSection(size)
+}
+
 func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -426,7 +440,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		opts = new(Options)
 	}
 	inj.opts = opts
-	// check image architecture
+	// read image information
 	peFile, err := pe.NewFile(bytes.NewReader(image))
 	if err != nil {
 		return err
