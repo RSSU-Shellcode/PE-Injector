@@ -17,7 +17,6 @@ const (
 	imageDataDirectorySize  = 4 + 4
 	imageSectionHeaderSize  = 40
 
-	exportDirectorySize  = 10 * 4
 	importDescriptorSize = 5 * 4
 	baseRelocationSize   = 2 * 4
 
@@ -25,7 +24,7 @@ const (
 	relBasedHighlow  = 3
 	relBasedDir64    = 10
 
-	reserveSectionSize = 8
+	reserveSectionSize = 16
 )
 
 var defaultSectionNames = []string{
@@ -316,7 +315,7 @@ func (inj *Injector) extendSection(data []byte) (uint32, error) {
 	oldSizeOfRawData := last.SizeOfRawData
 	// adjust VirtualSize and SizeOfRawData
 	setSize := uint32(reserveSectionSize + len(data))
-	newSize := alignFileOffset(min(last.VirtualSize, last.SizeOfRawData) + setSize)
+	newSize := inj.alignFile(min(last.VirtualSize, last.SizeOfRawData) + setSize)
 	last.VirtualSize += setSize
 	last.SizeOfRawData = newSize
 	// add padding data if last section need extend raw data
@@ -388,8 +387,8 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 	readStruct(inj.dup[lastOffset:], last)
 	sh := &pe.SectionHeader32{
 		VirtualSize:      size,
-		VirtualAddress:   last.VirtualAddress + alignMemoryRegion(last.VirtualSize),
-		SizeOfRawData:    alignFileOffset(size),
+		VirtualAddress:   last.VirtualAddress + inj.alignSection(last.VirtualSize),
+		SizeOfRawData:    inj.alignFile(size),
 		PointerToRawData: last.PointerToRawData + last.SizeOfRawData,
 		Characteristics:  0x60000020, // RX
 	}
@@ -498,6 +497,20 @@ func (inj *Injector) extractString(rva uint32) string {
 	return ""
 }
 
+func (inj *Injector) alignSection(size uint32) uint32 {
+	if size%inj.sectionAlign == 0 {
+		return size
+	}
+	return (size/inj.sectionAlign + 1) * inj.sectionAlign
+}
+
+func (inj *Injector) alignFile(size uint32) uint32 {
+	if size%inj.fileAlign == 0 {
+		return size
+	}
+	return (size/inj.fileAlign + 1) * inj.fileAlign
+}
+
 func readStruct(src []byte, val interface{}) {
 	_ = binary.Read(bytes.NewBuffer(src), binary.LittleEndian, val)
 }
@@ -506,18 +519,4 @@ func writeStruct(dst []byte, val interface{}) {
 	buf := bytes.NewBuffer(nil)
 	_ = binary.Write(buf, binary.LittleEndian, val)
 	copy(dst, buf.Bytes())
-}
-
-func alignFileOffset(size uint32) uint32 {
-	if size%0x200 == 0 {
-		return size
-	}
-	return (size/0x200 + 1) * 0x200
-}
-
-func alignMemoryRegion(size uint32) uint32 {
-	if size%0x1000 == 0 {
-		return size
-	}
-	return (size/0x1000 + 1) * 0x1000
 }
