@@ -23,6 +23,7 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 	copy(output, inj.dup[:inj.img.Sections[0].Offset])
 	// extend the first section
 	for _, step := range []func(output []byte, size uint32){
+		inj.adjustFileHeader,
 		inj.adjustOptionalHeader,
 		inj.adjustDataDirectory,
 		inj.adjustSectionHeader,
@@ -43,6 +44,12 @@ func (inj *Injector) checkImageAlignment() error {
 		return errors.New("section alignment is not aligned to file alignment")
 	}
 	return nil
+}
+
+func (inj *Injector) adjustFileHeader(output []byte, size uint32) {
+	hdr := inj.img.FileHeader
+	hdr.PointerToSymbolTable += size
+	writeStruct(output[inj.offFileHdr:], hdr)
 }
 
 func (inj *Injector) adjustOptionalHeader(output []byte, size uint32) {
