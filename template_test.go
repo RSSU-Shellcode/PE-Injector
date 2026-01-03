@@ -56,8 +56,8 @@ func TestTemplate(t *testing.T) {
 		ctx, err := injector.Inject(image, payload, opts)
 		require.NoError(t, err)
 		require.Equal(t, ModeCodeCave, ctx.Mode)
-		fmt.Println(ctx.Loader[0])
-		fmt.Println(ctx.Loader[1])
+		fmt.Println(ctx.LoaderHex)
+		fmt.Println(ctx.LoaderInst)
 
 		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
 	})
@@ -70,8 +70,8 @@ func TestTemplate(t *testing.T) {
 		ctx, err := injector.Inject(image, payload, opts)
 		require.NoError(t, err)
 		require.Equal(t, ModeCodeCave, ctx.Mode)
-		fmt.Println(ctx.Loader[0])
-		fmt.Println(ctx.Loader[1])
+		fmt.Println(ctx.LoaderHex)
+		fmt.Println(ctx.LoaderInst)
 
 		testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 	})
