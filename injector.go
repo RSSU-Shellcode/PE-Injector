@@ -1026,17 +1026,11 @@ func mergeBytes(b [][]byte) []byte {
 }
 
 func (inj *Injector) cleanup() {
-	inj.abs = false
-	inj.dup = nil
-	inj.img = nil
-	inj.containSign = false
-	inj.containCFG = false
-	inj.eat = nil
-	inj.iat = nil
-	inj.section = nil
-	inj.segment = nil
-	inj.ccList = nil
-	inj.caves = nil
+	rd := inj.rand
+	n := Injector{
+		rand: rd,
+	}
+	*inj = n
 }
 
 // Close is used to close pe injector.
