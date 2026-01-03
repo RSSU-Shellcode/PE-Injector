@@ -2,6 +2,7 @@ package injector
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"runtime"
@@ -360,6 +361,37 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 			testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
 		})
 	})
+}
+
+func TestInjector_ExtendTextSection(t *testing.T) {
+	injector := NewInjector()
+
+	rd := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec
+
+	t.Run("x86", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x86.dat")
+		require.NoError(t, err)
+
+		size := uint32(1 + rd.Intn(128*1024))
+		output, err := injector.ExtendTextSection(image, size)
+		require.NoError(t, err)
+
+		testExecuteImage(t, "testdata/extended_x86.exe", output)
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		image, err := os.ReadFile("testdata/image_x64.dat")
+		require.NoError(t, err)
+
+		size := uint32(1 + rd.Intn(128*1024))
+		output, err := injector.ExtendTextSection(image, size)
+		require.NoError(t, err)
+
+		testExecuteImage(t, "testdata/extended_x64.exe", output)
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
 }
 
 func TestSpecificAddress(t *testing.T) {
