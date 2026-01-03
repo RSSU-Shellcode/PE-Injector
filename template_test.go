@@ -59,7 +59,7 @@ func TestTemplate(t *testing.T) {
 		fmt.Println(ctx.LoaderHex)
 		fmt.Println(ctx.LoaderInst)
 
-		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
+		testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestTemplate(t *testing.T) {
 		fmt.Println(ctx.LoaderHex)
 		fmt.Println(ctx.LoaderInst)
 
-		testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
+		testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
 	})
 
 	err = injector.Close()

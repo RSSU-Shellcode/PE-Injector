@@ -28,7 +28,7 @@ func TestRelocateInstructionSegment(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, ModeExtendSection, ctx.Mode)
 
-		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
+		testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestRelocateInstructionSegment(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, ModeCodeCave, ctx.Mode)
 
-		testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
+		testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
 	})
 
 	err := injector.Close()

@@ -19,7 +19,7 @@ func TestExtendTextSection_EXE(t *testing.T) {
 		output, err := injector.extendTextSection(1427)
 		require.NoError(t, err)
 
-		testExecuteImage(t, "testdata/extended_x86.exe", output)
+		testExecuteEXE(t, "testdata/extended_x86.exe", output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestExtendTextSection_EXE(t *testing.T) {
 		output, err := injector.extendTextSection(7433)
 		require.NoError(t, err)
 
-		testExecuteImage(t, "testdata/extended_x64.exe", output)
+		testExecuteEXE(t, "testdata/extended_x64.exe", output)
 	})
 
 	err := injector.Close()

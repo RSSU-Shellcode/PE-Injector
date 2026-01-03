@@ -190,7 +190,7 @@ func TestExtendSection(t *testing.T) {
 			require.Less(t, last.VirtualSize, uint32(512))
 			require.Equal(t, last.Size, uint32(512))
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteEXE(t, "testdata/injected_x86.exe", output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -211,7 +211,7 @@ func TestExtendSection(t *testing.T) {
 			require.Less(t, last.VirtualSize, uint32(512))
 			require.Equal(t, last.Size, uint32(512))
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteEXE(t, "testdata/injected_x64.exe", output)
 		})
 	})
 
@@ -234,7 +234,7 @@ func TestExtendSection(t *testing.T) {
 			require.Greater(t, last.VirtualSize, uint32(len(data)))
 			require.Greater(t, last.Size, uint32(len(data)))
 
-			testExecuteImage(t, "testdata/injected_x86.exe", output)
+			testExecuteEXE(t, "testdata/injected_x86.exe", output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -255,7 +255,7 @@ func TestExtendSection(t *testing.T) {
 			require.Greater(t, last.VirtualSize, uint32(len(data)))
 			require.Greater(t, last.Size, uint32(len(data)))
 
-			testExecuteImage(t, "testdata/injected_x64.exe", output)
+			testExecuteEXE(t, "testdata/injected_x64.exe", output)
 		})
 	})
 
@@ -284,7 +284,7 @@ func TestCreateSection(t *testing.T) {
 		require.NoError(t, err)
 		require.Greater(t, peFile.NumberOfSections, injector.img.NumberOfSections)
 
-		testExecuteImage(t, "testdata/injected_x86.exe", output)
+		testExecuteEXE(t, "testdata/injected_x86.exe", output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -305,7 +305,7 @@ func TestCreateSection(t *testing.T) {
 		require.NoError(t, err)
 		require.Greater(t, peFile.NumberOfSections, injector.img.NumberOfSections)
 
-		testExecuteImage(t, "testdata/injected_x64.exe", output)
+		testExecuteEXE(t, "testdata/injected_x64.exe", output)
 	})
 
 	err := injector.Close()

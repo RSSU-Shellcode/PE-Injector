@@ -23,7 +23,7 @@ func TestGarbage(t *testing.T) {
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
 
-		testExecuteImage(t, "testdata/injected_x86.exe", ctx.Output)
+		testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestGarbage(t *testing.T) {
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
 
-		testExecuteImage(t, "testdata/injected_x64.exe", ctx.Output)
+		testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
 	})
 
 	err := injector.Close()
