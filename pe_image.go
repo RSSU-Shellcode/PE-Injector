@@ -252,7 +252,7 @@ func (inj *Injector) overwriteChecksum() {
 	case "386":
 		checksum = inj.hdr32.CheckSum
 	case "amd64":
-		checksum = inj.hdr32.CheckSum
+		checksum = inj.hdr64.CheckSum
 	}
 	if checksum == 0 {
 		return
