@@ -329,7 +329,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		return nil, errors.New("invalid force mode with shellcode source")
 	}
 	if opts.ForceCreateSection {
-		err = inj.createSectionForRaw(shellcode)
+		err = inj.createSectionForRaw(len(shellcode))
 		if err != nil {
 			return nil, err
 		}
@@ -418,7 +418,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	}
 	inj.ctx.Mode = ModeCreateSection
 	// if failed, try to use create section mode
-	err = inj.createSectionForRaw(shellcode)
+	err = inj.createSectionForRaw(len(shellcode))
 	if err != nil {
 		return err
 	}
@@ -934,12 +934,11 @@ func (inj *Injector) removeCodeCave(i int) {
 	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
 }
 
-func (inj *Injector) createSectionForRaw(shellcode []byte) error {
-	size := uint32(len(shellcode)) // #nosec G115
+func (inj *Injector) createSectionForRaw(size int) error {
 	if !inj.opts.NotSaveContext {
 		size += 1024
 	}
-	section, err := inj.createSection(inj.opts.SectionName, size)
+	section, err := inj.createSection(inj.opts.SectionName, uint32(size)) // #nosec G115
 	if err != nil {
 		return err
 	}
