@@ -684,10 +684,10 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 		if inj.opts.ForceExtendSection {
 			return "", errors.New("not enough code caves for force extend section mode")
 		}
-		return inj.useCreateSectionMode(ctx, payload, loader)
+		return inj.useCreateSectionMode(ctx, loader, payload)
 	}
 	if inj.opts.ForceExtendSection {
-		return inj.useExtendSectionMode(ctx, payload, loader)
+		return inj.useExtendSectionMode(ctx, loader, payload)
 	}
 	// check can use code cave mode
 	var numCaves int
@@ -700,25 +700,25 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 		numCaves += maxNumLoaderInst
 	}
 	if numCaves < len(inj.caves) {
-		return inj.useCodeCaveMode(ctx, payload, loader), nil
+		return inj.useCodeCaveMode(ctx, loader, payload), nil
 	}
 	// if the number of code caves is not enough
 	if inj.opts.ForceCodeCave {
 		return "", errors.New("not enough code caves for force code cave mode")
 	}
-	return inj.useExtendSectionMode(ctx, payload, loader)
+	return inj.useExtendSectionMode(ctx, loader, payload)
 }
 
-func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) string {
+func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, loader string, payload []byte) string {
 	// generate assembly source
 	var stub string
 	switch inj.arch {
 	case "386":
 		key := inj.rand.Uint32()
 		ctx.PayloadKey = key
-		for i := 0; i < len(sc); i += 4 {
+		for i := 0; i < len(payload); i += 4 {
 			reg := regVolatileX86[inj.rand.Intn(len(regVolatileX86))]
-			val := binary.LittleEndian.Uint32(sc[i:])
+			val := binary.LittleEndian.Uint32(payload[i:])
 			stub += fmt.Sprintf(`
               mov {{.RegV.%[1]s}}, 0x%[2]X
               xor {{.RegV.%[1]s}}, {{.RegN.ebx}}
@@ -729,9 +729,9 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 	case "amd64":
 		key := inj.rand.Uint64()
 		ctx.PayloadKey = key
-		for i := 0; i < len(sc); i += 8 {
+		for i := 0; i < len(payload); i += 8 {
 			reg := regVolatileX64[inj.rand.Intn(len(regVolatileX64))]
-			val := binary.LittleEndian.Uint64(sc[i:])
+			val := binary.LittleEndian.Uint64(payload[i:])
 			stub += fmt.Sprintf(`
               mov {{.RegV.%[1]s}}, 0x%[2]X
               xor {{.RegV.%[1]s}}, {{.RegN.rbx}}
@@ -743,11 +743,11 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) stri
 	ctx.CodeCave = true
 	inj.ctx.Mode = ModeCodeCave
 	// replace the flag to assembly source
-	return strings.ReplaceAll(src, codeCaveModeStub, stub)
+	return strings.ReplaceAll(loader, codeCaveModeStub, stub)
 }
 
-func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
-	payload := inj.encryptPayload(ctx, sc)
+func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	payload = inj.encryptPayload(ctx, payload)
 	offset, err := inj.extendSection(payload)
 	if err != nil {
 		return "", err
@@ -756,11 +756,11 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, sc []byte, src string)
 	ctx.PayloadOffset = offset
 	inj.ctx.Mode = ModeExtendSection
 	// remove the flag in assembly source
-	return strings.ReplaceAll(src, codeCaveModeStub, ""), nil
+	return strings.ReplaceAll(loader, codeCaveModeStub, ""), nil
 }
 
-func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string) (string, error) {
-	payload := inj.encryptPayload(ctx, sc)
+func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	payload = inj.encryptPayload(ctx, payload)
 	randomOffset := uint32(inj.rand.Intn(2048)) // #nosec G115
 	// calculate the loader size(approximation)
 	loaderSize := reservedLoaderSize
@@ -789,26 +789,26 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, sc []byte, src string)
 	ctx.PayloadOffset = section.VirtualAddress + scOffset
 	inj.ctx.Mode = ModeCreateSection
 	// remove the flag in assembly source
-	return strings.ReplaceAll(src, codeCaveModeStub, ""), nil
+	return strings.ReplaceAll(loader, codeCaveModeStub, ""), nil
 }
 
-func (inj *Injector) encryptPayload(ctx *loaderCtx, sc []byte) []byte {
+func (inj *Injector) encryptPayload(ctx *loaderCtx, payload []byte) []byte {
 	// encrypt payload
-	encrypted := make([]byte, len(sc))
+	encrypted := make([]byte, len(payload))
 	switch inj.arch {
 	case "386":
 		key := inj.rand.Uint32()
 		ctx.PayloadKey = key
-		for i := 0; i < len(sc); i += 4 {
-			val := binary.LittleEndian.Uint32(sc[i:])
+		for i := 0; i < len(payload); i += 4 {
+			val := binary.LittleEndian.Uint32(payload[i:])
 			binary.LittleEndian.PutUint32(encrypted[i:], val^key)
 			key = xorShift32(key)
 		}
 	case "amd64":
 		key := inj.rand.Uint64()
 		ctx.PayloadKey = key
-		for i := 0; i < len(sc); i += 8 {
-			val := binary.LittleEndian.Uint64(sc[i:])
+		for i := 0; i < len(payload); i += 8 {
+			val := binary.LittleEndian.Uint64(payload[i:])
 			binary.LittleEndian.PutUint64(encrypted[i:], val^key)
 			key = xorShift64(key)
 		}
