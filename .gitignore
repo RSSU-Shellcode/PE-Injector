@@ -29,3 +29,6 @@ go.work.sum
 
 # Ignore JetBrains GoLand
 .idea
+
+# Ignore Visual Studio
+.vs
