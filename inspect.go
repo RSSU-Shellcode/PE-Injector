@@ -19,15 +19,20 @@ type InspectConfig struct {
 	HasLoadLibraryA        bool `toml:"has_load_library_a"         json:"has_load_library_a"`
 }
 
-// InspectLoaderTemplate is used to test junk code template.
-func InspectLoaderTemplate(arch string, src string, cfg *InspectConfig) (string, []byte, error) {
+// InspectLoaderTemplate is used to test loader template.
+func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, []byte, error) {
 	switch arch {
 	case "386", "amd64":
 	default:
 		return "", nil, fmt.Errorf("unsupported architecture: %s", arch)
 	}
 	injector := NewInjector()
+	// build injector internal status
 	injector.arch = arch
+	err := injector.initAssembler()
+	if err != nil {
+		return "", nil, err
+	}
 	injector.opts = &Options{
 		NoGarbage: true,
 
@@ -38,15 +43,16 @@ func InspectLoaderTemplate(arch string, src string, cfg *InspectConfig) (string,
 	injector.ctx = new(Context)
 	injector.dup = make([]byte, 16*1024)
 	injector.caves = []*codeCave{
-		{0x10000, 0x1000, 32},
+		{
+			virtualAddr:  0x10000,
+			pointerToRaw: 0x1000,
+			size:         32,
+		},
 	}
 	injector.iat = buildFakeIATList(cfg)
-	src = strings.ReplaceAll(src, codeCaveModeStub, "")
-	err := injector.initAssembler()
-	if err != nil {
-		return "", nil, err
-	}
-	asm, err := injector.buildLoaderASM(src, nil, true)
+	// build loader assembly source
+	template = strings.ReplaceAll(template, codeCaveModeStub, "")
+	asm, err := injector.buildLoaderASM(template, nil, false)
 	if err != nil {
 		return "", nil, err
 	}
@@ -120,7 +126,7 @@ func buildFakeIATList(cfg *InspectConfig) []*iat {
 }
 
 // InspectJunkCodeTemplate is used to test junk code template.
-func InspectJunkCodeTemplate(arch string, src string) (string, []byte, error) {
+func InspectJunkCodeTemplate(arch string, template string) (string, []byte, error) {
 	switch arch {
 	case "386", "amd64":
 	default:
@@ -133,7 +139,7 @@ func InspectJunkCodeTemplate(arch string, src string) (string, []byte, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	asm, err := injector.buildJunkCode(src)
+	asm, err := injector.buildJunkCode(template)
 	if err != nil {
 		return "", nil, err
 	}
