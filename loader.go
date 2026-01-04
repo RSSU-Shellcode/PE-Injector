@@ -170,21 +170,21 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 			err = errors.New(fmt.Sprint(r))
 		}
 	}()
-	var src string
+	var loader string
 	switch inj.arch {
 	case "386":
-		src = inj.getLoaderX86()
+		loader = inj.getLoaderX86()
 	case "amd64":
-		src = inj.getLoaderX64()
+		loader = inj.getLoaderX64()
 	}
-	asm, err := inj.buildLoaderASM(src, payload, false)
+	asm, err := inj.buildLoaderASM(loader, payload, true)
 	if err != nil {
 		return nil, err
 	}
 	return inj.assemble(asm)
 }
 
-func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (string, error) {
+func (inj *Injector) buildLoaderASM(loader string, payload []byte, process bool) (string, error) {
 	// make sure payload is 4 or 8 bytes alignment
 	var numPad int
 	switch inj.arch {
@@ -252,17 +252,17 @@ func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (strin
 	inj.ctx.HasLoadLibraryA = hasLoadLibraryA
 	inj.ctx.HasLoadLibraryW = hasLoadLibraryW
 	inj.ctx.HasGetProcAddress = hasGetProcAddress
-	if ins {
+	if process {
+		loader, err = inj.processLoader(ctx, loader, payload)
+		if err != nil {
+			return "", err
+		}
+	} else {
 		switch inj.arch {
 		case "386":
 			ctx.PayloadKey = inj.rand.Uint32()
 		case "amd64":
 			ctx.PayloadKey = inj.rand.Uint64()
-		}
-	} else {
-		src, err = inj.buildLoaderSource(ctx, payload, src)
-		if err != nil {
-			return "", err
 		}
 	}
 	// process loader template and assemble it
@@ -271,7 +271,7 @@ func (inj *Injector) buildLoaderASM(src string, payload []byte, ins bool) (strin
 		"hex": toHex,
 		"dr":  toRegDWORD,
 		"igi": inj.insertGarbageInst,
-	}).Parse(src)
+	}).Parse(loader)
 	if err != nil {
 		return "", fmt.Errorf("invalid loader template: %s", err)
 	}
@@ -656,7 +656,7 @@ func (inj *Injector) writeShellcodeJumper(ctx *loaderCtx) error {
 	return nil
 }
 
-func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (string, error) {
+func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte) (string, error) {
 	var counter int
 	for _, sw := range []bool{
 		inj.opts.ForceCodeCave,
@@ -684,29 +684,29 @@ func (inj *Injector) buildLoaderSource(ctx *loaderCtx, sc []byte, src string) (s
 		if inj.opts.ForceExtendSection {
 			return "", errors.New("not enough code caves for force extend section mode")
 		}
-		return inj.useCreateSectionMode(ctx, sc, src)
+		return inj.useCreateSectionMode(ctx, payload, loader)
 	}
 	if inj.opts.ForceExtendSection {
-		return inj.useExtendSectionMode(ctx, sc, src)
+		return inj.useExtendSectionMode(ctx, payload, loader)
 	}
 	// check can use code cave mode
 	var numCaves int
 	switch inj.arch {
 	case "386":
-		numCaves = (len(sc)/4 + 1) * numInstForCopyPayload
+		numCaves = (len(payload)/4 + 1) * numInstForCopyPayload
 		numCaves += maxNumLoaderInst
 	case "amd64":
-		numCaves = (len(sc)/8 + 1) * numInstForCopyPayload
+		numCaves = (len(payload)/8 + 1) * numInstForCopyPayload
 		numCaves += maxNumLoaderInst
 	}
 	if numCaves < len(inj.caves) {
-		return inj.useCodeCaveMode(ctx, sc, src), nil
+		return inj.useCodeCaveMode(ctx, payload, loader), nil
 	}
 	// if the number of code caves is not enough
 	if inj.opts.ForceCodeCave {
 		return "", errors.New("not enough code caves for force code cave mode")
 	}
-	return inj.useExtendSectionMode(ctx, sc, src)
+	return inj.useExtendSectionMode(ctx, payload, loader)
 }
 
 func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, sc []byte, src string) string {
