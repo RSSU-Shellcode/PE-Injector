@@ -113,12 +113,6 @@ type loaderCtx struct {
 	LackWaitForSingleObject bool
 	LoadLibraryWOnly        bool
 
-	// store options status
-	NeedCreateThread    bool
-	NeedWaitThread      bool
-	NeedEraseShellcode  bool
-	NeedShellcodeJumper bool
-
 	// encrypt procedure name with xor
 	Kernel32DLLDB          []uint64
 	Kernel32DLLKey         []uint64
@@ -146,10 +140,18 @@ type loaderCtx struct {
 	CreateThread        uint32
 	WaitForSingleObject uint32
 
+	// store options status
+	NeedCreateThread    bool
+	NeedWaitThread      bool
+	NeedEraseShellcode  bool
+	NeedShellcodeJumper bool
+
+	// about inject mode
+	CodeCaveMode      bool
+	ExtendSectionMode bool
+	CreateSectionMode bool
+
 	// information of write payload
-	CodeCave      bool
-	ExtendSection bool
-	CreateSection bool
 	JumperOffset  uint32
 	EntryOffset   int
 	MemRegionSize int
@@ -209,9 +211,9 @@ func (inj *Injector) buildLoaderASM(loader string, payload []byte, process bool)
 		PAData: make(map[string]uint64),
 		PAKey:  make(map[string]uint64),
 
-		CodeCave:      inj.opts.ForceCodeCave,
-		ExtendSection: inj.opts.ForceExtendSection,
-		CreateSection: inj.opts.ForceCreateSection,
+		CodeCaveMode:      inj.opts.ForceCodeCave,
+		ExtendSectionMode: inj.opts.ForceExtendSection,
+		CreateSectionMode: inj.opts.ForceCreateSection,
 
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
@@ -737,7 +739,7 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, loader string, payload []by
 			stub += "\r\n"
 		}
 	}
-	ctx.CodeCave = true
+	ctx.CodeCaveMode = true
 	inj.ctx.Mode = ModeCodeCave
 	// replace the flag to assembly source
 	return strings.ReplaceAll(loader, codeCaveModeStub, stub)
@@ -749,7 +751,7 @@ func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, loader string, payload
 	if err != nil {
 		return "", err
 	}
-	ctx.ExtendSection = true
+	ctx.ExtendSectionMode = true
 	ctx.PayloadOffset = offset
 	inj.ctx.Mode = ModeExtendSection
 	// remove the flag in assembly source
@@ -784,7 +786,7 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, loader string, payload
 	_, _ = inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+scOffset])
 	// write encrypted payload
 	copy(inj.dup[section.Offset+scOffset:], payload)
-	ctx.CreateSection = true
+	ctx.CreateSectionMode = true
 	ctx.PayloadOffset = section.VirtualAddress + scOffset
 	inj.ctx.Mode = ModeCreateSection
 	// remove the flag in assembly source
