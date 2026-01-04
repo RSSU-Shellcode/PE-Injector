@@ -5,13 +5,14 @@ import (
 	"debug/pe"
 	"encoding/binary"
 	"errors"
+	"fmt"
 )
 
-func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
+func (inj *Injector) extendTextSection(size uint32) (output []byte, err error) {
 	if !inj.canTryExtend {
 		return nil, errors.New("the first section without RX")
 	}
-	err := inj.checkImageAlignment()
+	err = inj.checkImageAlignment()
 	if err != nil {
 		return nil, err
 	}
@@ -19,9 +20,15 @@ func (inj *Injector) extendTextSection(size uint32) ([]byte, error) {
 	// for adjust other section data easily
 	size = inj.alignSection(size)
 	// copy all data before the first section data
-	output := make([]byte, len(inj.dup)+int(size))
+	output = make([]byte, len(inj.dup)+int(size))
 	copy(output, inj.dup[:inj.img.Sections[0].Offset])
-	// extend the first section
+	// maybe extend with invalid pe image structure
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprint(r))
+		}
+	}()
+	// extend the text section
 	for _, step := range []func(output []byte, size uint32){
 		inj.adjustFileHeader,
 		inj.adjustOptionalHeader,
