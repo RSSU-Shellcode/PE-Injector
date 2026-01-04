@@ -22,10 +22,7 @@ var _ embed.FS
 // add edi, 4              add rdi, 8
 const numInstForCopyPayload = 4
 
-const (
-	codeCaveModeStub   = "{{STUB CodeCaveMode STUB}}"
-	reservedLoaderSize = 4096
-)
+const codeCaveModeStub = "{{STUB CodeCaveMode STUB}}"
 
 const (
 	acAllocationType = "AllocationType"
@@ -763,16 +760,18 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, loader string, payload
 	payload = inj.encryptPayload(ctx, payload)
 	randomOffset := uint32(inj.rand.Intn(2048)) // #nosec G115
 	// calculate the loader size(approximation)
-	loaderSize := reservedLoaderSize
-	if !inj.opts.NoGarbage {
-		var maxNumInst int
-		switch inj.arch {
-		case "386":
-			maxNumInst = inj.getMaxNumLoaderInstX86()
-		case "amd64":
-			maxNumInst = inj.getMaxNumLoaderInstX64()
-		}
-		loaderSize += maxNumInst * 16
+	var maxNumInst int
+	switch inj.arch {
+	case "386":
+		maxNumInst = inj.getMaxNumLoaderInstX86()
+	case "amd64":
+		maxNumInst = inj.getMaxNumLoaderInstX64()
+	}
+	var loaderSize int
+	if inj.opts.NoGarbage {
+		loaderSize = maxNumInst * 16
+	} else {
+		loaderSize = maxNumInst * (16 + 16)
 	}
 	scOffset := uint32(loaderSize) + randomOffset // #nosec G115
 	size := scOffset + uint32(len(payload))       // #nosec G115
