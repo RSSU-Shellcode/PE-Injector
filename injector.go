@@ -379,8 +379,8 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	if target == 0 {
 		return errors.New("hook target function address is zero")
 	}
-	instFOA := inj.selectHookInstruction(inj.rvaToFOA(target))
-	target = inj.foaToRVA(instFOA) // #nosec G115
+	instFOA := inj.selectHookInstruction(inj.rvaToFOA(target)) // TODO confused!!!!
+	target = inj.foaToRVA(instFOA)                             // #nosec G115
 	first := inj.selectFirstCodeCave(target)
 	var dstRVA uint32
 	if inj.section != nil {
@@ -455,11 +455,16 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		opts = new(Options)
 	}
 	inj.opts = opts
-	// read image information
+	// parse pe image file
 	peFile, err := pe.NewFile(bytes.NewReader(image))
 	if err != nil {
 		return err
 	}
+	// check is an executable image
+	if peFile.Characteristics&pe.IMAGE_FILE_EXECUTABLE_IMAGE == 0 {
+		return errors.New("not executable image")
+	}
+	// read image information
 	isDLL := peFile.Characteristics&pe.IMAGE_FILE_DLL != 0
 	var arch string
 	switch peFile.Machine {
