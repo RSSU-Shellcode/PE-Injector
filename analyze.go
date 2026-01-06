@@ -3,6 +3,7 @@ package injector
 // Info contains the image analyze result.
 type Info struct {
 	Architecture string     `json:"architecture"`
+	IsEXE        bool       `json:"is_exe"`
 	IsDLL        bool       `json:"is_dll"`
 	ImageSize    uint32     `json:"image_size"`
 	ImageBase    uint64     `json:"image_base"`
@@ -20,13 +21,13 @@ type Info struct {
 	HasLoadLibraryW        bool `json:"has_load_library_w"`
 	HasGetProcAddress      bool `json:"has_get_proc_address"`
 
-	NumCodeCaves     int  `json:"num_code_caves"`
-	ContainSignature bool `json:"contain_signature"`
-	ContainCFG       bool `json:"contain_cfg"`
-	CanCreateSection bool `json:"can_create_section"`
-	CanInjectLoader  bool `json:"can_inject_loader"`
-	CanInjectJumper  bool `json:"can_inject_jumper"`
-	InjectLoaderRank int  `json:"inject_loader_rank"`
+	NumCodeCaves      int  `json:"num_code_caves"`
+	ContainSignature  bool `json:"contain_signature"`
+	ContainLoadConfig bool `json:"contain_load_config"`
+	CanCreateSection  bool `json:"can_create_section"`
+	CanInjectLoader   bool `json:"can_inject_loader"`
+	CanInjectJumper   bool `json:"can_inject_jumper"`
+	InjectLoaderRank  int  `json:"inject_loader_rank"`
 }
 
 // Analyze is used to analyze the target pe image file that can be injected.
@@ -109,6 +110,7 @@ func Analyze(image []byte) (*Info, error) {
 	}
 	info := Info{
 		Architecture:           architecture,
+		IsEXE:                  !injector.dll,
 		IsDLL:                  injector.dll,
 		ImageSize:              imageSize,
 		ImageBase:              imageBase,
@@ -126,7 +128,7 @@ func Analyze(image []byte) (*Info, error) {
 		HasGetProcAddress:      hasGetProcAddress,
 		NumCodeCaves:           numCaves,
 		ContainSignature:       injector.containSign,
-		ContainCFG:             injector.containCFG,
+		ContainLoadConfig:      injector.containCFG,
 		CanCreateSection:       canCreateSection,
 		CanInjectLoader:        canInjectLoader,
 		CanInjectJumper:        numCaves > 0,
