@@ -159,7 +159,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 		t.Run("entry point", func(t *testing.T) {
 			opts.Address = 0
 
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
@@ -178,7 +178,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			}
 			opts.Address = 0x478101
 
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
@@ -201,7 +201,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 		t.Run("entry point", func(t *testing.T) {
 			opts.Address = 0
 
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
@@ -220,7 +220,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			}
 			opts.Address = 0x140075DDC
 
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
@@ -291,7 +291,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 		t.Run("entry point", func(t *testing.T) {
 			opts.Address = 0
 
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			shellcode := []byte{
 				0x90,
@@ -309,7 +309,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 		t.Run("custom address", func(t *testing.T) {
 			opts.Address = 0x478101
 
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			shellcode := []byte{
 				0x90,
@@ -329,7 +329,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 		t.Run("entry point", func(t *testing.T) {
 			opts.Address = 0
 
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			shellcode := []byte{
 				0x90,
@@ -347,7 +347,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 		t.Run("custom address", func(t *testing.T) {
 			opts.Address = 0x140075DDC
 
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			shellcode := []byte{
 				0x90,
@@ -369,26 +369,61 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 
 	rd := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec
 
-	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x86.dat")
-		require.NoError(t, err)
+	t.Run("exe", func(t *testing.T) {
+		t.Run("x86", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
+			require.NoError(t, err)
 
-		size := uint32(1 + rd.Intn(128*1024))
-		output, err := injector.ExtendTextSection(image, size)
-		require.NoError(t, err)
+			size := uint32(1 + rd.Intn(128*1024))
+			output, err := injector.ExtendTextSection(image, size)
+			require.NoError(t, err)
 
-		testExecuteEXE(t, "testdata/extended_x86.exe", output)
+			testExecuteEXE(t, "testdata/extended_x86.exe", output)
+		})
+
+		t.Run("x64", func(t *testing.T) {
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
+			require.NoError(t, err)
+
+			size := uint32(1 + rd.Intn(128*1024))
+			output, err := injector.ExtendTextSection(image, size)
+			require.NoError(t, err)
+
+			testExecuteEXE(t, "testdata/extended_x64.exe", output)
+		})
+
 	})
 
-	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x64.dat")
-		require.NoError(t, err)
+	t.Run("dll", func(t *testing.T) {
+		t.Run("x86", func(t *testing.T) {
+			if runtime.GOARCH != "386" {
+				return
+			}
 
-		size := uint32(1 + rd.Intn(128*1024))
-		output, err := injector.ExtendTextSection(image, size)
-		require.NoError(t, err)
+			image, err := os.ReadFile("testdata/image_dll_x86.dat")
+			require.NoError(t, err)
 
-		testExecuteEXE(t, "testdata/extended_x64.exe", output)
+			size := uint32(1 + rd.Intn(128*1024))
+			output, err := injector.ExtendTextSection(image, size)
+			require.NoError(t, err)
+
+			testExecuteDLL(t, "testdata/extended_x86.dll", output)
+		})
+
+		t.Run("x64", func(t *testing.T) {
+			if runtime.GOARCH != "amd64" {
+				return
+			}
+
+			image, err := os.ReadFile("testdata/image_dll_x64.dat")
+			require.NoError(t, err)
+
+			size := uint32(1 + rd.Intn(128*1024))
+			output, err := injector.ExtendTextSection(image, size)
+			require.NoError(t, err)
+
+			testExecuteDLL(t, "testdata/extended_x64.dll", output)
+		})
 	})
 
 	err := injector.Close()
@@ -404,7 +439,7 @@ func TestSpecificAddress(t *testing.T) {
 				Address: 0x478101,
 			}
 
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
@@ -422,7 +457,7 @@ func TestSpecificAddress(t *testing.T) {
 				Address: 0x140075DDC,
 			}
 
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
@@ -442,7 +477,7 @@ func TestSpecificAddress(t *testing.T) {
 				Address: 0x478101,
 			}
 
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			shellcode := []byte{
 				0x90,
@@ -462,7 +497,7 @@ func TestSpecificAddress(t *testing.T) {
 				Address: 0x140075DDC,
 			}
 
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			shellcode := []byte{
 				0x90,
@@ -570,7 +605,7 @@ func TestSpecificSeed(t *testing.T) {
 
 	t.Run("loader", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 			require.NoError(t, err)
@@ -585,7 +620,7 @@ func TestSpecificSeed(t *testing.T) {
 		})
 
 		t.Run("x64", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 			require.NoError(t, err)
@@ -602,7 +637,7 @@ func TestSpecificSeed(t *testing.T) {
 
 	t.Run("raw", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			shellcode := []byte{
 				0x90,
@@ -619,7 +654,7 @@ func TestSpecificSeed(t *testing.T) {
 		})
 
 		t.Run("x64", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			shellcode := []byte{
 				0x90,
@@ -644,7 +679,7 @@ func TestInjectorFuzz(t *testing.T) {
 	injector := NewInjector()
 
 	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x86.dat")
+		image, err := os.ReadFile("testdata/image_exe_x86.dat")
 		require.NoError(t, err)
 		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 		require.NoError(t, err)
@@ -674,7 +709,7 @@ func TestInjectorFuzz(t *testing.T) {
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x64.dat")
+		image, err := os.ReadFile("testdata/image_exe_x64.dat")
 		require.NoError(t, err)
 		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 		require.NoError(t, err)
@@ -764,39 +799,6 @@ func testExecuteEXE(t *testing.T, path string, image []byte) {
 	t.FailNow()
 }
 
-func TestInjector_ExtendTextSection_DLL(t *testing.T) {
-	injector := NewInjector()
-
-	rd := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec
-
-	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x86.dat")
-		require.NoError(t, err)
-
-		size := uint32(1 + rd.Intn(128*1024))
-		output, err := injector.ExtendTextSection(image, size)
-		require.NoError(t, err)
-
-		testExecuteEXE(t, "testdata/extended_x86.exe", output)
-	})
-
-	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_dll_x64.dat")
-		require.NoError(t, err)
-
-		size := uint32(1 + rd.Intn(128*1024))
-		output, err := injector.ExtendTextSection(image, size)
-		require.NoError(t, err)
-
-		testExecuteDLL(t, "testdata/image_dll_x64.dll", output)
-	})
-
-	err := injector.Close()
-	require.NoError(t, err)
-
-	fmt.Println("asd")
-}
-
 func testExecuteDLL(t *testing.T, path string, image []byte) {
 	err := os.WriteFile(path, image, 0600)
 	require.NoError(t, err)
@@ -810,4 +812,7 @@ func testExecuteDLL(t *testing.T, path string, image []byte) {
 		fmt.Println(err)
 		t.FailNow()
 	}
+
+	err = dll.Release()
+	require.NoError(t, err)
 }
