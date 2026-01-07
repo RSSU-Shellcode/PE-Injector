@@ -57,7 +57,7 @@ type Injector struct {
 	// assembler engine
 	engine *keystone.Engine
 
-	// context arguments
+	// context data
 	raw  bool
 	ctx  *Context
 	opts *Options
@@ -131,7 +131,7 @@ type Options struct {
 
 	// not select a random instruction after target address that can be hooked.
 	// when Address is set or NotSaveContext, it will be ignored.
-	NotHookInstruction bool `toml:"not_hook_instruction" json:"not_hook_instruction"`
+	NotHookInstruction bool `toml:"not_hook_instruction" json:"not_hook_instruction"` // TODO rename field
 
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or
@@ -165,7 +165,7 @@ type Options struct {
 	NoGarbage bool `toml:"no_garbage" json:"no_garbage"`
 
 	// reserve load config directory for enable Control Flow Guard.
-	ReserveCFG bool `toml:"reserve_cfg" json:"reserve_cfg"`
+	ReserveCFG bool `toml:"reserve_cfg" json:"reserve_cfg"` // TODO rename field
 
 	// specify the new section name, the default is ".patch".
 	SectionName string `toml:"section_name" json:"section_name"`
@@ -206,14 +206,14 @@ type Options struct {
 type Context struct {
 	Output []byte `json:"output"`
 
-	Hook []string `json:"hook"`
-
+	HookInst   string `json:"hook_inst"`
 	LoaderHex  string `json:"loader_hex"`
 	LoaderInst string `json:"loader_inst"`
 
 	Arch  string `json:"arch"`
-	Mode  string `json:"mode"`
+	IsEXE bool   `json:"is_exe"`
 	IsDLL bool   `json:"is_dll"`
+	Mode  string `json:"mode"`
 	IsRaw bool   `json:"is_raw"`
 	Seed  int64  `json:"seed"`
 
@@ -318,7 +318,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		_ = inj.engine.Close()
 		inj.engine = nil
 	}()
-	// set method flag
+	// set raw flag
 	inj.raw = true
 	// auto append the mark about end of shellcode
 	shellcode = bytes.Clone(shellcode)
@@ -534,6 +534,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	// update context
 	inj.ctx = &Context{
 		Arch:  arch,
+		IsEXE: !isDLL,
 		IsDLL: isDLL,
 		Seed:  seed,
 
@@ -704,8 +705,12 @@ func (inj *Injector) calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) 
 		size int
 	)
 	for i := 0; i < len(insts); i++ {
-		hook := strings.ToLower(insts[i].String())
-		inj.ctx.Hook = append(inj.ctx.Hook, hook)
+		inst := strings.ToLower(insts[i].String())
+		if inj.ctx.HookInst == "" {
+			inj.ctx.HookInst = inst
+		} else {
+			inj.ctx.HookInst += "\r\n" + inst
+		}
 		num++
 		size += insts[i].Len
 		if size >= nearJumpSize {
