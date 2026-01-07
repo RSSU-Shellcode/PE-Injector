@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 
@@ -116,8 +117,13 @@ func main() {
 	fmt.Println()
 	fmt.Println("==============Context===============")
 	fmt.Println("arch:", ctx.Arch)
+	if ctx.IsEXE {
+		fmt.Println("type: exe")
+	}
+	if ctx.IsDLL {
+		fmt.Println("type: dll")
+	}
 	fmt.Println("mode:", ctx.Mode)
-	fmt.Println("dll: ", ctx.IsDLL)
 	fmt.Println("raw: ", ctx.IsRaw)
 	fmt.Println("size:", len(ctx.Output))
 	fmt.Println("seed:", ctx.Seed)
@@ -148,9 +154,7 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("================Hook================")
-	for i := 0; i < len(ctx.Hook); i++ {
-		fmt.Println("  ", ctx.Hook[i])
-	}
+	fmt.Println("  " + strings.ReplaceAll(ctx.HookInst, "\r\n", "\r\n  "))
 	fmt.Println("====================================")
 	fmt.Println()
 
@@ -169,8 +173,12 @@ func analyzeImage() {
 	checkError(err)
 	fmt.Println("================PE image================")
 	fmt.Println("Arch: ", info.Architecture)
-	fmt.Println("IsEXE:", info.IsEXE)
-	fmt.Println("IsDLL:", info.IsDLL)
+	if info.IsEXE {
+		fmt.Println("Type:  exe")
+	}
+	if info.IsDLL {
+		fmt.Println("Type:  dll")
+	}
 	fmt.Println("ImageSize: ", info.ImageSize)
 	fmt.Printf("ImageBase:  0x%X\n", info.ImageBase)
 	fmt.Printf("EntryPoint: 0x%X\n", info.EntryPoint)
@@ -189,7 +197,7 @@ func analyzeImage() {
 	fmt.Println("LoadLibraryA:       ", info.HasLoadLibraryA)
 	fmt.Println("LoadLibraryW:       ", info.HasLoadLibraryW)
 	fmt.Println("GetProcAddress:     ", info.HasGetProcAddress)
-	fmt.Println("================Injector================")
+	fmt.Println("=================Inject=================")
 	fmt.Println("NumCodeCaves:     ", info.NumCodeCaves)
 	fmt.Println("ContainSignature: ", info.ContainSignature)
 	fmt.Println("ContainLoadConfig:", info.ContainLoadConfig)
