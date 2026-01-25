@@ -19,8 +19,8 @@ func TestAnalyze(t *testing.T) {
 
 			spew.Dump(info)
 
-			require.True(t, info.IsEXE)
-			require.False(t, info.IsDLL)
+			require.Equal(t, "x86", info.ImageArch)
+			require.Equal(t, imageTypeEXE, info.ImageType)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -32,8 +32,8 @@ func TestAnalyze(t *testing.T) {
 
 			spew.Dump(info)
 
-			require.True(t, info.IsEXE)
-			require.False(t, info.IsDLL)
+			require.Equal(t, "x64", info.ImageArch)
+			require.Equal(t, imageTypeEXE, info.ImageType)
 		})
 	})
 
@@ -47,8 +47,8 @@ func TestAnalyze(t *testing.T) {
 
 			spew.Dump(info)
 
-			require.False(t, info.IsEXE)
-			require.True(t, info.IsDLL)
+			require.Equal(t, "x86", info.ImageArch)
+			require.Equal(t, imageTypeDLL, info.ImageType)
 		})
 
 		t.Run("x64", func(t *testing.T) {
@@ -60,8 +60,8 @@ func TestAnalyze(t *testing.T) {
 
 			spew.Dump(info)
 
-			require.False(t, info.IsEXE)
-			require.True(t, info.IsDLL)
+			require.Equal(t, "x64", info.ImageArch)
+			require.Equal(t, imageTypeDLL, info.ImageType)
 		})
 	})
 
