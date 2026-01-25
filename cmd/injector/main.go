@@ -172,14 +172,9 @@ func analyzeImage() {
 	info, err := injector.Analyze(image)
 	checkError(err)
 	fmt.Println("================PE image================")
-	fmt.Println("Arch: ", info.Architecture)
-	if info.IsEXE {
-		fmt.Println("Type:  exe")
-	}
-	if info.IsDLL {
-		fmt.Println("Type:  dll")
-	}
-	fmt.Println("ImageSize: ", info.ImageSize)
+	fmt.Println("Arch:", info.ImageArch)
+	fmt.Println("Type:", info.ImageType)
+	fmt.Println("Size:", info.ImageSize)
 	fmt.Printf("ImageBase:  0x%X\n", info.ImageBase)
 	fmt.Printf("EntryPoint: 0x%X\n", info.EntryPoint)
 	fmt.Println("===============PE Sections==============")
@@ -197,7 +192,7 @@ func analyzeImage() {
 	fmt.Println("LoadLibraryA:       ", info.HasLoadLibraryA)
 	fmt.Println("LoadLibraryW:       ", info.HasLoadLibraryW)
 	fmt.Println("GetProcAddress:     ", info.HasGetProcAddress)
-	fmt.Println("=================Inject=================")
+	fmt.Println("================Injection===============")
 	fmt.Println("NumCodeCaves:     ", info.NumCodeCaves)
 	fmt.Println("ContainSignature: ", info.ContainSignature)
 	fmt.Println("ContainLoadConfig:", info.ContainLoadConfig)
