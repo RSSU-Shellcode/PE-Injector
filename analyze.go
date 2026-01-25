@@ -1,7 +1,7 @@
 package injector
 
-// Info contains the image analyze result.
-type Info struct {
+// AnalyzeInfo contains the image analyze information.
+type AnalyzeInfo struct {
 	ImageArch string `json:"image_arch"`
 	ImageType string `json:"image_type"`
 	ImageSize uint32 `json:"image_size"`
@@ -21,17 +21,17 @@ type Info struct {
 	HasLoadLibraryW        bool `json:"has_load_library_w"`
 	HasGetProcAddress      bool `json:"has_get_proc_address"`
 
-	NumCodeCaves      int  `json:"num_code_caves"`
-	ContainSignature  bool `json:"contain_signature"`
-	ContainLoadConfig bool `json:"contain_load_config"`
-	CanCreateSection  bool `json:"can_create_section"`
-	CanInjectLoader   bool `json:"can_inject_loader"`
-	CanInjectJumper   bool `json:"can_inject_jumper"`
-	InjectLoaderRank  int  `json:"inject_loader_rank"`
+	NumCodeCaves     int  `json:"num_code_caves"`
+	CanCreateSection bool `json:"can_create_section"`
+	CanInjectLoader  bool `json:"can_inject_loader"`
+	InjectLoaderRank int  `json:"inject_loader_rank"`
+
+	HasSignature  bool `json:"has_signature"`
+	HasLoadConfig bool `json:"has_load_config"`
 }
 
-// Analyze is used to analyze the target pe image file that can be injected.
-func Analyze(image []byte) (*Info, error) {
+// Analyze is used to analyze the target pe image about injection.
+func Analyze(image []byte) (*AnalyzeInfo, error) {
 	injector := NewInjector()
 	err := injector.preprocess(image, nil)
 	if err != nil {
@@ -87,34 +87,19 @@ func Analyze(image []byte) (*Info, error) {
 	hasLoadLibraryA := injector.getProcFromIAT("LoadLibraryA") != nil
 	hasLoadLibraryW := injector.getProcFromIAT("LoadLibraryW") != nil
 	hasGetProcAddress := injector.getProcFromIAT("GetProcAddress") != nil
-	ctx := &loaderCtx{}
-	hasCoreProc := injector.findProcFromIAT(ctx) == nil
-	// process total rank
-	numCaves := len(injector.caves)
 	var canCreateSection bool
 	_, err = injector.createSection(".test", 1024)
 	if err == nil {
 		canCreateSection = true
 	}
-	canInjectLoader := true
-	if !hasCoreProc {
-		canInjectLoader = false
-	}
-	var numLoaderInst int
-	switch injector.arch {
-	case "386":
-		numLoaderInst = defaultMaxNumLoaderInstX86
-	case "amd64":
-		numLoaderInst = defaultMaxNumLoaderInstX64
-	}
-	if numLoaderInst+8 > numCaves {
-		canInjectLoader = false
-	}
+	// process inject loader rank
+	ctx := &loaderCtx{}
+	canInjectLoader := injector.findProcFromIAT(ctx) == nil
 	var injectLoaderRank int
 	if canInjectLoader {
 		injectLoaderRank = calcInjectLoaderRank(ctx)
 	}
-	info := Info{
+	info := AnalyzeInfo{
 		ImageArch:              imageArch,
 		ImageType:              imageType,
 		ImageSize:              imageSize,
@@ -131,13 +116,12 @@ func Analyze(image []byte) (*Info, error) {
 		HasLoadLibraryA:        hasLoadLibraryA,
 		HasLoadLibraryW:        hasLoadLibraryW,
 		HasGetProcAddress:      hasGetProcAddress,
-		NumCodeCaves:           numCaves,
-		ContainSignature:       injector.containSign,
-		ContainLoadConfig:      injector.containCFG,
+		NumCodeCaves:           len(injector.caves),
 		CanCreateSection:       canCreateSection,
 		CanInjectLoader:        canInjectLoader,
-		CanInjectJumper:        numCaves > 0,
 		InjectLoaderRank:       injectLoaderRank,
+		HasSignature:           injector.hasSignature,
+		HasLoadConfig:          injector.hasLoadConfig,
 	}
 	err = injector.Close()
 	if err != nil {
