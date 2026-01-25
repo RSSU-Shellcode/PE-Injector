@@ -74,6 +74,6 @@ func TestAnalyze(t *testing.T) {
 
 		spew.Dump(info)
 
-		require.True(t, info.ContainSignature)
+		require.True(t, info.HasSignature)
 	})
 }
