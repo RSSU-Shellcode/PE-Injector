@@ -49,14 +49,13 @@ func main() {
 		if info.NumCodeCaves < minNumCaves {
 			return nil
 		}
-		if mustNotSign && info.ContainSignature {
+		if mustNotSign && info.HasSignature {
 			return nil
 		}
 		fmt.Println(path)
 		fmt.Println("num code caves:    ", info.NumCodeCaves)
 		fmt.Println("can create section:", info.CanCreateSection)
 		fmt.Println("can inject loader: ", info.CanInjectLoader)
-		fmt.Println("can inject jumper: ", info.CanInjectJumper)
 		if info.CanInjectLoader {
 			fmt.Println("inject loader rank:", info.InjectLoaderRank)
 		}
