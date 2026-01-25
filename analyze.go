@@ -5,8 +5,8 @@ type AnalyzeInfo struct {
 	ImageArch string `json:"image_arch"`
 	ImageType string `json:"image_type"`
 	ImageSize uint32 `json:"image_size"`
-	ImageBase uint64 `json:"image_base"`
 
+	ImageBase  uint64     `json:"image_base"`
 	EntryPoint uint64     `json:"entry_point"`
 	Sections   []*Section `json:"sections"`
 	Exports    []*Export  `json:"exports"`
