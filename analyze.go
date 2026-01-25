@@ -2,14 +2,14 @@ package injector
 
 // Info contains the image analyze result.
 type Info struct {
-	Architecture string     `json:"architecture"`
-	IsEXE        bool       `json:"is_exe"`
-	IsDLL        bool       `json:"is_dll"`
-	ImageSize    uint32     `json:"image_size"`
-	ImageBase    uint64     `json:"image_base"`
-	EntryPoint   uint64     `json:"entry_point"`
-	Sections     []*Section `json:"sections"`
-	Exports      []*Export  `json:"exports"`
+	ImageArch string `json:"image_arch"`
+	ImageType string `json:"image_type"`
+	ImageSize uint32 `json:"image_size"`
+	ImageBase uint64 `json:"image_base"`
+
+	EntryPoint uint64     `json:"entry_point"`
+	Sections   []*Section `json:"sections"`
+	Exports    []*Export  `json:"exports"`
 
 	HasAllProcedures       bool `json:"has_all_procedures"`
 	HasVirtualAlloc        bool `json:"has_virtual_alloc"`
@@ -39,22 +39,28 @@ func Analyze(image []byte) (*Info, error) {
 	}
 	// read pe image basic information
 	var (
-		architecture string
-		imageSize    uint32
-		imageBase    uint64
-		entryPoint   uint64
+		imageArch  string
+		imageSize  uint32
+		imageBase  uint64
+		entryPoint uint64
 	)
 	switch injector.arch {
 	case "386":
-		architecture = "x86"
+		imageArch = "x86"
 		imageSize = injector.hdr32.SizeOfImage
 		imageBase = uint64(injector.hdr32.ImageBase)
 		entryPoint = imageBase + uint64(injector.hdr32.AddressOfEntryPoint)
 	case "amd64":
-		architecture = "x64"
+		imageArch = "x64"
 		imageSize = injector.hdr64.SizeOfImage
 		imageBase = injector.hdr64.ImageBase
 		entryPoint = imageBase + uint64(injector.hdr64.AddressOfEntryPoint)
+	}
+	var imageType string
+	if injector.dll {
+		imageType = imageTypeDLL
+	} else {
+		imageType = imageTypeEXE
 	}
 	l := len(injector.img.Sections)
 	sections := make([]*Section, l)
@@ -109,9 +115,8 @@ func Analyze(image []byte) (*Info, error) {
 		injectLoaderRank = calcInjectLoaderRank(ctx)
 	}
 	info := Info{
-		Architecture:           architecture,
-		IsEXE:                  !injector.dll,
-		IsDLL:                  injector.dll,
+		ImageArch:              imageArch,
+		ImageType:              imageType,
 		ImageSize:              imageSize,
 		ImageBase:              imageBase,
 		EntryPoint:             entryPoint,
