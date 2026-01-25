@@ -16,7 +16,7 @@ func TestRelocateInstructionSegment(t *testing.T) {
 	}
 
 	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x86.dat")
+		image, err := os.ReadFile("testdata/image_exe_x86.dat")
 		require.NoError(t, err)
 		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 		require.NoError(t, err)
@@ -32,7 +32,7 @@ func TestRelocateInstructionSegment(t *testing.T) {
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x64.dat")
+		image, err := os.ReadFile("testdata/image_exe_x64.dat")
 		require.NoError(t, err)
 		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 		require.NoError(t, err)
