@@ -27,6 +27,11 @@ const (
 	reserveSectionSize = 16
 )
 
+const (
+	imageTypeEXE = "exe"
+	imageTypeDLL = "dll"
+)
+
 var defaultSectionNames = []string{
 	".patch", ".code", ".test", ".init",
 	".dbg", ".debug", ".PAGE", ".CRT",
@@ -211,7 +216,7 @@ func (inj *Injector) removeSignature() {
 	dd.VirtualAddress = 0
 	dd.Size = 0
 	// store state for analyze
-	inj.containSign = true
+	inj.hasSignature = true
 }
 
 func (inj *Injector) removeLoadConfig() {
@@ -243,7 +248,7 @@ func (inj *Injector) removeLoadConfig() {
 	dd.VirtualAddress = 0
 	dd.Size = 0
 	// store state for analyze
-	inj.containCFG = true
+	inj.hasLoadConfig = true
 }
 
 func (inj *Injector) overwriteChecksum() {
@@ -307,7 +312,7 @@ func (inj *Injector) extendSection(data []byte) (uint32, error) {
 	last := new(pe.SectionHeader32)
 	readStruct(inj.dup[shOffset:], last)
 	// the section must be read only
-	if last.Characteristics&0xF0000000 != 0x40000000 {
+	if last.Characteristics&0xF0000000 != 0x40000000 { // TODO fix bug
 		return 0, fmt.Errorf("the last section is not read only")
 	}
 	// store old section header data
