@@ -17,6 +17,19 @@ func TestScan(t *testing.T) {
 		}
 	})
 
+	t.Run("min code cave", func(t *testing.T) {
+		opts := &ScanOptions{
+			MinNumCaves: 1,
+		}
+
+		results, err := Scan("testdata", opts)
+		require.NoError(t, err)
+
+		for _, result := range results {
+			fmt.Println(result.Path)
+		}
+	})
+
 	t.Run("no signature", func(t *testing.T) {
 		opts := &ScanOptions{
 			NoSignature: true,
