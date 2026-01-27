@@ -1,8 +1,11 @@
 package injector
 
 import (
+	"io"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const defaultMinNumCaves = 350
@@ -24,21 +27,28 @@ type ScanResult struct {
 // Scan is used to scan the target image in directory.
 func Scan(path string, opts *ScanOptions) ([]*ScanResult, error) {
 	if opts == nil {
-		opts = &ScanOptions{
-			MinNumCaves: defaultMinNumCaves,
-		}
+		opts = new(ScanOptions)
 	}
+	minNumCaves := opts.MinNumCaves
+	if minNumCaves < 1 {
+		minNumCaves = defaultMinNumCaves
+	}
+	rd := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec
 	var results []*ScanResult
 	err := filepath.Walk(path, func(path string, file os.FileInfo, _ error) error {
 		if file.IsDir() {
 			return nil
 		}
 		ext := filepath.Ext(file.Name())
-		if ext != ".exe" && ext != ".dll" {
+		if ext == ".sys" {
 			return nil
 		}
 		path, _ = filepath.Abs(path)
 		if path == "" {
+			return nil
+		}
+		maybePE, err := maybePEImage(rd, path)
+		if !maybePE || err != nil {
 			return nil
 		}
 		image, err := os.ReadFile(path) // #nosec
@@ -49,7 +59,7 @@ func Scan(path string, opts *ScanOptions) ([]*ScanResult, error) {
 		if err != nil {
 			return nil
 		}
-		// check condition
+		// check condition in options
 		if info.NumCodeCaves < opts.MinNumCaves {
 			return nil
 		}
@@ -74,4 +84,21 @@ func Scan(path string, opts *ScanOptions) ([]*ScanResult, error) {
 		return nil, err
 	}
 	return results, nil
+}
+
+func maybePEImage(rd *rand.Rand, path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = f.Close() }()
+	buf := make([]byte, 4+rd.Intn(64))
+	_, err = io.ReadFull(f, buf)
+	if err != nil {
+		return false, err
+	}
+	if buf[0] == 'M' && buf[1] == 'Z' {
+		return true, nil
+	}
+	return false, nil
 }
