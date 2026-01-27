@@ -29,10 +29,6 @@ func Scan(path string, opts *ScanOptions) ([]*ScanResult, error) {
 	if opts == nil {
 		opts = new(ScanOptions)
 	}
-	minNumCaves := opts.MinNumCaves
-	if minNumCaves < 1 {
-		minNumCaves = defaultMinNumCaves
-	}
 	rd := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec
 	var results []*ScanResult
 	err := filepath.Walk(path, func(path string, file os.FileInfo, _ error) error {
@@ -47,8 +43,7 @@ func Scan(path string, opts *ScanOptions) ([]*ScanResult, error) {
 		if path == "" {
 			return nil
 		}
-		maybePE, err := maybePEImage(rd, path)
-		if !maybePE || err != nil {
+		if !maybePEImage(rd, path) {
 			return nil
 		}
 		image, err := os.ReadFile(path) // #nosec
@@ -59,20 +54,8 @@ func Scan(path string, opts *ScanOptions) ([]*ScanResult, error) {
 		if err != nil {
 			return nil
 		}
-		// check condition in options
-		if info.NumCodeCaves < opts.MinNumCaves {
+		if !matchPEImage(info, opts) {
 			return nil
-		}
-		if opts.NoSignature && info.HasSignature {
-			return nil
-		}
-		if opts.NoLoadConfig && info.HasLoadConfig {
-			return nil
-		}
-		if !opts.IgnoreRank {
-			if !info.CanCreateSection && !info.CanInjectLoader {
-				return nil
-			}
 		}
 		results = append(results, &ScanResult{
 			Path: path,
@@ -86,19 +69,41 @@ func Scan(path string, opts *ScanOptions) ([]*ScanResult, error) {
 	return results, nil
 }
 
-func maybePEImage(rd *rand.Rand, path string) (bool, error) {
-	f, err := os.Open(path)
+func matchPEImage(info *AnalyzeInfo, opts *ScanOptions) bool {
+	minNumCaves := opts.MinNumCaves
+	if minNumCaves < 1 {
+		minNumCaves = defaultMinNumCaves
+	}
+	if info.NumCodeCaves < minNumCaves {
+		return false
+	}
+	if opts.NoSignature && info.HasSignature {
+		return false
+	}
+	if opts.NoLoadConfig && info.HasLoadConfig {
+		return false
+	}
+	if !opts.IgnoreRank {
+		if !info.CanCreateSection && !info.CanInjectLoader {
+			return false
+		}
+	}
+	return true
+}
+
+func maybePEImage(rd *rand.Rand, path string) bool {
+	f, err := os.Open(path) // #nosec
 	if err != nil {
-		return false, err
+		return false
 	}
 	defer func() { _ = f.Close() }()
 	buf := make([]byte, 4+rd.Intn(64))
 	_, err = io.ReadFull(f, buf)
 	if err != nil {
-		return false, err
+		return false
 	}
 	if buf[0] == 'M' && buf[1] == 'Z' {
-		return true, nil
+		return true
 	}
-	return false, nil
+	return false
 }
