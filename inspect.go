@@ -19,20 +19,15 @@ type InspectConfig struct {
 	HasLoadLibraryA        bool `toml:"has_load_library_a"         json:"has_load_library_a"`
 }
 
-// InspectLoaderTemplate is used to test loader template.
+// InspectLoaderTemplate is used to inspect loader template.
 func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, []byte, error) {
-	switch arch {
-	case "386", "amd64":
-	default:
-		return "", nil, fmt.Errorf("unsupported architecture: %s", arch)
-	}
-	injector := NewInjector()
-	// build injector internal status
-	injector.arch = arch
-	err := injector.initAssembler()
+	arch, err := selectInspectArch(arch)
 	if err != nil {
 		return "", nil, err
 	}
+	// build injector internal status
+	injector := NewInjector()
+	injector.arch = arch
 	injector.opts = &Options{
 		NoGarbage: true,
 
@@ -50,6 +45,10 @@ func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, [
 		},
 	}
 	injector.iat = buildFakeIATList(cfg)
+	err = injector.initAssembler()
+	if err != nil {
+		return "", nil, err
+	}
 	// build loader assembly source
 	template = strings.ReplaceAll(template, codeCaveModeStub, "")
 	asm, err := injector.buildLoaderASM(template, nil, false)
@@ -65,6 +64,48 @@ func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, [
 		return "", nil, err
 	}
 	return asm, inst, nil
+}
+
+// InspectJunkCodeTemplate is used to inspect junk code template.
+func InspectJunkCodeTemplate(arch, template string) (string, []byte, error) {
+	arch, err := selectInspectArch(arch)
+	if err != nil {
+		return "", nil, err
+	}
+	// build injector internal status
+	injector := NewInjector()
+	injector.arch = arch
+	injector.opts = new(Options)
+	err = injector.initAssembler()
+	if err != nil {
+		return "", nil, err
+	}
+	asm, err := injector.buildJunkCode(template)
+	if err != nil {
+		return "", nil, err
+	}
+	inst, err := injector.assemble(asm)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to assemble junk code: %s", err)
+	}
+	err = injector.Close()
+	if err != nil {
+		return "", nil, err
+	}
+	return asm, inst, nil
+}
+
+func selectInspectArch(arch string) (string, error) {
+	switch arch {
+	case "386", "amd64":
+	case "x86":
+		arch = "386"
+	case "x64":
+		arch = "amd64"
+	default:
+		return "", fmt.Errorf("unsupported architecture: %s", arch)
+	}
+	return arch, nil
 }
 
 func buildFakeIATList(cfg *InspectConfig) []*iat {
@@ -123,33 +164,4 @@ func buildFakeIATList(cfg *InspectConfig) []*iat {
 		rva:  0x8000,
 	})
 	return list
-}
-
-// InspectJunkCodeTemplate is used to test junk code template.
-func InspectJunkCodeTemplate(arch string, template string) (string, []byte, error) {
-	switch arch {
-	case "386", "amd64":
-	default:
-		return "", nil, fmt.Errorf("unsupported architecture: %s", arch)
-	}
-	injector := NewInjector()
-	injector.arch = arch
-	injector.opts = new(Options)
-	err := injector.initAssembler()
-	if err != nil {
-		return "", nil, err
-	}
-	asm, err := injector.buildJunkCode(template)
-	if err != nil {
-		return "", nil, err
-	}
-	inst, err := injector.assemble(asm)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to assemble junk code: %s", err)
-	}
-	err = injector.Close()
-	if err != nil {
-		return "", nil, err
-	}
-	return asm, inst, nil
 }
