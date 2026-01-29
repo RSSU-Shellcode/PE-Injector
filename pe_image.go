@@ -220,7 +220,7 @@ func (inj *Injector) removeSignature() {
 }
 
 func (inj *Injector) removeLoadConfig() {
-	if inj.opts.ReserveCFG {
+	if inj.opts.ReserveLoadConfig {
 		return
 	}
 	var dataDirectory *[16]pe.DataDirectory
@@ -251,27 +251,20 @@ func (inj *Injector) removeLoadConfig() {
 	inj.hasLoadConfig = true
 }
 
-func (inj *Injector) overwriteChecksum() {
-	var checksum uint32
-	switch inj.arch {
-	case "386":
-		checksum = inj.hdr32.CheckSum
-	case "amd64":
-		checksum = inj.hdr64.CheckSum
+func (inj *Injector) overwriteCheckSum() {
+	var checkSum uint32
+	if inj.opts.CalculateCheckSum {
+		checkSum = calculateCheckSum(inj.dup)
 	}
-	if checksum == 0 {
-		return
-	}
-	checksum = calculateChecksum(inj.dup)
 	// calculate the offset of the checksum field
 	sumOffset := int(inj.offOptHdr + 64)
 	// overwrite checksum
 	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, checksum)
+	binary.LittleEndian.PutUint32(buf, checkSum)
 	copy(inj.dup[sumOffset:], buf)
 }
 
-func calculateChecksum(image []byte) uint32 {
+func calculateCheckSum(image []byte) uint32 {
 	// calculate the offset of the checksum field
 	hdrOffset := binary.LittleEndian.Uint32(image[imageDOSHeader-4:])
 	fileHeader := hdrOffset + imageNTSignatureSize
