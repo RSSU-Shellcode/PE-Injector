@@ -87,9 +87,9 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
-	t.Run("no shellcode jumper", func(t *testing.T) {
+	t.Run("not fuzz hook", func(t *testing.T) {
 		opts := Options{
-			NoShellcodeJumper: true,
+			NotFuzzHook: true,
 		}
 
 		testInjectorInject(t, injector, &opts)
@@ -103,10 +103,18 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
-	t.Run("reserve cfg", func(t *testing.T) {
+	t.Run("no shellcode jumper", func(t *testing.T) {
 		opts := Options{
-			ReserveCFG:      true,
-			NotCreateThread: true,
+			NoShellcodeJumper: true,
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
+	t.Run("reserve load config", func(t *testing.T) {
+		opts := Options{
+			ReserveLoadConfig: true,
+			NotCreateThread:   true,
 		}
 
 		testInjectorInject(t, injector, &opts)
