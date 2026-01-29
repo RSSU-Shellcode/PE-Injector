@@ -86,8 +86,8 @@ type Injector struct {
 	offDataDir uint32
 
 	// restore before remove
-	containSign bool
-	containCFG  bool
+	hasSignature  bool
+	hasLoadConfig bool
 
 	// about process EAT and IAT
 	eat []*eat
@@ -117,21 +117,21 @@ type Injector struct {
 
 // Options contains options about inject shellcode.
 type Options struct {
-	// specify the target function address that will
-	// be hooked, it is an VA address, not a file offset
-	// or RVA, remember disable ASLR when debug image.
+	// specify the target function address that will be hooked,
+	// it is a Virtual Address, not a file offset or RVA.
+	// remember disable ASLR when debug image.
 	// if it is zero, use the entry point.
 	Address uint64 `toml:"address" json:"address"`
 
-	// specify the target function in EAT that will
-	// be hooked, it not support forwarded.
-	// the hook target is usually not at the beginning
-	// of the function.
+	// specify the target function in EAT that will be hooked,
+	// it not support forwarded function.
 	Function string `toml:"function" json:"function"`
 
-	// not select a random instruction after target address that can be hooked.
-	// when Address is set or NotSaveContext, it will be ignored.
-	NotHookInstruction bool `toml:"not_hook_instruction" json:"not_hook_instruction"` // TODO rename field
+	// TODO finish it
+	// not hook any instruction in text section for
+	// inject raw instruction only, it is used to deploy
+	// code for other advanced usage like shield stub.
+	NoHook bool `toml:"no_hook" json:"no_hook"`
 
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or
@@ -156,16 +156,21 @@ type Options struct {
 	// it is useless for method InjectRaw.
 	NotEraseShellcode bool `toml:"not_erase_shellcode" json:"not_erase_shellcode"`
 
-	// not add a shellcode jumper to call shellcode.
-	// it is useless for method InjectRaw.
-	NoShellcodeJumper bool `toml:"no_shellcode_jumper" json:"no_shellcode_jumper"`
+	// not select a random instruction after target address
+	// that can be hooked.
+	// when Address is set or NotSaveContext, it will be ignored.
+	NotFuzzHook bool `toml:"not_fuzz_hook" json:"not_fuzz_hook"`
 
 	// not append garbage instruction to loader.
 	// It is only for Inject with ModeCreateSection.
 	NoGarbage bool `toml:"no_garbage" json:"no_garbage"`
 
-	// reserve load config directory for enable Control Flow Guard.
-	ReserveCFG bool `toml:"reserve_cfg" json:"reserve_cfg"` // TODO rename field
+	// not add a shellcode jumper to call shellcode.
+	// it is useless for method InjectRaw.
+	NoShellcodeJumper bool `toml:"no_shellcode_jumper" json:"no_shellcode_jumper"`
+
+	// reserve load config data directory like enable Control Flow Guard.
+	ReserveLoadConfig bool `toml:"reserve_load_config" json:"reserve_load_config"`
 
 	// specify the new section name, the default is ".patch".
 	SectionName string `toml:"section_name" json:"section_name"`
@@ -372,16 +377,15 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 			err = errors.New(fmt.Sprint(r))
 		}
 	}()
-	target, err := inj.selectHookTarget()
+	targetRVA, err := inj.selectHookTarget()
 	if err != nil {
 		return err
 	}
-	if target == 0 {
+	if targetRVA == 0 {
 		return errors.New("hook target function address is zero")
 	}
-	instFOA := inj.selectHookInstruction(inj.rvaToFOA(target)) // TODO confused!!!!
-	target = inj.foaToRVA(instFOA)                             // #nosec G115
-	first := inj.selectFirstCodeCave(target)
+	targetRVA = inj.fuzzHook(targetRVA)
+	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
 	if inj.section != nil {
 		dstRVA = inj.section.VirtualAddress
@@ -391,7 +395,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 		}
 		dstRVA = first.virtualAddr
 	}
-	err = inj.hook(target, dstRVA)
+	err = inj.hook(targetRVA, dstRVA)
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
@@ -401,15 +405,15 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	}
 	if inj.section != nil {
 		inj.ctx.Mode = ModeCreateSection
-		inj.padding(shellcode, target)
+		inj.padding(shellcode, targetRVA)
 		return nil
 	}
 	if !raw {
-		return inj.insert(target, first)
+		return inj.insert(targetRVA, first)
 	}
 	// try to cove cave mode
 	inj.ctx.Mode = ModeCodeCave
-	err = inj.insert(target, first)
+	err = inj.insert(targetRVA, first)
 	if err == nil {
 		return nil
 	}
@@ -422,7 +426,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	if err != nil {
 		return err
 	}
-	inj.padding(shellcode, target)
+	inj.padding(shellcode, targetRVA)
 	return nil
 }
 
@@ -551,7 +555,7 @@ func (inj *Injector) checkOptionConflict(opts *Options) error {
 	if opts.Address != 0 && opts.Function != "" {
 		return errors.New("both Address and Function are specified")
 	}
-	if opts.ReserveCFG && !opts.NotCreateThread && !opts.NoShellcodeJumper {
+	if opts.ReserveLoadConfig && !opts.NotCreateThread && !opts.NoShellcodeJumper {
 		return errors.New("cannot create thread with shellcode jumper when reserve CFG")
 	}
 	return nil
@@ -585,15 +589,18 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 	return entryPoint, nil
 }
 
+// select a random instruction after target address that can be hooked.
+
 //gocyclo:ignore
-func (inj *Injector) selectHookInstruction(foa uint32) uint32 {
-	if inj.abs || inj.opts.NotHookInstruction || inj.opts.NotSaveContext {
-		return foa
+func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
+	if inj.abs || inj.opts.NotFuzzHook || inj.opts.NotSaveContext {
+		return targetRVA
 	}
 	// select a random instruction that can be hooked.
-	idx := 4 + inj.rand.Intn(40)
+	num := 4 + inj.rand.Intn(40)
+	foa := inj.rvaToFOA(targetRVA)
 	target := foa
-	for i := 0; i < 50; i++ {
+	for i := 0; i < num; i++ {
 		if foa+32 > inj.size {
 			break
 		}
@@ -630,13 +637,10 @@ func (inj *Injector) selectHookInstruction(foa uint32) uint32 {
 		}
 		// set preselected target
 		target = foa
-		if i >= idx {
-			break
-		}
 		// decode next instruction
 		foa += uint32(inst.Len)
 	}
-	return target
+	return inj.foaToRVA(target)
 }
 
 // selectFirstCodeCave will try to search a cave near the target RVA.
@@ -697,8 +701,8 @@ func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
 	return nil
 }
 
-// calcInstNumAndSize is used to calculate the instruction number
-// and the total size that will be overwritten.
+// calcInstNumAndSize is used to calculate the number of the
+// instruction and the total size that will be overwritten.
 func (inj *Injector) calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) {
 	var (
 		num  int
