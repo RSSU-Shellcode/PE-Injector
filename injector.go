@@ -163,11 +163,14 @@ type Options struct {
 
 	// not append garbage instruction to loader.
 	// It is only for Inject with ModeCreateSection.
-	NoGarbage bool `toml:"no_garbage" json:"no_garbage"`
+	NoGarbageInst bool `toml:"no_garbage_inst" json:"no_garbage_inst"`
 
 	// not add a shellcode jumper to call shellcode.
 	// it is useless for method InjectRaw.
 	NoShellcodeJumper bool `toml:"no_shellcode_jumper" json:"no_shellcode_jumper"`
+
+	// calculate check sum after inject or extend image.
+	CalculateCheckSum bool `toml:"calculate_check_sum" json:"calculate_check_sum"`
 
 	// reserve load config data directory like enable Control Flow Guard.
 	ReserveLoadConfig bool `toml:"reserve_load_config" json:"reserve_load_config"`
@@ -222,13 +225,13 @@ type Context struct {
 	IsRaw bool   `json:"is_raw"`
 	Seed  int64  `json:"seed"`
 
-	SaveContext     bool   `json:"save_context"`
-	CreateThread    bool   `json:"create_thread"`
-	WaitThread      bool   `json:"wait_thread"`
-	EraseShellcode  bool   `json:"erase_shellcode"`
-	ShellcodeJumper bool   `json:"shellcode_jumper"`
-	HasGarbage      bool   `json:"has_garbage"`
-	SectionName     string `json:"section_name"`
+	SaveContext        bool   `json:"save_context"`
+	CreateThread       bool   `json:"create_thread"`
+	WaitThread         bool   `json:"wait_thread"`
+	EraseShellcode     bool   `json:"erase_shellcode"`
+	HasGarbageInst     bool   `json:"has_garbage_inst"`
+	HasShellcodeJumper bool   `json:"has_shellcode_jumper"`
+	SectionName        string `json:"section_name"`
 
 	HasAllProcedures       bool `json:"has_all_procedures"`
 	HasVirtualAlloc        bool `json:"has_virtual_alloc"`
@@ -292,7 +295,7 @@ func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
-	inj.overwriteChecksum()
+	inj.overwriteCheckSum()
 	inj.ctx.Output = inj.dup
 	// record loader assembly
 	binHex, insts := inj.disassembleLoader(loader)
@@ -343,7 +346,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
 	}
-	inj.overwriteChecksum()
+	inj.overwriteCheckSum()
 	inj.ctx.Output = inj.dup
 	return inj.ctx, nil
 }
@@ -367,7 +370,7 @@ func (inj *Injector) ExtendTextSection(image []byte, size uint32) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	inj.overwriteChecksum()
+	inj.overwriteCheckSum()
 	return inj.dup, nil
 }
 
@@ -542,9 +545,9 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		IsDLL: isDLL,
 		Seed:  seed,
 
-		SaveContext:  !opts.NotSaveContext,
-		CreateThread: !opts.NotCreateThread,
-		HasGarbage:   !opts.NoGarbage,
+		SaveContext:    !opts.NotSaveContext,
+		CreateThread:   !opts.NotCreateThread,
+		HasGarbageInst: !opts.NoGarbageInst,
 
 		NumCodeCaves: len(caves),
 	}
