@@ -396,10 +396,6 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 
 	t.Run("dll", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
-			if runtime.GOARCH != "386" {
-				return
-			}
-
 			image, err := os.ReadFile("testdata/image_dll_x86.dat")
 			require.NoError(t, err)
 
@@ -407,14 +403,13 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 			output, err := injector.ExtendTextSection(image, size)
 			require.NoError(t, err)
 
+			if runtime.GOARCH != "386" {
+				return
+			}
 			testExecuteDLL(t, "testdata/extended_x86.dll", output)
 		})
 
 		t.Run("x64", func(t *testing.T) {
-			if runtime.GOARCH != "amd64" {
-				return
-			}
-
 			image, err := os.ReadFile("testdata/image_dll_x64.dat")
 			require.NoError(t, err)
 
@@ -422,6 +417,9 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 			output, err := injector.ExtendTextSection(image, size)
 			require.NoError(t, err)
 
+			if runtime.GOARCH != "amd64" {
+				return
+			}
 			testExecuteDLL(t, "testdata/extended_x64.dll", output)
 		})
 	})
