@@ -29,7 +29,7 @@ func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, [
 	injector := NewInjector()
 	injector.arch = arch
 	injector.opts = &Options{
-		NoGarbage: true,
+		NoGarbageInst: true,
 
 		ForceCodeCave:      cfg.CodeCaveMode,
 		ForceExtendSection: cfg.ExtendSectionMode,

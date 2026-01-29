@@ -65,7 +65,7 @@ type junkCodeCtx struct {
 
 // the output garbage instruction length is no limit.
 func (inj *Injector) garbageInst() []byte {
-	if inj.opts.NoGarbage || inj.ctx.Mode != ModeCreateSection {
+	if inj.opts.NoGarbageInst || inj.ctx.Mode != ModeCreateSection {
 		return nil
 	}
 	// dynamically adjust probability
