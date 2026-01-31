@@ -241,7 +241,7 @@ func (inj *Injector) buildLoaderASM(loader string, payload []byte, process bool)
 	hasGetProcAddress := inj.getProcFromIAT("GetProcAddress") != nil
 	inj.ctx.WaitThread = ctx.NeedWaitThread
 	inj.ctx.EraseShellcode = ctx.NeedEraseShellcode
-	inj.ctx.ShellcodeJumper = ctx.NeedShellcodeJumper
+	inj.ctx.HasShellcodeJumper = ctx.NeedShellcodeJumper
 	inj.ctx.HasAllProcedures = !ctx.LackProcedure
 	inj.ctx.HasVirtualAlloc = !ctx.LackVirtualAlloc
 	inj.ctx.HasVirtualFree = !ctx.LackVirtualFree
@@ -770,7 +770,7 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, loader string, payload
 		maxNumInst = inj.getMaxNumLoaderInstX64()
 	}
 	var loaderSize int
-	if inj.opts.NoGarbage {
+	if inj.opts.NoGarbageInst {
 		loaderSize = maxNumInst * 16
 	} else {
 		loaderSize = maxNumInst * (16 + 16)
@@ -845,7 +845,7 @@ func (inj *Injector) encryptPayload(ctx *loaderCtx, payload []byte) []byte {
 }
 
 func (inj *Injector) insertGarbageInst() string {
-	if inj.opts.NoGarbage || inj.ctx.Mode != ModeCreateSection {
+	if inj.opts.NoGarbageInst || inj.ctx.Mode != ModeCreateSection {
 		return ""
 	}
 	return ";" + toDB(inj.garbageInst())

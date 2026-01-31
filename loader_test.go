@@ -13,7 +13,7 @@ func TestLoader(t *testing.T) {
 
 	opts := &Options{
 		NotSaveContext: true,
-		NoGarbage:      true,
+		NoGarbageInst:  true,
 		RandSeed:       1234,
 	}
 
@@ -59,7 +59,7 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 			mode = ModeExtendSection
 		}
 
-		image, err := os.ReadFile("testdata/image_x86.dat")
+		image, err := os.ReadFile("testdata/image_exe_x86.dat")
 		require.NoError(t, err)
 		shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
 		require.NoError(t, err)
@@ -79,7 +79,7 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 			mode = ModeCodeCave
 		}
 
-		image, err := os.ReadFile("testdata/image_x64.dat")
+		image, err := os.ReadFile("testdata/image_exe_x64.dat")
 		require.NoError(t, err)
 		shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
 		require.NoError(t, err)
