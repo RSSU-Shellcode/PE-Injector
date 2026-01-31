@@ -13,7 +13,7 @@ func TestSaveContext(t *testing.T) {
 		injector.arch = "386"
 		injector.opts = new(Options)
 		injector.ctx = &Context{
-			Mode: ModeCreateSection,
+			Mode: ModeCreateText,
 		}
 		err := injector.initAssembler()
 		require.NoError(t, err)
@@ -30,7 +30,7 @@ func TestSaveContext(t *testing.T) {
 		injector.arch = "amd64"
 		injector.opts = new(Options)
 		injector.ctx = &Context{
-			Mode: ModeCreateSection,
+			Mode: ModeCreateText,
 		}
 		err := injector.initAssembler()
 		require.NoError(t, err)
@@ -49,7 +49,7 @@ func TestRestoreContext(t *testing.T) {
 		injector.arch = "386"
 		injector.opts = new(Options)
 		injector.ctx = &Context{
-			Mode: ModeCreateSection,
+			Mode: ModeCreateText,
 		}
 		err := injector.initAssembler()
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestRestoreContext(t *testing.T) {
 		injector.arch = "amd64"
 		injector.opts = new(Options)
 		injector.ctx = &Context{
-			Mode: ModeCreateSection,
+			Mode: ModeCreateText,
 		}
 		err := injector.initAssembler()
 		require.NoError(t, err)
