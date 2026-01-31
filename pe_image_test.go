@@ -44,7 +44,7 @@ func TestProcessIAT(t *testing.T) {
 	injector := NewInjector()
 
 	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x86.dat")
+		image, err := os.ReadFile("testdata/image_exe_x86.dat")
 		require.NoError(t, err)
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestProcessIAT(t *testing.T) {
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x64.dat")
+		image, err := os.ReadFile("testdata/image_exe_x64.dat")
 		require.NoError(t, err)
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
@@ -157,15 +157,15 @@ func TestRemoveLoadConfig(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCalculateChecksum(t *testing.T) {
+func TestCalculateCheckSum(t *testing.T) {
 	image, err := os.ReadFile("testdata/putty.dat")
 	require.NoError(t, err)
 	peFile, err := pe.NewFile(bytes.NewReader(image))
 	require.NoError(t, err)
 	hdr := peFile.OptionalHeader.(*pe.OptionalHeader64)
 
-	checksum := calculateChecksum(image)
-	require.Equal(t, hdr.CheckSum, checksum)
+	checkSum := calculateCheckSum(image)
+	require.Equal(t, hdr.CheckSum, checkSum)
 }
 
 func TestExtendSection(t *testing.T) {
@@ -173,7 +173,7 @@ func TestExtendSection(t *testing.T) {
 
 	t.Run("reuse", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			err = injector.preprocess(image, nil)
 			require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestExtendSection(t *testing.T) {
 		})
 
 		t.Run("x64", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			err = injector.preprocess(image, nil)
 			require.NoError(t, err)
@@ -217,7 +217,7 @@ func TestExtendSection(t *testing.T) {
 
 	t.Run("extend", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_x86.dat")
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
 			err = injector.preprocess(image, nil)
 			require.NoError(t, err)
@@ -238,7 +238,7 @@ func TestExtendSection(t *testing.T) {
 		})
 
 		t.Run("x64", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_x64.dat")
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
 			err = injector.preprocess(image, nil)
 			require.NoError(t, err)
@@ -267,7 +267,7 @@ func TestCreateSection(t *testing.T) {
 	injector := NewInjector()
 
 	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x86.dat")
+		image, err := os.ReadFile("testdata/image_exe_x86.dat")
 		require.NoError(t, err)
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
@@ -288,7 +288,7 @@ func TestCreateSection(t *testing.T) {
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/image_x64.dat")
+		image, err := os.ReadFile("testdata/image_exe_x64.dat")
 		require.NoError(t, err)
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
