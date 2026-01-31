@@ -58,9 +58,9 @@ type Injector struct {
 	engine *keystone.Engine
 
 	// context data
-	raw  bool
-	ctx  *Context
 	opts *Options
+	ctx  *Context
+	raw  bool
 	arch string
 	dll  bool
 	size uint32
@@ -218,12 +218,12 @@ type Context struct {
 	LoaderHex  string `json:"loader_hex"`
 	LoaderInst string `json:"loader_inst"`
 
-	Arch  string `json:"arch"`
-	IsEXE bool   `json:"is_exe"`
-	IsDLL bool   `json:"is_dll"`
-	Mode  string `json:"mode"`
-	IsRaw bool   `json:"is_raw"`
-	Seed  int64  `json:"seed"`
+	Arch string `json:"arch"`
+	Type string `json:"type"`
+	Size int64  `json:"size"`
+	Mode string `json:"mode"`
+	Raw  bool   `json:"raw"`
+	Seed int64  `json:"seed"`
 
 	SaveContext        bool   `json:"save_context"`
 	CreateThread       bool   `json:"create_thread"`
@@ -297,6 +297,7 @@ func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, err
 	}
 	inj.overwriteCheckSum()
 	inj.ctx.Output = inj.dup
+	inj.ctx.Size = int64(len(inj.dup))
 	// record loader assembly
 	binHex, insts := inj.disassembleLoader(loader)
 	inj.ctx.LoaderHex = binHex
@@ -348,6 +349,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	}
 	inj.overwriteCheckSum()
 	inj.ctx.Output = inj.dup
+	inj.ctx.Size = int64(len(inj.dup))
 	return inj.ctx, nil
 }
 
@@ -496,6 +498,13 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.arch = arch
 	inj.size = uint32(len(image)) // #nosec G115
 	inj.dll = isDLL
+	// set image type
+	var typ string
+	if isDLL {
+		typ = imageTypeDLL
+	} else {
+		typ = imageTypeEXE
+	}
 	// calculate common offset of image file
 	hdrOffset := binary.LittleEndian.Uint32(image[imageDOSHeader-4:])
 	fileHeader := hdrOffset + imageNTSignatureSize
@@ -540,10 +549,9 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 	inj.rand.Seed(seed)
 	// update context
 	inj.ctx = &Context{
-		Arch:  arch,
-		IsEXE: !isDLL,
-		IsDLL: isDLL,
-		Seed:  seed,
+		Arch: arch,
+		Type: typ,
+		Seed: seed,
 
 		SaveContext:    !opts.NotSaveContext,
 		CreateThread:   !opts.NotCreateThread,
@@ -746,7 +754,7 @@ func (inj *Injector) slice(shellcode []byte) error {
 	if !inj.raw {
 		inj.ctx.NumLoaderInst = len(segments)
 	}
-	inj.ctx.IsRaw = inj.raw
+	inj.ctx.Raw = inj.raw
 	return nil
 }
 
