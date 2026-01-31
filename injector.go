@@ -17,22 +17,38 @@ import (
 
 // support modes:
 //
-// 1. code cave
-// The loader and shellcode body are all injected to code caves.
-// It will only change the .text section.
+// [code cave]
+//   The Loader and Payload are all injected to code caves in .text section.
+//   It will only change the .text section content, not adjust the size.
+//   This is the most recommended mode, but enough code caves are needed.
 //
-// 2. extend section
-// The loader is injected to code caves.
-// The shellcode body is injected to the last section(extended).
-// It will change the .text section, adjust the last section
-// header and the OptionalHeader.SizeOfImage
+// [code cave with new section]
+//   The Loader is injected to code caves in .text section.
+//   The Payload is written to a new read-only section at the tail of image.
+//   It will only change the .text section content, not adjust the size.
+//   This is the next recommended mode, only enough code caves for loader.
 //
-// 3. create section
-// The loader and shellcode body are all injected to a new section.
-// It will change the .text section, create a new section, adjust
-// the FileHeader.NumberOfSections and OptionalHeader.SizeOfImage
+// [extend text section]
+//   Injector will try to extend .text section for write Loader and Payload.
+//   It will change the .text section content and adjust the size.
+//   {NOTICE}
+//   Extend text section maybe failed, so it is common recommended mode.
+//   The Payload must be small(1 KB), otherwise it will make the entropy of
+//   the .text section too high, if Payload is too large, use the next mode.
 //
-// All the modes will not adjust the size of .text section.
+// [extend text section with new section]
+//   Injector will try to extend .text section for write Loader.
+//   The Payload is written to a new read-only section at the tail of image.
+//   It will change the .text section content and adjust the size.
+//   {NOTICE}
+//   Extend text section maybe failed, so it is common recommended mode.
+//
+// [create text section]
+//   The Loader and Payload are all injected to a new RX section at the tail
+//   of image for test or decoy.
+//   It will only change the .text section content, not adjust the size.
+//   {NOTICE}
+//   NOT use this mode in the actual scene except create decoy.
 
 // these modes are used to display the mode that injector used.
 const (
@@ -175,7 +191,8 @@ type Options struct {
 	// reserve load config data directory like enable Control Flow Guard.
 	ReserveLoadConfig bool `toml:"reserve_load_config" json:"reserve_load_config"`
 
-	// specify the new section name, the default is ".patch".
+	// specify the new section name that will be created,
+	// if it is empty, select one random name in defaultSectionNames.
 	SectionName string `toml:"section_name" json:"section_name"`
 
 	// specify a random seed for test and debug.
@@ -221,8 +238,8 @@ type Context struct {
 	Arch string `json:"arch"`
 	Type string `json:"type"`
 	Size int64  `json:"size"`
-	Mode string `json:"mode"`
 	Raw  bool   `json:"raw"`
+	Mode string `json:"mode"`
 	Seed int64  `json:"seed"`
 
 	SaveContext        bool   `json:"save_context"`
