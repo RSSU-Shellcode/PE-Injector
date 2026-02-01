@@ -147,9 +147,11 @@ type loaderCtx struct {
 	NeedShellcodeJumper bool
 
 	// about inject mode
-	CodeCaveMode      bool
-	ExtendSectionMode bool
-	CreateSectionMode bool
+	CodeCaveMode     bool
+	CodeCaveNSMode   bool
+	ExtendTextMode   bool
+	ExtendTextNSMode bool
+	CreateTextMode   bool
 
 	// information of write payload
 	JumperOffset  uint32
@@ -211,9 +213,11 @@ func (inj *Injector) buildLoaderASM(loader string, payload []byte, process bool)
 		PAData: make(map[string]uint64),
 		PAKey:  make(map[string]uint64),
 
-		CodeCaveMode:      inj.opts.ForceCodeCave,
-		ExtendSectionMode: inj.opts.ForceExtendSection,
-		CreateSectionMode: inj.opts.ForceCreateSection,
+		CodeCaveMode:     inj.opts.ForceCodeCave,
+		CodeCaveNSMode:   inj.opts.ForceCodeCaveNS,
+		ExtendTextMode:   inj.opts.ForceExtendText,
+		ExtendTextNSMode: inj.opts.ForceExtendTextNS,
+		CreateTextMode:   inj.opts.ForceCreateText,
 
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
@@ -659,8 +663,10 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 	var counter int
 	for _, sw := range []bool{
 		inj.opts.ForceCodeCave,
-		inj.opts.ForceExtendSection,
-		inj.opts.ForceCreateSection,
+		inj.opts.ForceCodeCaveNS,
+		inj.opts.ForceExtendText,
+		inj.opts.ForceExtendTextNS,
+		inj.opts.ForceCreateText,
 	} {
 		if sw {
 			counter++
@@ -676,7 +682,7 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 	case "amd64":
 		maxNumLoaderInst = inj.getMaxNumLoaderInstX64()
 	}
-	if maxNumLoaderInst > len(inj.caves) || inj.opts.ForceCreateSection {
+	if maxNumLoaderInst > len(inj.caves) || inj.opts.ForceCreateText {
 		if inj.opts.ForceCodeCave {
 			return "", errors.New("not enough code caves for force code cave mode")
 		}
@@ -745,17 +751,31 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, loader string, payload []by
 	return strings.ReplaceAll(loader, codeCaveModeStub, stub)
 }
 
-func (inj *Injector) useExtendSectionMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+func (inj *Injector) useCodeCaveNSMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
 	payload = inj.encryptPayload(ctx, payload)
-	offset, err := inj.extendSection(payload)
+	section, err := inj.createROSection(inj.opts.SectionName, uint32(len(payload)))
 	if err != nil {
 		return "", err
 	}
-	ctx.ExtendSectionMode = true
-	ctx.PayloadOffset = offset
-	inj.ctx.Mode = ModeExtendSection
-	// remove the flag in assembly source
-	return strings.ReplaceAll(loader, codeCaveModeStub, ""), nil
+	// write encrypted payload
+	copy(inj.dup[section.Offset:], payload)
+	// update context
+	ctx.CodeCaveNSMode = true
+	ctx.PayloadOffset = section.VirtualAddress
+	inj.ctx.Mode = ModeCodeCaveNS
+	return removeCodeCaveModeStub(loader), nil
+}
+
+func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	ctx.ExtendTextMode = true
+	inj.ctx.Mode = ModeExtendText
+	return removeCodeCaveModeStub(loader), nil
+}
+
+func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	ctx.ExtendTextNSMode = true
+	inj.ctx.Mode = ModeExtendTextNS
+	return removeCodeCaveModeStub(loader), nil
 }
 
 func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
@@ -777,7 +797,7 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, loader string, payload
 	}
 	scOffset := uint32(loaderSize) + randomOffset // #nosec G115
 	size := scOffset + uint32(len(payload))       // #nosec G115
-	section, err := inj.createSection(inj.opts.SectionName, size)
+	section, err := inj.createSection(inj.opts.SectionName, size, sectionReadExecute)
 	if err != nil {
 		return "", err
 	}
@@ -786,11 +806,10 @@ func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, loader string, payload
 	_, _ = inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+scOffset])
 	// write encrypted payload
 	copy(inj.dup[section.Offset+scOffset:], payload)
-	ctx.CreateSectionMode = true
+	ctx.CreateTextMode = true
 	ctx.PayloadOffset = section.VirtualAddress + scOffset
-	inj.ctx.Mode = ModeCreateSection
-	// remove the flag in assembly source
-	return strings.ReplaceAll(loader, codeCaveModeStub, ""), nil
+	inj.ctx.Mode = ModeCreateText
+	return removeCodeCaveModeStub(loader), nil
 }
 
 func (inj *Injector) encryptPayload(ctx *loaderCtx, payload []byte) []byte {
@@ -845,10 +864,14 @@ func (inj *Injector) encryptPayload(ctx *loaderCtx, payload []byte) []byte {
 }
 
 func (inj *Injector) insertGarbageInst() string {
-	if inj.opts.NoGarbageInst || inj.ctx.Mode != ModeCreateSection {
+	if inj.opts.NoGarbageInst || inj.ctx.Mode != ModeCreateText {
 		return ""
 	}
 	return ";" + toDB(inj.garbageInst())
+}
+
+func removeCodeCaveModeStub(loader string) string {
+	return strings.ReplaceAll(loader, codeCaveModeStub, "")
 }
 
 func xorShift32(seed uint32) uint32 {
