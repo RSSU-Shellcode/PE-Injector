@@ -11,7 +11,7 @@ func TestGarbage(t *testing.T) {
 	injector := NewInjector()
 
 	opts := &Options{
-		ForceCreateSection: true,
+		ForceCreateText: true,
 	}
 
 	t.Run("x86", func(t *testing.T) {
