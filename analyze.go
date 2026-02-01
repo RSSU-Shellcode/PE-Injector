@@ -88,7 +88,7 @@ func Analyze(image []byte) (*AnalyzeInfo, error) {
 	hasLoadLibraryW := injector.getProcFromIAT("LoadLibraryW") != nil
 	hasGetProcAddress := injector.getProcFromIAT("GetProcAddress") != nil
 	var canCreateSection bool
-	_, err = injector.createSection(".test", 1024)
+	_, err = injector.createSectionRO(".test", 1024)
 	if err == nil {
 		canCreateSection = true
 	}
