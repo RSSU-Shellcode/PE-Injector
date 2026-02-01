@@ -52,9 +52,13 @@ import (
 
 // these modes are used to display the mode that injector used.
 const (
-	ModeCodeCave      = "code-cave"
+	ModeCodeCave     = "code-cave"
+	ModeCodeCaveNS   = "code-cave_ns"
+	ModeExtendText   = "extend-text"
+	ModeExtendTextNS = "extend-text_ns"
+	ModeCreateText   = "create-text"
+
 	ModeExtendSection = "extend-section"
-	ModeCreateSection = "create-section"
 )
 
 var (
@@ -198,18 +202,20 @@ type Options struct {
 	// specify a random seed for test and debug.
 	RandSeed int64 `toml:"rand_seed" json:"rand_seed"`
 
-	// force use code cave mode for write shellcode.
-	// if code cave is not enough, it will return an error.
+	// force use ModeCodeCave for inject shellcode.
 	ForceCodeCave bool `toml:"force_code_cave" json:"force_code_cave"`
 
-	// force extend the last section even if the number
-	// of code cave is enough for write shellcode.
-	// it is useless for method InjectRaw.
-	ForceExtendSection bool `toml:"force_extend_section" json:"force_extend_section"`
+	// force use ModeCodeCaveNS for inject shellcode.
+	ForceCodeCaveNS bool `toml:"force_code_cave_ns" json:"force_code_cave_ns"`
 
-	// force create a new section after the last section
-	// for write loader and shellcode.
-	ForceCreateSection bool `toml:"force_create_section" json:"force_create_section"`
+	// force use ModeExtendText for inject shellcode.
+	ForceExtendText bool `toml:"force_extend_text" json:"force_extend_text"`
+
+	// force use ModeExtendTextNS for inject shellcode.
+	ForceExtendTextNS bool `toml:"force_extend_text_ns" json:"force_extend_text_ns"`
+
+	// force use ModeCreateText for inject shellcode.
+	ForceCreateText bool `toml:"force_create_text" json:"force_create_text"`
 
 	// specify the x86 loader template.
 	LoaderX86 string `toml:"loader_x86" json:"loader_x86"`
@@ -351,10 +357,10 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 	shellcode = append(shellcode, endOfShellcode...)
 	// prepare force inject mode
 	opts = inj.opts
-	if opts.ForceCodeCave && opts.ForceCreateSection {
+	if opts.ForceCodeCave && opts.ForceCreateText {
 		return nil, errors.New("invalid force mode with shellcode source")
 	}
-	if opts.ForceCreateSection {
+	if opts.ForceCreateText {
 		err = inj.createSectionForRaw(len(shellcode))
 		if err != nil {
 			return nil, err
@@ -426,7 +432,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 		return err
 	}
 	if inj.section != nil {
-		inj.ctx.Mode = ModeCreateSection
+		inj.ctx.Mode = ModeCreateText
 		inj.padding(shellcode, targetRVA)
 		return nil
 	}
@@ -442,7 +448,7 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 	if inj.opts.ForceCodeCave {
 		return err
 	}
-	inj.ctx.Mode = ModeCreateSection
+	inj.ctx.Mode = ModeCreateText
 	// if failed, try to use create section mode
 	err = inj.createSectionForRaw(len(shellcode))
 	if err != nil {
@@ -980,7 +986,7 @@ func (inj *Injector) createSectionForRaw(size int) error {
 	if !inj.opts.NotSaveContext {
 		size += 1024
 	}
-	section, err := inj.createSection(inj.opts.SectionName, uint32(size)) // #nosec G115
+	section, err := inj.createSection(inj.opts.SectionName, uint32(size), sectionReadExecute) // #nosec G115
 	if err != nil {
 		return err
 	}
