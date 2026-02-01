@@ -225,6 +225,20 @@ func (inj *Injector) buildLoaderASM(loader string, payload []byte, process bool)
 
 		EndOfLoader: endOfShellcode,
 	}
+	if process {
+		var err error
+		loader, err = inj.processLoader(ctx, loader, payload)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		switch inj.arch {
+		case "386":
+			ctx.PayloadKey = inj.rand.Uint32()
+		case "amd64":
+			ctx.PayloadKey = inj.rand.Uint64()
+		}
+	}
 	err := inj.findProcFromIAT(ctx)
 	if err != nil {
 		return "", err
@@ -255,19 +269,6 @@ func (inj *Injector) buildLoaderASM(loader string, payload []byte, process bool)
 	inj.ctx.HasLoadLibraryA = hasLoadLibraryA
 	inj.ctx.HasLoadLibraryW = hasLoadLibraryW
 	inj.ctx.HasGetProcAddress = hasGetProcAddress
-	if process {
-		loader, err = inj.processLoader(ctx, loader, payload)
-		if err != nil {
-			return "", err
-		}
-	} else {
-		switch inj.arch {
-		case "386":
-			ctx.PayloadKey = inj.rand.Uint32()
-		case "amd64":
-			ctx.PayloadKey = inj.rand.Uint64()
-		}
-	}
 	// process loader template and assemble it
 	tpl, err := template.New("loader").Funcs(template.FuncMap{
 		"db":  toDB,
@@ -689,7 +690,7 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 		if inj.opts.ForceExtendSection {
 			return "", errors.New("not enough code caves for force extend section mode")
 		}
-		return inj.useCreateSectionMode(ctx, loader, payload)
+		return inj.useCreateTextMode(ctx, loader, payload)
 	}
 	if inj.opts.ForceExtendSection {
 		return inj.useExtendSectionMode(ctx, loader, payload)
@@ -767,6 +768,29 @@ func (inj *Injector) useCodeCaveNSMode(ctx *loaderCtx, loader string, payload []
 }
 
 func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	// calculate the loader size(approximation)
+	var maxNumInst int
+	switch inj.arch {
+	case "386":
+		maxNumInst = inj.getMaxNumLoaderInstX86()
+	case "amd64":
+		maxNumInst = inj.getMaxNumLoaderInstX64()
+	}
+	var loaderSize int
+	if inj.opts.NoGarbageInst {
+		loaderSize = maxNumInst * 16
+	} else {
+		loaderSize = maxNumInst * (16 + 16)
+	}
+	payload = inj.encryptPayload(ctx, payload)
+
+	randomBeginSize := uint32(inj.rand.Intn(64))  // #nosec G115
+	randomEndOffset := uint32(inj.rand.Intn(256)) // #nosec G115
+	payloadOffset := randomBeginSize + uint32(loaderSize) + randomEndOffset
+	size := payloadOffset + uint32(len(payload))
+
+	inj.extendTextSection()
+
 	ctx.ExtendTextMode = true
 	inj.ctx.Mode = ModeExtendText
 	return removeCodeCaveModeStub(loader), nil
@@ -778,9 +802,9 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	return removeCodeCaveModeStub(loader), nil
 }
 
-func (inj *Injector) useCreateSectionMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
 	payload = inj.encryptPayload(ctx, payload)
-	randomOffset := uint32(inj.rand.Intn(2048)) // #nosec G115
+	randomOffset := uint32(inj.rand.Intn(1024)) // #nosec G115
 	// calculate the loader size(approximation)
 	var maxNumInst int
 	switch inj.arch {
