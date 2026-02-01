@@ -754,7 +754,7 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, loader string, payload []by
 
 func (inj *Injector) useCodeCaveNSMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
 	payload = inj.encryptPayload(ctx, payload)
-	section, err := inj.createROSection(inj.opts.SectionName, uint32(len(payload)))
+	section, err := inj.createSectionRO(inj.opts.SectionName, uint32(len(payload)))
 	if err != nil {
 		return "", err
 	}
@@ -768,7 +768,7 @@ func (inj *Injector) useCodeCaveNSMode(ctx *loaderCtx, loader string, payload []
 }
 
 func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
-	// calculate the loader size(approximation)
+	// calculate the loader size (approximation)
 	var maxNumInst int
 	switch inj.arch {
 	case "386":
@@ -783,14 +783,20 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 		loaderSize = maxNumInst * (16 + 16)
 	}
 	payload = inj.encryptPayload(ctx, payload)
-
+	// calculate the section size (approximation)
 	randomBeginSize := uint32(inj.rand.Intn(64))  // #nosec G115
 	randomEndOffset := uint32(inj.rand.Intn(256)) // #nosec G115
 	payloadOffset := randomBeginSize + uint32(loaderSize) + randomEndOffset
 	size := payloadOffset + uint32(len(payload))
-
-	inj.extendTextSection()
-
+	output, err := inj.extendTextSection(size)
+	if err != nil {
+		return "", err
+	}
+	err = inj.preprocess(output, nil) // update internal status
+	if err != nil {
+		return "", err
+	}
+	ctx.PayloadOffset = inj.img.Sections[0].VirtualAddress + payloadOffset
 	ctx.ExtendTextMode = true
 	inj.ctx.Mode = ModeExtendText
 	return removeCodeCaveModeStub(loader), nil
@@ -821,7 +827,7 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	}
 	scOffset := uint32(loaderSize) + randomOffset // #nosec G115
 	size := scOffset + uint32(len(payload))       // #nosec G115
-	section, err := inj.createSection(inj.opts.SectionName, size, sectionReadExecute)
+	section, err := inj.createSectionRX(inj.opts.SectionName, size)
 	if err != nil {
 		return "", err
 	}
