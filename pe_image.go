@@ -32,6 +32,12 @@ const (
 	imageTypeDLL = "dll"
 )
 
+// about section characteristics
+const (
+	sectionReadExecute = 0x60000020
+	sectionReadOnly    = 0x40000040
+)
+
 var defaultSectionNames = []string{
 	".patch", ".code", ".test", ".init",
 	".dbg", ".debug", ".PAGE", ".CRT",
@@ -360,17 +366,19 @@ func (inj *Injector) extendSection(data []byte) (uint32, error) {
 
 // createSection is used to create a new section after the last section.
 // #nosec G115
-func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader, error) {
+func (inj *Injector) createSection(name string, size, char uint32) (*pe.SectionHeader, error) {
 	if len(inj.img.Sections) == 0 {
 		return nil, errors.New("no sections in pe image")
 	}
-	if name == "" {
+	switch {
+	case name == "":
 		idx := inj.rand.Intn(len(defaultSectionNames))
 		name = defaultSectionNames[idx]
+	case name == "*":
+		name = inj.generateRandomSectionName()
 	}
-	fSection := inj.img.Sections[0]
-	fhOffset := fSection.Offset
 	// calculate the offset about the end of last section header
+	fhOffset := inj.img.Sections[0].Offset
 	sctOffset := inj.offOptHdr + uint32(inj.img.SizeOfOptionalHeader)
 	shOffset := sctOffset + uint32((inj.img.NumberOfSections)*imageSectionHeaderSize)
 	if fhOffset-shOffset < imageSectionHeaderSize {
@@ -388,7 +396,7 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 		VirtualAddress:   last.VirtualAddress + inj.alignSection(last.VirtualSize),
 		SizeOfRawData:    inj.alignFile(size),
 		PointerToRawData: last.PointerToRawData + last.SizeOfRawData,
-		Characteristics:  0x60000020, // RX
+		Characteristics:  char,
 	}
 	copy(sh.Name[:], name)
 	writeStruct(inj.dup[shOffset:], sh)
@@ -433,6 +441,21 @@ func (inj *Injector) createSection(name string, size uint32) (*pe.SectionHeader,
 	// update context
 	inj.ctx.SectionName = name
 	return &nsh, nil
+}
+
+// generate random name like .abc .EDF
+func (inj *Injector) generateRandomSectionName() string {
+	var offset int
+	if inj.rand.Intn(2) == 0 {
+		offset = 'a'
+	} else {
+		offset = 'A'
+	}
+	name := "."
+	for i := 0; i < 3; i++ {
+		name += string(byte(offset + inj.rand.Intn(26)))
+	}
+	return name
 }
 
 // #nosec G115
