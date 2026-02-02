@@ -37,17 +37,18 @@ const (
 )
 
 var defaultSectionNames = []string{
-	".patch", ".code", ".test", ".init",
-	".dbg", ".debug", ".PAGE", ".CRT",
+	".patch", ".pth", ".code", ".test",
+	".debug", ".dbg", ".PAGE", ".CRT",
 }
 
 // Section contains the basic info of section.
 type Section struct {
-	Name            string `json:"name"`
-	VirtualAddress  uint32 `json:"virtual_address"`
-	VirtualSize     uint32 `json:"virtual_size"`
-	OffsetToRawData uint32 `json:"offset_to_raw_data"`
-	SizeOfRawData   uint32 `json:"size_of_raw_data"`
+	Name             string `json:"name"`
+	VirtualAddress   uint32 `json:"virtual_address"`
+	VirtualSize      uint32 `json:"virtual_size"`
+	PointerToRawData uint32 `json:"pointer_to_raw_data"`
+	SizeOfRawData    uint32 `json:"size_of_raw_data"`
+	Characteristics  uint32 `json:"characteristics"`
 }
 
 // Export contains export function address.
@@ -298,11 +299,11 @@ func calculateCheckSum(image []byte) uint32 {
 	return uint32(sum & 0xFFFFFFFF) // #nosec G115
 }
 
-func (inj *Injector) createROSection(name string, size uint32) (*pe.SectionHeader, error) {
+func (inj *Injector) createSectionRO(name string, size uint32) (*pe.SectionHeader, error) {
 	return inj.createSection(name, size, sectionReadOnly)
 }
 
-func (inj *Injector) createRXSection(name string, size uint32) (*pe.SectionHeader, error) {
+func (inj *Injector) createSectionRX(name string, size uint32) (*pe.SectionHeader, error) {
 	return inj.createSection(name, size, sectionReadExecute)
 }
 
