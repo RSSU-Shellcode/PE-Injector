@@ -67,11 +67,12 @@ func Analyze(image []byte) (*AnalyzeInfo, error) {
 	for i := 0; i < l; i++ {
 		sh := injector.img.Sections[i].SectionHeader
 		sections[i] = &Section{
-			Name:            sh.Name,
-			VirtualSize:     sh.VirtualSize,
-			VirtualAddress:  sh.VirtualAddress,
-			SizeOfRawData:   sh.Size,
-			OffsetToRawData: sh.Offset,
+			Name:             sh.Name,
+			VirtualAddress:   sh.VirtualAddress,
+			VirtualSize:      sh.VirtualSize,
+			PointerToRawData: sh.Offset,
+			SizeOfRawData:    sh.Size,
+			Characteristics:  sh.Characteristics,
 		}
 	}
 	l = len(injector.eat)
