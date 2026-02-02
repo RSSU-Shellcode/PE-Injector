@@ -22,7 +22,7 @@ func TestScanCodeCave(t *testing.T) {
 
 		fmt.Println(len(caves))
 		for _, cave := range caves {
-			fmt.Println(cave.virtualAddr, cave.pointerToRaw, cave.size)
+			fmt.Println(cave.va, cave.off, cave.size)
 		}
 
 		require.Equal(t, 435, len(caves))
@@ -39,7 +39,7 @@ func TestScanCodeCave(t *testing.T) {
 
 		fmt.Println(len(caves))
 		for _, cave := range caves {
-			fmt.Println(cave.virtualAddr, cave.pointerToRaw, cave.size)
+			fmt.Println(cave.va, cave.off, cave.size)
 		}
 
 		require.Equal(t, 1557, len(caves))
