@@ -80,7 +80,6 @@ type Injector struct {
 	// context data
 	opts *Options
 	ctx  *Context
-	raw  bool
 	arch string
 	dll  bool
 	size uint32
@@ -115,6 +114,9 @@ type Injector struct {
 
 	// try to extend text section
 	canTryExtend bool
+
+	// record loader size for process
+	loaderSize int
 
 	// about create section mode
 	section *pe.SectionHeader
@@ -308,8 +310,6 @@ func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, err
 		_ = inj.engine.Close()
 		inj.engine = nil
 	}()
-	// set method flag
-	inj.raw = false
 	loader, err := inj.buildLoader(payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
@@ -350,8 +350,6 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		_ = inj.engine.Close()
 		inj.engine = nil
 	}()
-	// set raw flag
-	inj.raw = true
 	// auto append the mark about end of shellcode
 	shellcode = bytes.Clone(shellcode)
 	shellcode = append(shellcode, endOfShellcode...)
@@ -421,13 +419,13 @@ func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
 		if first == nil {
 			return errors.New("not enough code caves for inject shellcode")
 		}
-		dstRVA = first.virtualAddr
+		dstRVA = first.va
 	}
 	err = inj.hook(targetRVA, dstRVA)
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
-	err = inj.slice(shellcode)
+	err = inj.slice(shellcode, raw)
 	if err != nil {
 		return err
 	}
@@ -681,7 +679,7 @@ func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 func (inj *Injector) selectFirstCodeCave(target uint32) *codeCave {
 	var first *codeCave
 	for i, cave := range inj.caves {
-		offset := int64(cave.virtualAddr) - int64(target)
+		offset := int64(cave.va) - int64(target)
 		if offset <= 4096 && offset >= -4096 {
 			first = cave
 			inj.removeCodeCave(i)
@@ -759,7 +757,7 @@ func (inj *Injector) calcInstNumAndSize(insts []*x86asm.Inst) (int, int, error) 
 }
 
 // slice will disassemble shellcode and return a slice of instruction segment.
-func (inj *Injector) slice(shellcode []byte) error {
+func (inj *Injector) slice(shellcode []byte, raw bool) error {
 	insts, err := inj.disassemble(shellcode)
 	if err != nil {
 		return fmt.Errorf("failed to disassemble shellcode: %s", err)
@@ -774,10 +772,10 @@ func (inj *Injector) slice(shellcode []byte) error {
 	}
 	inj.segment = segments
 	// update context
-	if !inj.raw {
+	if !raw {
 		inj.ctx.NumLoaderInst = len(segments)
 	}
-	inj.ctx.Raw = inj.raw
+	inj.ctx.Raw = raw
 	return nil
 }
 
@@ -803,7 +801,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		inst := saveContext[i]
 		size := uint32(len(inst))
 		// build jmp instruction to next code cave
-		rel := int64(next.virtualAddr) - int64(current.virtualAddr+size) - nearJumpSize
+		rel := int64(next.va) - int64(current.va+size) - nearJumpSize
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
@@ -843,14 +841,14 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		}
 		// check it is contained the image base stub
 		if bytes.Contains(segment, imageBaseStub) {
-			addr := ccLi[i-2].virtualAddr + 5
+			addr := ccLi[i-2].va + 5
 			buf := make([]byte, 4)
 			binary.LittleEndian.PutUint32(buf, addr)
 			segment = bytes.ReplaceAll(segment, imageBaseStub, buf)
 		}
 		// check it is the end of the shellcode
 		if bytes.Equal(segment, endOfShellcode) {
-			rel := int64(current.virtualAddr) - int64(c.virtualAddr) - nearJumpSize
+			rel := int64(current.va) - int64(c.va) - nearJumpSize
 			jmp := make([]byte, nearJumpSize)
 			jmp[0] = 0xE9
 			binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
@@ -858,7 +856,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			continue
 		}
 		// build jmp instruction to next code cave
-		rel := int64(n.virtualAddr) - int64(c.virtualAddr+size) - nearJumpSize
+		rel := int64(n.va) - int64(c.va+size) - nearJumpSize
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
@@ -871,7 +869,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		inst := restoreContext[i]
 		size := uint32(len(inst))
 		// build jmp instruction to next code cave
-		rel := int64(next.virtualAddr) - int64(current.virtualAddr+size) - nearJumpSize
+		rel := int64(next.va) - int64(current.va+size) - nearJumpSize
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
@@ -891,14 +889,14 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			return errors.New("appear too large original instruction in patch")
 		}
 		// relocate instruction
-		offset := int64(current.virtualAddr) - int64(targetRVA+offTarget)
+		offset := int64(current.va) - int64(targetRVA+offTarget)
 		inst = inj.relocateInstruction(inst, offset)
 		// build jmp instruction to next code cave or original instruction
 		var rel int64
 		if i != len(inj.oriInst)-1 {
-			rel = int64(next.virtualAddr) - int64(current.virtualAddr+size) - nearJumpSize
+			rel = int64(next.va) - int64(current.va+size) - nearJumpSize
 		} else {
-			rel = int64(inj.retRVA) - int64(current.virtualAddr+size) - nearJumpSize
+			rel = int64(inj.retRVA) - int64(current.va+size) - nearJumpSize
 		}
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
@@ -964,8 +962,8 @@ func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave)
 		panic(err)
 	}
 	// calculate the two code cave offset
-	vDst := int64(inj.ccList[dst].virtualAddr)
-	vSrc := int64(current.virtualAddr + uint32(inst.Len))
+	vDst := int64(inj.ccList[dst].va)
+	vSrc := int64(current.va + uint32(inst.Len))
 	offset := vSrc - vDst + int64(rel)
 	// calculate the last offset and relocate instruction
 	return inj.relocateInstruction(segment, offset)
@@ -986,7 +984,7 @@ func (inj *Injector) createSectionForRaw(size int) error {
 	if !inj.opts.NotSaveContext {
 		size += 1024
 	}
-	section, err := inj.createSection(inj.opts.SectionName, uint32(size), sectionReadExecute) // #nosec G115
+	section, err := inj.createSectionRX(inj.opts.SectionName, uint32(size)) // #nosec G115
 	if err != nil {
 		return err
 	}
