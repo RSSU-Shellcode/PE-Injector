@@ -14,16 +14,16 @@ const (
 )
 
 type codeCave struct {
-	virtualAddr  uint32
-	pointerToRaw uint32
-	size         int
+	va   uint32 // VirtualAddress
+	off  uint32 // PointerToRawData
+	size int
 }
 
 func (c *codeCave) Write(img, data []byte) {
 	if len(data) > c.size {
 		panic("data length is grater than code cave size")
 	}
-	copy(img[c.pointerToRaw:], data)
+	copy(img[c.off:], data)
 }
 
 func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
@@ -67,7 +67,7 @@ func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 }
 
 // #nosec G115
-func (inj *Injector) scanSection(section []byte, va, raw uint32) []*codeCave {
+func (inj *Injector) scanSection(section []byte, va, off uint32) []*codeCave {
 	var expCaveSize int
 	switch inj.arch {
 	case "386":
@@ -111,9 +111,9 @@ func (inj *Injector) scanSection(section []byte, va, raw uint32) []*codeCave {
 		}
 		if caveSize == expSize {
 			caves = append(caves, &codeCave{
-				virtualAddr:  va + uint32(address+reserve),
-				pointerToRaw: raw + uint32(address+reserve),
-				size:         caveSize - reserve,
+				va:   va + uint32(address+reserve),
+				off:  off + uint32(address+reserve),
+				size: caveSize - reserve,
 			})
 		}
 		address += caveSize
