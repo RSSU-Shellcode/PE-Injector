@@ -2,14 +2,15 @@ package injector
 
 import (
 	"fmt"
-	"strings"
 )
 
 // InspectConfig contains configuration about inspect loader template.
 type InspectConfig struct {
-	CodeCaveMode      bool `toml:"code_cave_mode"      json:"code_cave_mode"`
-	ExtendSectionMode bool `toml:"extend_section_mode" json:"extend_section_mode"`
-	CreateSectionMode bool `toml:"create_section_mode" json:"create_section_mode"`
+	CodeCaveMode     bool `toml:"code_cave_mode"      json:"code_cave_mode"`
+	CodeCaveNSMode   bool `toml:"code_cave_ns_mode"   json:"code_cave_ns_mode"`
+	ExtendTextMode   bool `toml:"extend_text_mode"    json:"extend_text_mode"`
+	ExtendTextNSMode bool `toml:"extend_text_ns_mode" json:"extend_text_ns_mode"`
+	CreateTextMode   bool `toml:"create_text_mode"    json:"create_text_mode"`
 
 	HasVirtualAlloc        bool `toml:"has_virtual_alloc"          json:"has_virtual_alloc"`
 	HasVirtualFree         bool `toml:"has_virtual_free"           json:"has_virtual_free"`
@@ -17,6 +18,7 @@ type InspectConfig struct {
 	HasCreateThread        bool `toml:"has_create_thread"          json:"has_create_thread"`
 	HasWaitForSingleObject bool `toml:"has_wait_for_single_object" json:"has_wait_for_single_object"`
 	HasLoadLibraryA        bool `toml:"has_load_library_a"         json:"has_load_library_a"`
+	HasLoadLibraryW        bool `toml:"has_load_library_w"         json:"has_load_library_w"`
 }
 
 // InspectLoaderTemplate is used to inspect loader template.
@@ -31,17 +33,19 @@ func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, [
 	injector.opts = &Options{
 		NoGarbageInst: true,
 
-		ForceCodeCave:      cfg.CodeCaveMode,
-		ForceExtendSection: cfg.ExtendSectionMode,
-		ForceCreateSection: cfg.CreateSectionMode,
+		ForceCodeCave:     cfg.CodeCaveMode,
+		ForceCodeCaveNS:   cfg.CodeCaveNSMode,
+		ForceExtendText:   cfg.ExtendTextMode,
+		ForceExtendTextNS: cfg.ExtendTextNSMode,
+		ForceCreateText:   cfg.CreateTextMode,
 	}
 	injector.ctx = new(Context)
 	injector.dup = make([]byte, 16*1024)
 	injector.caves = []*codeCave{
 		{
-			virtualAddr:  0x10000,
-			pointerToRaw: 0x1000,
-			size:         32,
+			va:   0x10000,
+			off:  0x1000,
+			size: 32,
 		},
 	}
 	injector.iat = buildFakeIATList(cfg)
@@ -50,8 +54,8 @@ func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, [
 		return "", nil, err
 	}
 	// build loader assembly source
-	template = strings.ReplaceAll(template, codeCaveModeStub, "")
-	asm, err := injector.buildLoaderASM(template, nil, false)
+	template = removeCodeCaveModeStub(template)
+	asm, err := injector.generateLoader(template, nil, false)
 	if err != nil {
 		return "", nil, err
 	}
@@ -151,7 +155,8 @@ func buildFakeIATList(cfg *InspectConfig) []*iat {
 			proc: "LoadLibraryA",
 			rva:  0x7000,
 		})
-	} else {
+	}
+	if cfg.HasLoadLibraryW {
 		list = append(list, &iat{
 			dll:  "kernel32.dll",
 			proc: "LoadLibraryW",
