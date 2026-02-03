@@ -37,6 +37,8 @@ const (
 	defaultMaxNumLoaderInstX64 = 300
 )
 
+const reservedNumCodeCaves = 8
+
 // The role of the payload loader is used to decrypt payload
 // in the tail section to a new RWX page, then create thread at
 // the decrypted payload(default loader template).
@@ -689,15 +691,12 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 		}
 	}
 	if counter > 1 {
-		return "", errors.New("invalid force mode with payload source")
+		return "", errors.New("set too many force mode in options")
 	}
-	var maxNumLoaderInst int
-	switch inj.arch {
-	case "386":
-		maxNumLoaderInst = inj.getMaxNumLoaderInstX86()
-	case "amd64":
-		maxNumLoaderInst = inj.getMaxNumLoaderInstX64()
+	if counter == 1 {
+		return inj.useForceMode(ctx, loader, payload)
 	}
+
 	if maxNumLoaderInst > len(inj.caves) || inj.opts.ForceCreateText {
 		if inj.opts.ForceCodeCave {
 			return "", errors.New("not enough code caves for force code cave mode")
@@ -711,18 +710,7 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 		return inj.useExtendSectionMode(ctx, loader, payload)
 	}
 	// check can use code cave mode
-	var numCaves int
-	switch inj.arch {
-	case "386":
-		numCaves = (len(payload)/4 + 1) * numInstForCopyPayload
-		numCaves += maxNumLoaderInst
-	case "amd64":
-		numCaves = (len(payload)/8 + 1) * numInstForCopyPayload
-		numCaves += maxNumLoaderInst
-	}
-	if numCaves < len(inj.caves) {
-		return inj.useCodeCaveMode(ctx, loader, payload), nil
-	}
+
 	// if the number of code caves is not enough
 	if inj.opts.ForceCodeCave {
 		return "", errors.New("not enough code caves for force code cave mode")
@@ -730,7 +718,43 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 	return inj.useExtendSectionMode(ctx, loader, payload)
 }
 
-func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, loader string, payload []byte) string {
+func (inj *Injector) useForceMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	switch {
+	case inj.opts.ForceCodeCave:
+		return inj.useCodeCaveMode(ctx, loader, payload)
+	case inj.opts.ForceCodeCaveNS:
+		return inj.useCodeCaveNSMode(ctx, loader, payload)
+	case inj.opts.ForceExtendText:
+		return inj.useExtendTextMode(ctx, loader, payload)
+	case inj.opts.ForceExtendTextNS:
+		return inj.useExtendTextNSMode(ctx, loader, payload)
+	case inj.opts.ForceCreateText:
+		return inj.useCreateTextMode(ctx, loader, payload)
+	default:
+		panic("unreachable code")
+	}
+}
+
+func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	// check can use this mode
+	var maxNumLoaderInst int
+	switch inj.arch {
+	case "386":
+		maxNumLoaderInst = inj.getMaxNumLoaderInstX86()
+	case "amd64":
+		maxNumLoaderInst = inj.getMaxNumLoaderInstX64()
+	}
+	var numInsts int
+	switch inj.arch {
+	case "386":
+		numInsts = (len(payload)/4 + 1) * numInstForCopyPayload
+	case "amd64":
+		numInsts = (len(payload)/8 + 1) * numInstForCopyPayload
+	}
+	numInsts += maxNumLoaderInst
+	if numInsts > len(inj.caves)-reservedNumCodeCaves {
+		return "", errors.New("not enough code caves for code cave mode")
+	}
 	// generate assembly source
 	var stub string
 	switch inj.arch {
@@ -764,10 +788,21 @@ func (inj *Injector) useCodeCaveMode(ctx *loaderCtx, loader string, payload []by
 	ctx.CodeCaveMode = true
 	inj.ctx.Mode = ModeCodeCave
 	// replace the flag to assembly source
-	return strings.ReplaceAll(loader, codeCaveModeStub, stub)
+	return strings.ReplaceAll(loader, codeCaveModeStub, stub), nil
 }
 
 func (inj *Injector) useCodeCaveNSMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	// check can use this mode
+	var maxNumLoaderInst int
+	switch inj.arch {
+	case "386":
+		maxNumLoaderInst = inj.getMaxNumLoaderInstX86()
+	case "amd64":
+		maxNumLoaderInst = inj.getMaxNumLoaderInstX64()
+	}
+	if maxNumLoaderInst > len(inj.caves)-reservedNumCodeCaves {
+		return "", errors.New("not enough code caves for code cave with new section mode")
+	}
 	payload = inj.encryptPayload(ctx, payload)
 	section, err := inj.createSectionRO(inj.opts.SectionName, uint32(len(payload)))
 	if err != nil {
