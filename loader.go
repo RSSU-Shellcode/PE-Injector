@@ -37,7 +37,10 @@ const (
 	defaultMaxNumLoaderInstX64 = 300
 )
 
-const reservedNumCodeCaves = 8
+const (
+	reservedNumCodeCaves  = 8
+	extendTextNSThreshold = 1024
+)
 
 // The role of the payload loader is used to decrypt payload
 // in the tail section to a new RWX page, then create thread at
@@ -696,26 +699,31 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 	if counter == 1 {
 		return inj.useForceMode(ctx, loader, payload)
 	}
-
-	if maxNumLoaderInst > len(inj.caves) || inj.opts.ForceCreateText {
-		if inj.opts.ForceCodeCave {
-			return "", errors.New("not enough code caves for force code cave mode")
+	// try to use these modes in the following order
+	// 1. CodeCave
+	// 2. CodeCaveNS
+	// 3. ExtendText or ExtendTextNS
+	// 4. CreateText
+	loader, err := inj.useCodeCaveMode(ctx, loader, payload)
+	if err == nil {
+		return loader, nil
+	}
+	loader, err = inj.useCodeCaveNSMode(ctx, loader, payload)
+	if err == nil {
+		return loader, nil
+	}
+	if len(payload) <= extendTextNSThreshold {
+		loader, err = inj.useExtendTextMode(ctx, loader, payload)
+		if err == nil {
+			return loader, nil
 		}
-		if inj.opts.ForceExtendSection {
-			return "", errors.New("not enough code caves for force extend section mode")
+	} else {
+		loader, err = inj.useExtendTextNSMode(ctx, loader, payload)
+		if err == nil {
+			return loader, nil
 		}
-		return inj.useCreateTextMode(ctx, loader, payload)
 	}
-	if inj.opts.ForceExtendSection {
-		return inj.useExtendSectionMode(ctx, loader, payload)
-	}
-	// check can use code cave mode
-
-	// if the number of code caves is not enough
-	if inj.opts.ForceCodeCave {
-		return "", errors.New("not enough code caves for force code cave mode")
-	}
-	return inj.useExtendSectionMode(ctx, loader, payload)
+	return inj.useCreateTextMode(ctx, loader, payload)
 }
 
 func (inj *Injector) useForceMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
@@ -921,7 +929,6 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	if err != nil {
 		return "", err
 	}
-	inj.section = section
 	// write encrypted payload
 	copy(inj.dup[section.Offset+payloadOffset:], payload)
 	// update context
