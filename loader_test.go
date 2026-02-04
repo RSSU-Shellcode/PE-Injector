@@ -17,32 +17,58 @@ func TestLoader(t *testing.T) {
 		RandSeed:       1234,
 	}
 
-	t.Run("auto mode", func(t *testing.T) {
+	t.Run("automatic", func(t *testing.T) {
 		opts.ForceCodeCave = false
-		opts.ForceExtendSection = false
-		opts.ForceCreateSection = false
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = false
 		testLoader(t, injector, opts, "auto")
 	})
 
-	t.Run("code cave mode", func(t *testing.T) {
+	t.Run("code cave", func(t *testing.T) {
 		opts.ForceCodeCave = true
-		opts.ForceExtendSection = false
-		opts.ForceCreateSection = false
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = false
 		testLoader(t, injector, opts, ModeCodeCave)
 	})
 
-	t.Run("extend section mode", func(t *testing.T) {
+	t.Run("code cave with new section", func(t *testing.T) {
 		opts.ForceCodeCave = false
-		opts.ForceExtendSection = true
-		opts.ForceCreateSection = false
-		testLoader(t, injector, opts, ModeExtendSection)
+		opts.ForceCodeCaveNS = true
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = false
+		testLoader(t, injector, opts, ModeCodeCaveNS)
 	})
 
-	t.Run("create section mode", func(t *testing.T) {
+	t.Run("extend text section", func(t *testing.T) {
 		opts.ForceCodeCave = false
-		opts.ForceExtendSection = false
-		opts.ForceCreateSection = true
-		testLoader(t, injector, opts, ModeCreateSection)
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = true
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = false
+		testLoader(t, injector, opts, ModeExtendText)
+	})
+
+	t.Run("extend text with new section", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = true
+		opts.ForceCreateText = false
+		testLoader(t, injector, opts, ModeExtendTextNS)
+	})
+
+	t.Run("create text section", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = true
+		testLoader(t, injector, opts, ModeCreateText)
 	})
 
 	err := injector.Close()
@@ -54,9 +80,10 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 		if opts.ForceCodeCave {
 			return
 		}
-		mode := mode
-		if mode == "auto" {
-			mode = ModeExtendSection
+
+		expected := mode
+		if expected == "auto" {
+			expected = ModeExtendText
 		}
 
 		image, err := os.ReadFile("testdata/image_exe_x86.dat")
@@ -66,7 +93,7 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
-		require.Equal(t, mode, ctx.Mode)
+		require.Equal(t, expected, ctx.Mode)
 		fmt.Println(ctx.LoaderHex)
 		fmt.Println(ctx.LoaderInst)
 
@@ -74,9 +101,9 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		mode := mode
-		if mode == "auto" {
-			mode = ModeCodeCave
+		expected := mode
+		if expected == "auto" {
+			expected = ModeCodeCave
 		}
 
 		image, err := os.ReadFile("testdata/image_exe_x64.dat")
@@ -86,7 +113,7 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
-		require.Equal(t, mode, ctx.Mode)
+		require.Equal(t, expected, ctx.Mode)
 		fmt.Println(ctx.LoaderHex)
 		fmt.Println(ctx.LoaderInst)
 
