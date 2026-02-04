@@ -95,15 +95,15 @@ func TestRemoveSignature(t *testing.T) {
 		check()
 	})
 
-	t.Run("extend section", func(t *testing.T) {
-		_, err = injector.extendSection(bytes.Repeat([]byte{0x10}, 4096))
+	t.Run("extend text", func(t *testing.T) {
+		_, err = injector.ExtendTextSection(image, 8192)
 		require.NoError(t, err)
 
 		check()
 	})
 
 	t.Run("create section", func(t *testing.T) {
-		_, err = injector.createSection(".test", 4096)
+		_, err = injector.createSectionRO(".test", 4096)
 		require.NoError(t, err)
 
 		check()
@@ -139,15 +139,15 @@ func TestRemoveLoadConfig(t *testing.T) {
 		check()
 	})
 
-	t.Run("extend section", func(t *testing.T) {
-		_, err = injector.extendSection(bytes.Repeat([]byte{0x10}, 4096))
+	t.Run("extend text", func(t *testing.T) {
+		_, err = injector.ExtendTextSection(image, 8192)
 		require.NoError(t, err)
 
 		check()
 	})
 
 	t.Run("create section", func(t *testing.T) {
-		_, err = injector.createSection(".test", 4096)
+		_, err = injector.createSectionRO(".test", 4096)
 		require.NoError(t, err)
 
 		check()
@@ -168,101 +168,6 @@ func TestCalculateCheckSum(t *testing.T) {
 	require.Equal(t, hdr.CheckSum, checkSum)
 }
 
-func TestExtendSection(t *testing.T) {
-	injector := NewInjector()
-
-	t.Run("reuse", func(t *testing.T) {
-		t.Run("x86", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_exe_x86.dat")
-			require.NoError(t, err)
-			err = injector.preprocess(image, nil)
-			require.NoError(t, err)
-
-			data := []byte("Hello Injector!")
-			rva, err := injector.extendSection(data)
-			require.NoError(t, err)
-			fmt.Printf("rva: 0x%X\n", rva)
-
-			output := injector.dup
-			peFile, err := pe.NewFile(bytes.NewReader(output))
-			require.NoError(t, err)
-			last := peFile.Sections[len(peFile.Sections)-1]
-			require.Less(t, last.VirtualSize, uint32(512))
-			require.Equal(t, last.Size, uint32(512))
-
-			testExecuteEXE(t, "testdata/injected_x86.exe", output)
-		})
-
-		t.Run("x64", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_exe_x64.dat")
-			require.NoError(t, err)
-			err = injector.preprocess(image, nil)
-			require.NoError(t, err)
-
-			data := []byte("Hello Injector!")
-			rva, err := injector.extendSection(data)
-			require.NoError(t, err)
-			fmt.Printf("rva: 0x%X\n", rva)
-
-			output := injector.dup
-			peFile, err := pe.NewFile(bytes.NewReader(output))
-			require.NoError(t, err)
-			last := peFile.Sections[len(peFile.Sections)-1]
-			require.Less(t, last.VirtualSize, uint32(512))
-			require.Equal(t, last.Size, uint32(512))
-
-			testExecuteEXE(t, "testdata/injected_x64.exe", output)
-		})
-	})
-
-	t.Run("extend", func(t *testing.T) {
-		t.Run("x86", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_exe_x86.dat")
-			require.NoError(t, err)
-			err = injector.preprocess(image, nil)
-			require.NoError(t, err)
-
-			data := bytes.Repeat([]byte("Hello Injector!"), 1024)
-			rva, err := injector.extendSection(data)
-			require.NoError(t, err)
-			fmt.Printf("rva: 0x%X\n", rva)
-
-			output := injector.dup
-			peFile, err := pe.NewFile(bytes.NewReader(output))
-			require.NoError(t, err)
-			last := peFile.Sections[len(peFile.Sections)-1]
-			require.Greater(t, last.VirtualSize, uint32(len(data)))
-			require.Greater(t, last.Size, uint32(len(data)))
-
-			testExecuteEXE(t, "testdata/injected_x86.exe", output)
-		})
-
-		t.Run("x64", func(t *testing.T) {
-			image, err := os.ReadFile("testdata/image_exe_x64.dat")
-			require.NoError(t, err)
-			err = injector.preprocess(image, nil)
-			require.NoError(t, err)
-
-			data := bytes.Repeat([]byte("Hello Injector!"), 1024)
-			rva, err := injector.extendSection(data)
-			require.NoError(t, err)
-			fmt.Printf("rva: 0x%X\n", rva)
-
-			output := injector.dup
-			peFile, err := pe.NewFile(bytes.NewReader(output))
-			require.NoError(t, err)
-			last := peFile.Sections[len(peFile.Sections)-1]
-			require.Greater(t, last.VirtualSize, uint32(len(data)))
-			require.Greater(t, last.Size, uint32(len(data)))
-
-			testExecuteEXE(t, "testdata/injected_x64.exe", output)
-		})
-	})
-
-	err := injector.Close()
-	require.NoError(t, err)
-}
-
 func TestCreateSection(t *testing.T) {
 	injector := NewInjector()
 
@@ -272,7 +177,7 @@ func TestCreateSection(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		sh, err := injector.createSection(".patch", 666)
+		sh, err := injector.createSectionRO(".patch", 666)
 		require.NoError(t, err)
 		spew.Dump(sh)
 
@@ -282,7 +187,7 @@ func TestCreateSection(t *testing.T) {
 		output := injector.dup
 		peFile, err := pe.NewFile(bytes.NewReader(output))
 		require.NoError(t, err)
-		require.Greater(t, peFile.NumberOfSections, injector.img.NumberOfSections)
+		require.Equal(t, peFile.NumberOfSections+1, injector.img.NumberOfSections)
 
 		testExecuteEXE(t, "testdata/injected_x86.exe", output)
 	})
@@ -293,7 +198,7 @@ func TestCreateSection(t *testing.T) {
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
 
-		sh, err := injector.createSection(".patch", 666)
+		sh, err := injector.createSectionRO(".patch", 666)
 		require.NoError(t, err)
 		spew.Dump(sh)
 
@@ -303,7 +208,7 @@ func TestCreateSection(t *testing.T) {
 		output := injector.dup
 		peFile, err := pe.NewFile(bytes.NewReader(output))
 		require.NoError(t, err)
-		require.Greater(t, peFile.NumberOfSections, injector.img.NumberOfSections)
+		require.Equal(t, peFile.NumberOfSections+1, injector.img.NumberOfSections)
 
 		testExecuteEXE(t, "testdata/injected_x64.exe", output)
 	})
