@@ -723,7 +723,11 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 			return loader, nil
 		}
 	}
-	return inj.useCreateTextMode(ctx, loader, payload)
+	loader, err = inj.useCreateTextMode(ctx, loader, payload)
+	if err == nil {
+		return loader, nil
+	}
+	return "", errors.New("unable to select any mode for build loader")
 }
 
 func (inj *Injector) useForceMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
