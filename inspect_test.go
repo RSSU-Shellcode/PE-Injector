@@ -11,10 +11,12 @@ import (
 func TestInspectLoaderTemplate(t *testing.T) {
 	var configs []*InspectConfig
 	config := InspectConfig{}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		config.CodeCaveMode = i == 0
-		config.ExtendSectionMode = i == 1
-		config.CreateSectionMode = i == 2
+		config.CodeCaveNSMode = i == 1
+		config.ExtendTextMode = i == 2
+		config.ExtendTextNSMode = i == 3
+		config.CreateTextMode = i == 4
 
 		for i1 := 0; i1 < 2; i1++ {
 			config.HasVirtualAlloc = i1 == 0
@@ -26,11 +28,21 @@ func TestInspectLoaderTemplate(t *testing.T) {
 						config.HasCreateThread = i4 == 0
 						for i5 := 0; i5 < 2; i5++ {
 							config.HasWaitForSingleObject = i5 == 0
-							for i6 := 0; i6 < 2; i6++ {
-								config.HasLoadLibraryA = i6 == 0
-								cp := config
-								configs = append(configs, &cp)
-							}
+
+							config.HasLoadLibraryA = true
+							config.HasLoadLibraryW = false
+							cp := config
+							configs = append(configs, &cp)
+
+							config.HasLoadLibraryA = false
+							config.HasLoadLibraryW = true
+							cp = config
+							configs = append(configs, &cp)
+
+							config.HasLoadLibraryA = true
+							config.HasLoadLibraryW = true
+							cp = config
+							configs = append(configs, &cp)
 						}
 					}
 				}
