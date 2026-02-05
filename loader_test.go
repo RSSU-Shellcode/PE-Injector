@@ -1,6 +1,8 @@
 package injector
 
 import (
+	"bytes"
+	"debug/pe"
 	"fmt"
 	"os"
 	"testing"
@@ -17,7 +19,7 @@ func TestLoader(t *testing.T) {
 		RandSeed:       1234,
 	}
 
-	t.Run("automatic", func(t *testing.T) {
+	t.Run("auto", func(t *testing.T) {
 		opts.ForceCodeCave = false
 		opts.ForceCodeCaveNS = false
 		opts.ForceExtendText = false
@@ -98,6 +100,7 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 		fmt.Println(ctx.LoaderInst)
 
 		testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
+		testCheckOutput(t, image, ctx.Output, ctx.Mode)
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -118,7 +121,35 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 		fmt.Println(ctx.LoaderInst)
 
 		testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
+		testCheckOutput(t, image, ctx.Output, ctx.Mode)
 	})
+}
+
+func testCheckOutput(t *testing.T, origin, output []byte, mode string) {
+	ori, err := pe.NewFile(bytes.NewReader(origin))
+	require.NoError(t, err)
+	out, err := pe.NewFile(bytes.NewReader(output))
+	require.NoError(t, err)
+	switch mode {
+	case ModeCodeCave:
+		require.Equal(t, ori, out)
+	case ModeCodeCaveNS:
+		require.Equal(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
+		require.Equal(t, ori.Sections[0].Size, out.Sections[0].Size)
+		require.Equal(t, len(ori.Sections)+1, len(out.Sections))
+	case ModeExtendText:
+		require.Less(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
+		require.Less(t, ori.Sections[0].Size, out.Sections[0].Size)
+		require.Equal(t, len(ori.Sections), len(out.Sections))
+	case ModeExtendTextNS:
+		require.Less(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
+		require.Less(t, ori.Sections[0].Size, out.Sections[0].Size)
+		require.Equal(t, len(ori.Sections)+1, len(out.Sections))
+	case ModeCreateText:
+		require.Equal(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
+		require.Equal(t, ori.Sections[0].Size, out.Sections[0].Size)
+		require.Equal(t, len(ori.Sections)+1, len(out.Sections))
+	}
 }
 
 func TestToDB(t *testing.T) {
