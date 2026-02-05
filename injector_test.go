@@ -125,32 +125,58 @@ func TestInjector_Inject(t *testing.T) {
 }
 
 func testInjectorInject(t *testing.T, injector *Injector, opts *Options) {
-	t.Run("auto mode", func(t *testing.T) {
+	t.Run("auto", func(t *testing.T) {
 		opts.ForceCodeCave = false
-		opts.ForceExtendSection = false
-		opts.ForceCreateSection = false
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = false
 		testInjectorInjectWithOpts(t, injector, opts, "auto")
 	})
 
-	t.Run("code cave mode", func(t *testing.T) {
+	t.Run("code cave", func(t *testing.T) {
 		opts.ForceCodeCave = true
-		opts.ForceExtendSection = false
-		opts.ForceCreateSection = false
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = false
 		testInjectorInjectWithOpts(t, injector, opts, ModeCodeCave)
 	})
 
-	t.Run("extend section mode", func(t *testing.T) {
+	t.Run("code cave with new section", func(t *testing.T) {
 		opts.ForceCodeCave = false
-		opts.ForceExtendSection = true
-		opts.ForceCreateSection = false
-		testInjectorInjectWithOpts(t, injector, opts, ModeExtendSection)
+		opts.ForceCodeCaveNS = true
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = false
+		testInjectorInjectWithOpts(t, injector, opts, ModeCodeCaveNS)
 	})
 
-	t.Run("create section mode", func(t *testing.T) {
+	t.Run("extend text section", func(t *testing.T) {
 		opts.ForceCodeCave = false
-		opts.ForceExtendSection = false
-		opts.ForceCreateSection = true
-		testInjectorInjectWithOpts(t, injector, opts, ModeCreateSection)
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = true
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = false
+		testInjectorInjectWithOpts(t, injector, opts, ModeExtendText)
+	})
+
+	t.Run("extend text with new section", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = true
+		opts.ForceCreateText = false
+		testInjectorInjectWithOpts(t, injector, opts, ModeExtendTextNS)
+	})
+
+	t.Run("create text section", func(t *testing.T) {
+		opts.ForceCodeCave = false
+		opts.ForceCodeCaveNS = false
+		opts.ForceExtendText = false
+		opts.ForceExtendTextNS = false
+		opts.ForceCreateText = true
+		testInjectorInjectWithOpts(t, injector, opts, ModeCreateText)
 	})
 }
 
@@ -159,9 +185,9 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 		if opts.ForceCodeCave {
 			return
 		}
-		mode := mode
-		if mode == "auto" {
-			mode = ModeExtendSection
+		expected := mode
+		if expected == "auto" {
+			expected = ModeCodeCaveNS
 		}
 
 		t.Run("entry point", func(t *testing.T) {
@@ -175,7 +201,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, mode, ctx.Mode)
+			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 		})
@@ -194,16 +220,16 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, mode, ctx.Mode)
+			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 		})
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		mode := mode
-		if mode == "auto" {
-			mode = ModeCodeCave
+		expected := mode
+		if expected == "auto" {
+			expected = ModeCodeCave
 		}
 
 		t.Run("entry point", func(t *testing.T) {
@@ -217,7 +243,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, mode, ctx.Mode)
+			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
 		})
@@ -236,7 +262,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, mode, ctx.Mode)
+			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
 		})
@@ -273,20 +299,20 @@ func TestInjector_InjectRaw(t *testing.T) {
 func testInjectorInjectRaw(t *testing.T, injector *Injector, opts *Options) {
 	t.Run("auto mode", func(t *testing.T) {
 		opts.ForceCodeCave = false
-		opts.ForceCreateSection = false
+		opts.ForceCreateText = false
 		testInjectorInjectRawWithOpts(t, injector, opts, "auto")
 	})
 
 	t.Run("code cave mode", func(t *testing.T) {
 		opts.ForceCodeCave = true
-		opts.ForceCreateSection = false
+		opts.ForceCreateText = false
 		testInjectorInjectRawWithOpts(t, injector, opts, ModeCodeCave)
 	})
 
 	t.Run("create section mode", func(t *testing.T) {
 		opts.ForceCodeCave = false
-		opts.ForceCreateSection = true
-		testInjectorInjectRawWithOpts(t, injector, opts, ModeCreateSection)
+		opts.ForceCreateText = true
+		testInjectorInjectRawWithOpts(t, injector, opts, ModeCreateText)
 	})
 }
 
@@ -453,7 +479,7 @@ func TestSpecificAddress(t *testing.T) {
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeExtendSection, ctx.Mode)
+			require.Equal(t, ModeCodeCaveNS, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 		})
@@ -540,7 +566,7 @@ func TestSpecificFunction(t *testing.T) {
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeExtendSection, ctx.Mode)
+			require.Equal(t, ModeCodeCaveNS, ctx.Mode)
 
 			err = os.WriteFile("testdata/injected_x86.dll", ctx.Output, 0600)
 			require.NoError(t, err)
@@ -694,7 +720,7 @@ func TestInjectorFuzz(t *testing.T) {
 		for i := 0; i < 30; i++ {
 			opts.ForceCodeCave = false
 			opts.ForceExtendSection = true
-			opts.ForceCreateSection = false
+			opts.ForceCreateText = false
 
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
@@ -704,12 +730,12 @@ func TestInjectorFuzz(t *testing.T) {
 
 			opts.ForceCodeCave = false
 			opts.ForceExtendSection = false
-			opts.ForceCreateSection = true
+			opts.ForceCreateText = true
 
 			ctx, err = injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeCreateSection, ctx.Mode)
+			require.Equal(t, ModeCreateText, ctx.Mode)
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 		}
 	})
@@ -724,7 +750,7 @@ func TestInjectorFuzz(t *testing.T) {
 		for i := 0; i < 30; i++ {
 			opts.ForceCodeCave = true
 			opts.ForceExtendSection = false
-			opts.ForceCreateSection = false
+			opts.ForceCreateText = false
 
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
@@ -734,7 +760,7 @@ func TestInjectorFuzz(t *testing.T) {
 
 			opts.ForceCodeCave = false
 			opts.ForceExtendSection = true
-			opts.ForceCreateSection = false
+			opts.ForceCreateText = false
 
 			ctx, err = injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
@@ -744,12 +770,12 @@ func TestInjectorFuzz(t *testing.T) {
 
 			opts.ForceCodeCave = false
 			opts.ForceExtendSection = false
-			opts.ForceCreateSection = true
+			opts.ForceCreateText = true
 
 			ctx, err = injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeCreateSection, ctx.Mode)
+			require.Equal(t, ModeCreateText, ctx.Mode)
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
 		}
 	})
