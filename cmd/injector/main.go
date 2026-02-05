@@ -49,8 +49,10 @@ func init() {
 	flag.StringVar(&opts.SectionName, "sn", "", "specify the section name that will be created")
 	flag.Int64Var(&opts.RandSeed, "seed", 0, "specify a random seed for generate loader")
 	flag.BoolVar(&opts.ForceCodeCave, "fcc", false, "force use code cave mode")
-	flag.BoolVar(&opts.ForceExtendSection, "fes", false, "force use extend section mode")
-	flag.BoolVar(&opts.ForceCreateSection, "fcs", false, "force use create section mode")
+	flag.BoolVar(&opts.ForceCodeCaveNS, "fccns", false, "force use code cave with new section mode")
+	flag.BoolVar(&opts.ForceExtendText, "fet", false, "force use extend text section mode")
+	flag.BoolVar(&opts.ForceExtendTextNS, "fetns", false, "force use extend text with new section mode")
+	flag.BoolVar(&opts.ForceCreateText, "fct", false, "force use create text section mode")
 	flag.StringVar(&opts.LoaderX86, "ldr-x86", "", "specify the x86 loader template file path")
 	flag.StringVar(&opts.LoaderX64, "ldr-x64", "", "specify the x64 loader template file path")
 	flag.StringVar(&jcx86, "junk-x86", "", "specify the x86 junk template directory path")
@@ -128,9 +130,9 @@ func main() {
 	fmt.Println("create thread:   ", ctx.CreateThread)
 	fmt.Println("wait thread:     ", ctx.WaitThread)
 	fmt.Println("erase shellcode: ", ctx.EraseShellcode)
-	fmt.Println("garbage inst:    ", ctx.HasGarbageInst)
+	fmt.Println("has garbage inst:", ctx.HasGarbageInst)
 	fmt.Println("shellcode jumper:", ctx.HasShellcodeJumper)
-	if ctx.Mode == injector.ModeCreateSection {
+	if ctx.Mode == injector.ModeCreateText {
 		fmt.Println("section name:    ", ctx.SectionName)
 	}
 	fmt.Println()
