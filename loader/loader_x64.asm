@@ -225,7 +225,6 @@ entry:
       mov [rsp+0x30], {{.RegV.r9}}                             {{igi}}
     {{end}}
   {{end}}
-
 {{else}}
   // calculate image base address
   call get_rip
@@ -332,7 +331,7 @@ entry:
   pop {{.RegN.rdi}}                            {{igi}} // restore "rdi" for execute shellcode
 {{end}}
 
-{{if or .ExtendSectionMode .CreateSectionMode}}
+{{if or .CodeCaveNSMode .ExtendTextMode .ExtendTextNSMode .CreateTextMode}}
   // save rsi and rdi
   push rsi                                     {{igi}}
   push rdi                                     {{igi}}
@@ -369,7 +368,7 @@ entry:
   // restore rdi and rsi
   pop rdi                                      {{igi}}
   pop rsi                                      {{igi}}
-{{end}} // SectionMode
+{{end}}
 
 // ================================== execute shellcode ==================================
 

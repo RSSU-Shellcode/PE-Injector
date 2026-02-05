@@ -259,7 +259,6 @@ entry:
       mov [esp+0x18], {{.RegV.ecx}}                            {{igi}}
     {{end}}
   {{end}}
-
 {{else}}
   // calculate image base address
   call get_eip
@@ -363,7 +362,7 @@ entry:
   pop {{.RegN.edi}}                            {{igi}} // restore "edi"
 {{end}}
 
-{{if or .ExtendSectionMode .CreateSectionMode}}
+{{if or .CodeCaveNSMode .ExtendTextMode .ExtendTextNSMode .CreateTextMode}}
   // save esi and edi
   push esi                                     {{igi}}
   push edi                                     {{igi}}
@@ -400,7 +399,7 @@ entry:
   // restore edi and esi
   pop edi                                      {{igi}}
   pop esi                                      {{igi}}
-{{end}} // SectionMode
+{{end}}
 
 // ================================== execute shellcode ==================================
 
