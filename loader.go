@@ -206,6 +206,7 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 	return inj.assemble(asm)
 }
 
+//gocyclo:ignore
 func (inj *Injector) generateLoader(loader string, payload []byte, process bool) (string, error) {
 	// make sure payload is 4 or 8 bytes alignment
 	var numPad int
@@ -246,18 +247,19 @@ func (inj *Injector) generateLoader(loader string, payload []byte, process bool)
 
 		EndOfLoader: endOfShellcode,
 	}
-	if process {
-		var err error
-		loader, err = inj.processLoader(ctx, loader, payload)
-		if err != nil {
-			return "", err
-		}
-	} else {
+	if !process || inj.loaderSize == 0 {
 		switch inj.arch {
 		case "386":
 			ctx.PayloadKey = inj.rand.Uint32()
 		case "amd64":
 			ctx.PayloadKey = inj.rand.Uint64()
+		}
+	}
+	if process {
+		var err error
+		loader, err = inj.processLoader(ctx, loader, payload)
+		if err != nil {
+			return "", err
 		}
 	}
 	err := inj.findProcFromIAT(ctx)
@@ -705,28 +707,28 @@ func (inj *Injector) processLoader(ctx *loaderCtx, loader string, payload []byte
 	// 2. CodeCaveNS
 	// 3. ExtendText or ExtendTextNS
 	// 4. CreateText
-	loader, err := inj.useCodeCaveMode(ctx, loader, payload)
+	output, err := inj.useCodeCaveMode(ctx, loader, payload)
 	if err == nil {
-		return loader, nil
+		return output, nil
 	}
-	loader, err = inj.useCodeCaveNSMode(ctx, loader, payload)
+	output, err = inj.useCodeCaveNSMode(ctx, loader, payload)
 	if err == nil {
-		return loader, nil
+		return output, nil
 	}
 	if len(payload) <= extendTextNSThreshold {
-		loader, err = inj.useExtendTextMode(ctx, loader, payload)
+		output, err = inj.useExtendTextMode(ctx, loader, payload)
 		if err == nil {
-			return loader, nil
+			return output, nil
 		}
 	} else {
-		loader, err = inj.useExtendTextNSMode(ctx, loader, payload)
+		output, err = inj.useExtendTextNSMode(ctx, loader, payload)
 		if err == nil {
-			return loader, nil
+			return output, nil
 		}
 	}
-	loader, err = inj.useCreateTextMode(ctx, loader, payload)
+	output, err = inj.useCreateTextMode(ctx, loader, payload)
 	if err == nil {
-		return loader, nil
+		return output, nil
 	}
 	return "", errors.New("unable to select any mode for build loader")
 }
