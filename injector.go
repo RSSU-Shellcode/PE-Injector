@@ -113,7 +113,9 @@ type Injector struct {
 	// try to extend text section
 	canTryExtend bool
 
-	// record loader size for process
+	// record loader status for inject
+	loaderRVA  uint32
+	loaderFOA  uint32
 	loaderSize uint32
 
 	// about hook function
@@ -285,7 +287,7 @@ func NewInjector() *Injector {
 	return &injector
 }
 
-// Inject is used to inject a payload loader to PE image with multi modes,
+// Inject is used to inject a payload loader into PE image with multi modes,
 // Loader will decrypt and execute or process the input payload.
 func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, error) {
 	if len(payload) == 0 {
@@ -324,10 +326,10 @@ func (inj *Injector) Inject(image, payload []byte, opts *Options) (*Context, err
 	return inj.ctx, nil
 }
 
-// InjectRaw is used to inject shellcode to a PE image without loader.
-// It is an advanced usage, ensure the shellcode not contains behavior
+// InjectRaw is used to inject shellcode into a PE image without loader.
+// It is an advanced usage, ensure the shellcode not contain behaviors
 // like read data from the shellcode tail.
-// Must use "nop 5" for set a flag that define the end of shellcode.
+// MUST use "nop 5" for set a flag that define the end of shellcode.
 func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*Context, error) {
 	if len(shellcode) == 0 {
 		return nil, errors.New("empty shellcode")
@@ -412,8 +414,8 @@ func (inj *Injector) injectLoader(loader []byte) (err error) {
 	targetRVA = inj.fuzzHook(targetRVA)
 	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
-	if inj.section != nil {
-		dstRVA = inj.section.VirtualAddress
+	if inj.loaderRVA != 0 {
+		dstRVA = inj.loaderRVA
 	} else {
 		if first == nil {
 			return errors.New("not enough code caves for inject shellcode")
@@ -424,35 +426,15 @@ func (inj *Injector) injectLoader(loader []byte) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
-	err = inj.slice(loader, raw)
+	err = inj.slice(loader, false)
 	if err != nil {
 		return err
 	}
-	if inj.section != nil {
-		inj.ctx.Mode = ModeCreateText
+	if inj.loaderRVA != 0 {
 		inj.padding(loader, targetRVA)
 		return nil
 	}
-	if !raw {
-		return inj.insert(targetRVA, first)
-	}
-	// try to cove cave mode
-	inj.ctx.Mode = ModeCodeCave
-	err = inj.insert(targetRVA, first)
-	if err == nil {
-		return nil
-	}
-	if inj.opts.ForceCodeCave {
-		return err
-	}
-	inj.ctx.Mode = ModeCreateText
-	// if failed, try to use create section mode
-	err = inj.createSectionForRaw(len(loader))
-	if err != nil {
-		return err
-	}
-	inj.padding(loader, targetRVA)
-	return nil
+	return inj.insert(targetRVA, first)
 }
 
 func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
@@ -471,8 +453,8 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 	targetRVA = inj.fuzzHook(targetRVA)
 	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
-	if inj.section != nil {
-		dstRVA = inj.section.VirtualAddress
+	if inj.loaderRVA != 0 { // TODO replace loaderRVA
+		dstRVA = inj.loaderRVA
 	} else {
 		if first == nil {
 			return errors.New("not enough code caves for inject shellcode")
@@ -483,17 +465,14 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to hook target function: %s", err)
 	}
-	err = inj.slice(shellcode, raw)
+	err = inj.slice(shellcode, true)
 	if err != nil {
 		return err
 	}
-	if inj.section != nil {
+	if inj.loaderRVA != 0 {
 		inj.ctx.Mode = ModeCreateText
 		inj.padding(shellcode, targetRVA)
 		return nil
-	}
-	if !raw {
-		return inj.insert(targetRVA, first)
 	}
 	// try to cove cave mode
 	inj.ctx.Mode = ModeCodeCave
@@ -1045,11 +1024,12 @@ func (inj *Injector) createSectionForRaw(size int) error {
 	if err != nil {
 		return err
 	}
-	inj.section = section
+	_ = section // TODO use it
 	return nil
 }
 
-// padding is used to padding shellcode to the created section.
+// padding is used to padding shellcode to the extended text
+// section or created text section.
 // #nosec G115
 func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	var (
@@ -1073,7 +1053,7 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 		segment := inj.segment[i]
 		// check it is contained the image base stub
 		if bytes.Contains(segment, imageBaseStub) {
-			addr := inj.section.VirtualAddress + uint32(len(saveContext)) + scLen
+			addr := inj.loaderRVA + uint32(len(saveContext)) + scLen
 			addr -= uint32(len(inj.segment[i-1]))
 			buf := make([]byte, 4)
 			binary.LittleEndian.PutUint32(buf, addr)
@@ -1101,7 +1081,7 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	for i := 0; i < len(inj.oriInst); i++ {
 		inst := inj.extendInstruction(nil, inj.oriInst[i])
 		// relocate instruction
-		current := int64(inj.section.VirtualAddress + oriInstOffset + offInst)
+		current := int64(inj.loaderRVA + oriInstOffset + offInst)
 		offset := current - int64(targetRVA+offTarget)
 		inst = inj.relocateInstruction(inst, offset)
 		insts.Write(inst)
@@ -1109,14 +1089,14 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 		offInst += uint32(len(inst))
 	}
 	// write jmp to the next original instruction
-	offset := inj.section.VirtualAddress + oriInstOffset + offInst
+	offset := inj.loaderRVA + oriInstOffset + offInst
 	rel := int64(inj.retRVA) - int64(offset) - nearJumpSize
 	jmp := make([]byte, nearJumpSize)
 	jmp[0] = 0xE9
 	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 	insts.Write(jmp)
 	// write shellcode loader
-	copy(inj.dup[inj.section.Offset:], insts.Bytes())
+	copy(inj.dup[inj.loaderFOA:], insts.Bytes())
 }
 
 func mergeBytes(b [][]byte) []byte {
