@@ -203,7 +203,17 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return inj.assemble(asm)
+	output, err = inj.assemble(asm)
+	if err != nil {
+		return nil, err
+	}
+	// compare loader size
+	if inj.ctx.Mode != ModeCodeCave {
+		if len(bin) != len(output) {
+			return nil, errors.New("mismatched output loader size")
+		}
+	}
+	return output, nil
 }
 
 //gocyclo:ignore
@@ -860,8 +870,8 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	}
 	// calculate the section extend size
 	payload = inj.encryptPayload(ctx, payload)
-	randomBeginSize := uint32(inj.rand.Intn(64)) // #nosec G115
-	randomEndSize := uint32(inj.rand.Intn(256))  // #nosec G115
+	randomBeginSize := uint32(16 + inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(16 + inj.rand.Intn(256))  // #nosec G115
 	payloadOffset := randomBeginSize + inj.loaderSize + randomEndSize
 	size := payloadOffset + uint32(len(payload)) // #nosec G115
 	// extend text and update internal status
@@ -869,7 +879,7 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	if err != nil {
 		return "", err
 	}
-	err = inj.preprocess(output, nil)
+	err = inj.preprocess(output, inj.opts)
 	if err != nil {
 		return "", err
 	}
@@ -897,15 +907,15 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 		return removeCodeCaveModeStub(loader), nil
 	}
 	// calculate the section extend size
-	randomBeginSize := uint32(inj.rand.Intn(64)) // #nosec G115
-	randomEndSize := uint32(inj.rand.Intn(256))  // #nosec G115
+	randomBeginSize := uint32(16 + inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(16 + inj.rand.Intn(256))  // #nosec G115
 	size := randomBeginSize + inj.loaderSize + randomEndSize
 	// extend text and update internal status
 	output, err := inj.extendTextSection(size)
 	if err != nil {
 		return "", err
 	}
-	err = inj.preprocess(output, nil)
+	err = inj.preprocess(output, inj.opts)
 	if err != nil {
 		return "", err
 	}
@@ -938,8 +948,8 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	}
 	// calculate the section extend size
 	payload = inj.encryptPayload(ctx, payload)
-	randomBeginSize := uint32(inj.rand.Intn(64)) // #nosec G115
-	randomEndSize := uint32(inj.rand.Intn(256))  // #nosec G115
+	randomBeginSize := uint32(16 + inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(16 + inj.rand.Intn(256))  // #nosec G115
 	payloadOffset := randomBeginSize + inj.loaderSize + randomEndSize
 	size := payloadOffset + uint32(len(payload)) // #nosec G115
 	section, err := inj.createSectionRX(inj.opts.SectionName, size)
