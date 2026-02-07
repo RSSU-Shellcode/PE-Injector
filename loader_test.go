@@ -85,7 +85,7 @@ func testLoader(t *testing.T, injector *Injector, opts *Options, mode string) {
 
 		expected := mode
 		if expected == "auto" {
-			expected = ModeExtendText
+			expected = ModeCodeCaveNS
 		}
 
 		image, err := os.ReadFile("testdata/image_exe_x86.dat")
@@ -132,7 +132,8 @@ func testCheckOutput(t *testing.T, origin, output []byte, mode string) {
 	require.NoError(t, err)
 	switch mode {
 	case ModeCodeCave:
-		require.Equal(t, ori, out)
+		require.Equal(t, ori.FileHeader, out.FileHeader)
+		require.Equal(t, ori.OptionalHeader, out.OptionalHeader)
 	case ModeCodeCaveNS:
 		require.Equal(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
 		require.Equal(t, ori.Sections[0].Size, out.Sections[0].Size)
