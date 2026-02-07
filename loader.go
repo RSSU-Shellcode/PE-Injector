@@ -860,9 +860,9 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	}
 	// calculate the section extend size
 	payload = inj.encryptPayload(ctx, payload)
-	randomBeginSize := uint32(inj.rand.Intn(64))  // #nosec G115
-	randomEndOffset := uint32(inj.rand.Intn(256)) // #nosec G115
-	payloadOffset := randomBeginSize + inj.loaderSize + randomEndOffset
+	randomBeginSize := uint32(inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(inj.rand.Intn(256))  // #nosec G115
+	payloadOffset := randomBeginSize + inj.loaderSize + randomEndSize
 	size := payloadOffset + uint32(len(payload)) // #nosec G115
 	// extend text and update internal status
 	output, err := inj.extendTextSection(size)
@@ -876,6 +876,8 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	text := inj.img.Sections[0]
 	inj.loaderRVA = text.VirtualAddress + randomBeginSize
 	inj.loaderFOA = text.Offset + randomBeginSize
+	// write encrypted payload
+	copy(inj.dup[text.Offset+payloadOffset:], payload)
 	// update context
 	ctx.PayloadRVA = text.VirtualAddress + payloadOffset
 	ctx.ExtendTextMode = true
@@ -895,9 +897,9 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 		return removeCodeCaveModeStub(loader), nil
 	}
 	// calculate the section extend size
-	randomBeginSize := uint32(inj.rand.Intn(64))  // #nosec G115
-	randomEndOffset := uint32(inj.rand.Intn(256)) // #nosec G115
-	size := randomBeginSize + inj.loaderSize + randomEndOffset
+	randomBeginSize := uint32(inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(inj.rand.Intn(256))  // #nosec G115
+	size := randomBeginSize + inj.loaderSize + randomEndSize
 	// extend text and update internal status
 	output, err := inj.extendTextSection(size)
 	if err != nil {
@@ -936,9 +938,9 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	}
 	// calculate the section extend size
 	payload = inj.encryptPayload(ctx, payload)
-	randomBeginSize := uint32(inj.rand.Intn(64))  // #nosec G115
-	randomEndOffset := uint32(inj.rand.Intn(256)) // #nosec G115
-	payloadOffset := randomBeginSize + inj.loaderSize + randomEndOffset
+	randomBeginSize := uint32(inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(inj.rand.Intn(256))  // #nosec G115
+	payloadOffset := randomBeginSize + inj.loaderSize + randomEndSize
 	size := payloadOffset + uint32(len(payload)) // #nosec G115
 	section, err := inj.createSectionRX(inj.opts.SectionName, size)
 	if err != nil {
