@@ -893,7 +893,7 @@ func testExecuteEXE(t *testing.T, path string, image []byte) {
 	}
 
 	// when failed to test, backup output image for debug
-	path = strings.ReplaceAll(path, ".exe", ".bak")
+	path = strings.ReplaceAll(path, ".exe", ".exe.bak")
 	err = os.WriteFile(path, image, 0600)
 	require.NoError(t, err)
 	t.FailNow()
@@ -905,14 +905,21 @@ func testExecuteDLL(t *testing.T, path string, image []byte) {
 
 	dll, err := syscall.LoadDLL(path)
 	require.NoError(t, err)
+	defer func() {
+		err = dll.Release()
+		require.NoError(t, err)
+	}()
 
 	proc := dll.MustFindProc("Add")
 	ret, _, err := proc.Call(1, 2)
-	if ret != 3 {
-		fmt.Println(err)
-		t.FailNow()
+	if ret == 3 {
+		return
 	}
+	fmt.Println(err)
 
-	err = dll.Release()
+	// when failed to test, backup output image for debug
+	path = strings.ReplaceAll(path, ".dll", ".dll.bak")
+	err = os.WriteFile(path, image, 0600)
 	require.NoError(t, err)
+	t.FailNow()
 }
