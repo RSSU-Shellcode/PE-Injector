@@ -40,6 +40,7 @@ const (
 const (
 	paddingPayloadRVA     = 0x12345678
 	reservedNumCodeCaves  = 8
+	reservedCtxJunkInst   = 1024
 	extendTextNSThreshold = 1024
 )
 
@@ -870,8 +871,8 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	}
 	// calculate the section extend size
 	payload = inj.encryptPayload(ctx, payload)
-	randomBeginSize := uint32(16 + inj.rand.Intn(64)) // #nosec G115
-	randomEndSize := uint32(16 + inj.rand.Intn(256))  // #nosec G115
+	randomBeginSize := uint32(reservedCtxJunkInst + inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(reservedCtxJunkInst + inj.rand.Intn(256))  // #nosec G115
 	payloadOffset := randomBeginSize + inj.loaderSize + randomEndSize
 	size := payloadOffset + uint32(len(payload)) // #nosec G115
 	// extend text and update internal status
@@ -907,8 +908,8 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 		return removeCodeCaveModeStub(loader), nil
 	}
 	// calculate the section extend size
-	randomBeginSize := uint32(16 + inj.rand.Intn(64)) // #nosec G115
-	randomEndSize := uint32(16 + inj.rand.Intn(256))  // #nosec G115
+	randomBeginSize := uint32(reservedCtxJunkInst + inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(reservedCtxJunkInst + inj.rand.Intn(256))  // #nosec G115
 	size := randomBeginSize + inj.loaderSize + randomEndSize
 	// extend text and update internal status
 	output, err := inj.extendTextSection(size)
@@ -948,8 +949,8 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	}
 	// calculate the section extend size
 	payload = inj.encryptPayload(ctx, payload)
-	randomBeginSize := uint32(16 + inj.rand.Intn(64)) // #nosec G115
-	randomEndSize := uint32(16 + inj.rand.Intn(256))  // #nosec G115
+	randomBeginSize := uint32(reservedCtxJunkInst + inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(reservedCtxJunkInst + inj.rand.Intn(256))  // #nosec G115
 	payloadOffset := randomBeginSize + inj.loaderSize + randomEndSize
 	size := payloadOffset + uint32(len(payload)) // #nosec G115
 	section, err := inj.createSectionRX(inj.opts.SectionName, size)
@@ -1019,7 +1020,10 @@ func (inj *Injector) encryptPayload(ctx *loaderCtx, payload []byte) []byte {
 }
 
 func (inj *Injector) insertGarbageInst() string {
-	if inj.opts.NoGarbageInst || inj.ctx.Mode != ModeCreateText {
+	if inj.opts.NoGarbageInst {
+		return ""
+	}
+	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
 		return ""
 	}
 	return ";" + toDB(inj.garbageInst())
