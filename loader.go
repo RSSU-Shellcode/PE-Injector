@@ -16,13 +16,10 @@ import (
 // just for prevent [import _ "embed"] :)
 var _ embed.FS
 
-// mov eax, 0x11223344     mov rax, 0x1122334455667788
-// xor eax, ebx            xor rax, rbx
-// mov [edi], eax          mov [rdi], rax
-// add edi, 4              add rdi, 8
-const numInstForCopyPayload = 4
-
-const codeCaveModeStub = "{{STUB CodeCaveMode STUB}}"
+const (
+	defaultMaxNumLoaderInstX86 = 350
+	defaultMaxNumLoaderInstX64 = 300
+)
 
 const (
 	acAllocationType = "AllocationType"
@@ -32,17 +29,26 @@ const (
 	acFreeType       = "FreeType"
 )
 
-const (
-	defaultMaxNumLoaderInstX86 = 350
-	defaultMaxNumLoaderInstX64 = 300
-)
+// mov eax, 0x11223344     mov rax, 0x1122334455667788
+// xor eax, ebx            xor rax, rbx
+// mov [edi], eax          mov [rdi], rax
+// add edi, 4              add rdi, 8
+const numInstForCopyPayload = 4
+
+const codeCaveModeStub = "{{STUB CodeCaveMode STUB}}"
 
 const (
 	paddingPayloadRVA     = 0x12345678
 	reservedNumCodeCaves  = 8
-	reservedCtxJunkInst   = 1024
 	extendTextNSThreshold = 1024
 )
+
+var reservedCtxJunkInst int
+
+func init() {
+	reservedCtxJunkInst += len(mergeBytes(saveContextX64)) + len(mergeBytes(saveContextFPX64))
+	reservedCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkInstSize
+}
 
 // The role of the payload loader is used to decrypt payload
 // in the tail section to a new RWX page, then create thread at
@@ -887,6 +893,9 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	text := inj.img.Sections[0]
 	inj.loaderRVA = text.VirtualAddress + randomBeginSize
 	inj.loaderFOA = text.Offset + randomBeginSize
+
+	// padding the garbage instruction to the extended text
+
 	// write encrypted payload
 	copy(inj.dup[text.Offset+payloadOffset:], payload)
 	// update context
