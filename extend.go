@@ -8,27 +8,27 @@ import (
 	"fmt"
 )
 
-func (inj *Injector) extendTextSection(size uint32) (output []byte, err error) {
+func (inj *Injector) extendTextSection(size uint32) (image []byte, extend uint32, err error) {
 	if !inj.canTryExtend {
-		return nil, errors.New("the first section without RX")
+		return nil, 0, errors.New("the first section without RX")
 	}
 	err = inj.checkImageAlignment()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	// align the size to section alignment size
 	// for adjust other section data easily
 	size = inj.alignSection(size)
 	// copy all data before the first section data
-	output = make([]byte, len(inj.dup)+int(size))
-	copy(output, inj.dup[:inj.img.Sections[0].Offset])
+	image = make([]byte, len(inj.dup)+int(size))
+	copy(image, inj.dup[:inj.img.Sections[0].Offset])
 	// maybe extend with invalid pe image structure
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New(fmt.Sprint(r))
 		}
 	}()
-	// extend the text section
+	// try to extend the text section
 	for _, step := range []func(output []byte, size uint32){
 		inj.adjustFileHeader,
 		inj.adjustOptionalHeader,
@@ -38,9 +38,9 @@ func (inj *Injector) extendTextSection(size uint32) (output []byte, err error) {
 		inj.adjustImportDescriptor,
 		inj.adjustBaseRelocation,
 	} {
-		step(output, size)
+		step(image, size)
 	}
-	return output, nil
+	return image, size, nil
 }
 
 func (inj *Injector) checkImageAlignment() error {
