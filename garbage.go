@@ -9,6 +9,8 @@ import (
 	"text/template"
 )
 
+const maxJunkInstSize = 48
+
 // The role of the junk code is to make the instruction sequence
 // as featureless as possible.
 var (
@@ -89,6 +91,8 @@ func (inj *Injector) garbageInst() []byte {
 	}
 }
 
+// TODO add method force
+
 func (inj *Injector) getJunkCodeX86() []string {
 	if len(inj.opts.JunkCodeX86) > 0 {
 		return inj.opts.JunkCodeX86
@@ -134,6 +138,9 @@ func (inj *Injector) garbageTemplate() []byte {
 	inst, err := inj.assemble(asm)
 	if err != nil {
 		panic(fmt.Sprintf("failed to assemble junk code: %s", err))
+	}
+	if len(inst) > maxJunkInstSize {
+		panic(fmt.Sprintf("junk code is larger than %d", maxJunkInstSize))
 	}
 	return inst
 }
