@@ -65,7 +65,6 @@ type junkCodeCtx struct {
 	Less64 map[string]int
 }
 
-// the output garbage instruction length is no limit.
 func (inj *Injector) garbageInst() []byte {
 	if inj.opts.NoGarbageInst {
 		return nil
@@ -73,6 +72,10 @@ func (inj *Injector) garbageInst() []byte {
 	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
 		return nil
 	}
+	return inj.garbageInstForce()
+}
+
+func (inj *Injector) garbageInstForce() []byte {
 	// dynamically adjust probability
 	var junkCodes []string
 	switch inj.arch {
@@ -90,8 +93,6 @@ func (inj *Injector) garbageInst() []byte {
 		return inj.garbageTemplate()
 	}
 }
-
-// TODO add method force
 
 func (inj *Injector) getJunkCodeX86() []string {
 	if len(inj.opts.JunkCodeX86) > 0 {
