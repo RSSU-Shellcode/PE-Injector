@@ -419,8 +419,9 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 			require.NoError(t, err)
 
 			size := uint32(1 + rd.Intn(128*1024))
-			output, err := injector.ExtendTextSection(image, size)
+			output, extended, err := injector.ExtendTextSection(image, size)
 			require.NoError(t, err)
+			require.NotZero(t, extended)
 
 			testExecuteEXE(t, "testdata/extended_x86.exe", output)
 		})
@@ -430,8 +431,9 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 			require.NoError(t, err)
 
 			size := uint32(1 + rd.Intn(128*1024))
-			output, err := injector.ExtendTextSection(image, size)
+			output, extended, err := injector.ExtendTextSection(image, size)
 			require.NoError(t, err)
+			require.NotZero(t, extended)
 
 			testExecuteEXE(t, "testdata/extended_x64.exe", output)
 		})
@@ -444,8 +446,9 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 			require.NoError(t, err)
 
 			size := uint32(1 + rd.Intn(128*1024))
-			output, err := injector.ExtendTextSection(image, size)
+			output, extended, err := injector.ExtendTextSection(image, size)
 			require.NoError(t, err)
+			require.NotZero(t, extended)
 
 			if runtime.GOARCH != "386" {
 				return
@@ -458,8 +461,9 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 			require.NoError(t, err)
 
 			size := uint32(1 + rd.Intn(128*1024))
-			output, err := injector.ExtendTextSection(image, size)
+			output, extended, err := injector.ExtendTextSection(image, size)
 			require.NoError(t, err)
+			require.NotZero(t, extended)
 
 			if runtime.GOARCH != "amd64" {
 				return
