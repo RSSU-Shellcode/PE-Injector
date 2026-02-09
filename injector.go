@@ -181,7 +181,7 @@ type Options struct {
 	NotFuzzHook bool `toml:"not_fuzz_hook" json:"not_fuzz_hook"`
 
 	// not append garbage instruction to loader.
-	// It is only for Inject with ModeCreateSection.
+	// It is ignored when use modes about code cave.
 	NoGarbageInst bool `toml:"no_garbage_inst" json:"no_garbage_inst"`
 
 	// not add a shellcode jumper to call shellcode.
@@ -376,26 +376,28 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 }
 
 // ExtendTextSection is used to try to extend text section.
-func (inj *Injector) ExtendTextSection(image []byte, size uint32) ([]byte, error) {
+// If extend successfully, it will return the extended image
+// and the actual extended size.
+func (inj *Injector) ExtendTextSection(image []byte, size uint32) ([]byte, uint32, error) {
 	if size == 0 {
-		return bytes.Clone(image), nil
+		return bytes.Clone(image), 0, nil
 	}
 	defer inj.cleanup()
 	err := inj.preprocess(image, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	output, err := inj.extendTextSection(size)
+	output, extended, err := inj.extendTextSection(size)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	// preprocess again for overwrite checksum
 	err = inj.preprocess(output, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	inj.overwriteCheckSum()
-	return inj.dup, nil
+	return inj.dup, extended, nil
 }
 
 func (inj *Injector) injectLoader(loader []byte) (err error) {
@@ -659,8 +661,6 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 }
 
 // select a random instruction after target address that can be hooked.
-
-//gocyclo:ignore
 func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 	if inj.abs || inj.opts.NotFuzzHook || inj.opts.NotSaveContext {
 		return targetRVA
@@ -1028,8 +1028,8 @@ func (inj *Injector) createSectionForRaw(size int) error {
 	return nil
 }
 
-// padding is used to padding shellcode to the extended text
-// section or created text section.
+// padding is used to padding the shellcode to the
+// extended text section or created text section.
 // #nosec G115
 func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	var (
