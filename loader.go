@@ -43,6 +43,8 @@ const (
 	extendTextNSThreshold = 1024
 )
 
+// for calculate the instruction size about save and
+// restore context and with insert garbage instruction
 var (
 	reversedContextInst uint32
 	reversedCtxJunkInst uint32
@@ -197,9 +199,10 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 	case "amd64":
 		loader = inj.getLoaderX64()
 	}
-	// record seed for build loader
+	// record seed for build loader and insert garbage instruction
 	seed := inj.rand.Int63()
-	inj.rand.Seed(seed)
+	inj.rand.Seed(seed + 1024)
+	inj.igir.Seed(seed + 2048)
 	// the first generation is used to calculate loader size
 	asm, err := inj.generateLoader(loader, payload, true)
 	if err != nil {
@@ -210,12 +213,9 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 		return nil, err
 	}
 	inj.loaderSize = uint32(len(bin)) // #nosec G115
-
-	asm1 := asm
-	fmt.Println(asm1)
-
 	// reset random seed and generate the finial loader
-	inj.rand.Seed(seed)
+	inj.rand.Seed(seed + 1024)
+	inj.igir.Seed(seed + 2048)
 	asm, err = inj.generateLoader(loader, payload, true)
 	if err != nil {
 		return nil, err
@@ -224,18 +224,14 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("========================================")
-	fmt.Println(asm)
-
-	// compare loader size
-	if inj.ctx.Mode != ModeCodeCave {
-		if len(bin) != len(output) {
-			// paddingPayloadRVA maybe larger than that actual RVA, it
-			// caused the size of instructions will less than padding.
-			if len(bin)-len(output) != 3 {
-				return nil, errors.New("mismatched output loader size")
-			}
+	// compare loader size is expected
+	if inj.ctx.Mode != ModeCodeCave && len(bin) != len(output) {
+		// paddingPayloadRVA maybe larger than that actual RVA, it
+		// caused the size of instructions will less than padding.
+		switch len(bin) - len(output) {
+		case 3, 6:
+		default:
+			return nil, errors.New("mismatched output loader size")
 		}
 	}
 	return output, nil
