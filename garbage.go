@@ -72,6 +72,11 @@ func (inj *Injector) garbageInst() []byte {
 	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
 		return nil
 	}
+	// must reset seed to ensure that the generation
+	// sequence of garbage instructions is consistent
+	// in both cases, the correct size of the loader
+	// can be calculated.
+	inj.rand.Seed(inj.igir.Int63())
 	return inj.garbageInstEx(false)
 }
 
