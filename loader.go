@@ -43,13 +43,17 @@ const (
 	extendTextNSThreshold = 1024
 )
 
-var reservedCtxJunkInst uint32
+var (
+	reversedContextInst uint32
+	reversedCtxJunkInst uint32
+)
 
 func init() {
 	rsvCtxJunkInst := 0
 	rsvCtxJunkInst += len(mergeBytes(saveContextX64)) + len(mergeBytes(saveContextFPX64))
+	reversedContextInst = uint32(rsvCtxJunkInst)
 	rsvCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkInstSize
-	reservedCtxJunkInst = uint32(rsvCtxJunkInst)
+	reversedCtxJunkInst = uint32(rsvCtxJunkInst)
 }
 
 // The role of the payload loader is used to decrypt payload
@@ -878,14 +882,21 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 		return removeCodeCaveModeStub(loader), nil
 	}
 	// calculate the section extend size
+	reservedInstSize := reversedCtxJunkInst // TODO add mew method calc reservedInstSize
+	if !inj.opts.NotSaveContext {
+		reservedInstSize += reversedContextInst
+	}
+	if inj.opts.NoGarbageInst {
+		reservedInstSize = 0
+	}
 	payload = inj.encryptPayload(ctx, payload)
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
 	payloadOffset := uint32(0)
 	payloadOffset += randomBeginSize
-	payloadOffset += reservedCtxJunkInst
+	payloadOffset += reservedInstSize
 	payloadOffset += inj.loaderSize
-	payloadOffset += reservedCtxJunkInst
+	payloadOffset += reservedInstSize
 	payloadOffset += randomEndSize
 	payloadSize := uint32(len(payload))
 	size := payloadOffset + payloadSize
@@ -900,10 +911,13 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	}
 	text := inj.img.Sections[0]
 	// padding the extended section
-	inj.paddingGarbageInst(text.Offset, randomBeginSize+reservedCtxJunkInst)
-	off := randomBeginSize + reservedCtxJunkInst + inj.loaderSize
-	inj.paddingGarbageInst(text.Offset+off, reservedCtxJunkInst+randomEndSize)
-	off += reservedCtxJunkInst + randomEndSize + payloadSize
+	for i := uint32(0); i < extended; i++ {
+		inj.dup[text.Offset+i] = 0xCC
+	}
+	inj.paddingGarbageInst(text.Offset, randomBeginSize+reservedInstSize)
+	off := randomBeginSize + reservedInstSize + inj.loaderSize
+	inj.paddingGarbageInst(text.Offset+off, reservedInstSize+randomEndSize)
+	off += reservedInstSize + randomEndSize + payloadSize
 	inj.paddingGarbageInst(text.Offset+off, extended-size)
 	// write encrypted payload
 	copy(inj.dup[text.Offset+payloadOffset:], payload)
@@ -928,13 +942,17 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 		return removeCodeCaveModeStub(loader), nil
 	}
 	// calculate the section extend size
+	reservedInstSize := reversedCtxJunkInst
+	if inj.opts.NoGarbageInst {
+		reservedInstSize = 0
+	}
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
 	size := uint32(0)
 	size += randomBeginSize
-	size += reservedCtxJunkInst
+	size += reservedInstSize
 	size += inj.loaderSize
-	size += reservedCtxJunkInst
+	size += reservedInstSize
 	size += randomEndSize
 	// extend text and update internal status
 	output, extended, err := inj.extendTextSection(size)
@@ -954,8 +972,11 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	}
 	text := inj.img.Sections[0]
 	// padding the extended section
-	inj.paddingGarbageInst(text.Offset, randomBeginSize+reservedCtxJunkInst)
-	off := randomBeginSize + reservedCtxJunkInst + inj.loaderSize
+	for i := uint32(0); i < extended; i++ {
+		inj.dup[text.Offset+i] = 0xCC
+	}
+	inj.paddingGarbageInst(text.Offset, randomBeginSize+reservedInstSize)
+	off := randomBeginSize + reservedInstSize + inj.loaderSize
 	inj.paddingGarbageInst(text.Offset+off, extended-off)
 	// write encrypted payload
 	copy(inj.dup[section.Offset:], payload)
@@ -977,14 +998,18 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 		return removeCodeCaveModeStub(loader), nil
 	}
 	// calculate the section extend size
+	reservedInstSize := reversedCtxJunkInst
+	if inj.opts.NoGarbageInst {
+		reservedInstSize = 0
+	}
 	payload = inj.encryptPayload(ctx, payload)
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
 	payloadOffset := uint32(0)
 	payloadOffset += randomBeginSize
-	payloadOffset += reservedCtxJunkInst
+	payloadOffset += reservedInstSize
 	payloadOffset += inj.loaderSize
-	payloadOffset += reservedCtxJunkInst
+	payloadOffset += reservedInstSize
 	payloadOffset += randomEndSize
 	payloadSize := uint32(len(payload))
 	size := payloadOffset + payloadSize
@@ -992,11 +1017,14 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	if err != nil {
 		return "", err
 	}
-	// padding the extended section
-	inj.paddingGarbageInst(section.Offset, randomBeginSize+reservedCtxJunkInst)
-	off := randomBeginSize + reservedCtxJunkInst + inj.loaderSize
-	inj.paddingGarbageInst(section.Offset+off, reservedCtxJunkInst+randomEndSize)
-	off += reservedCtxJunkInst + randomEndSize + payloadSize
+	// padding the created section
+	for i := uint32(0); i < section.Size; i++ {
+		inj.dup[section.Offset+i] = 0xCC
+	}
+	inj.paddingGarbageInst(section.Offset, randomBeginSize+reservedInstSize)
+	off := randomBeginSize + reservedInstSize + inj.loaderSize
+	inj.paddingGarbageInst(section.Offset+off, reservedInstSize+randomEndSize)
+	off += reservedInstSize + randomEndSize + payloadSize
 	inj.paddingGarbageInst(section.Offset+off, section.Size-size)
 	// write encrypted payload
 	copy(inj.dup[section.Offset+payloadOffset:], payload)
@@ -1075,7 +1103,7 @@ func (inj *Injector) insertGarbageInst() string {
 func (inj *Injector) paddingGarbageInst(foa, size uint32) {
 	rem := size
 	for {
-		inst := inj.garbageInstForce()
+		inst := inj.garbageInstEx(true)
 		l := uint32(len(inst))
 		if rem >= l {
 			copy(inj.dup[foa:], inst)
