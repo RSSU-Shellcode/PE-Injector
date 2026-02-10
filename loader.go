@@ -210,6 +210,10 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 		return nil, err
 	}
 	inj.loaderSize = uint32(len(bin)) // #nosec G115
+
+	asm1 := asm
+	fmt.Println(asm1)
+
 	// reset random seed and generate the finial loader
 	inj.rand.Seed(seed)
 	asm, err = inj.generateLoader(loader, payload, true)
@@ -220,10 +224,18 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("========================================")
+	fmt.Println(asm)
+
 	// compare loader size
 	if inj.ctx.Mode != ModeCodeCave {
 		if len(bin) != len(output) {
-			return nil, errors.New("mismatched output loader size")
+			// paddingPayloadRVA maybe larger than that actual RVA, it
+			// caused the size of instructions will less than padding.
+			if len(bin)-len(output) != 3 {
+				return nil, errors.New("mismatched output loader size")
+			}
 		}
 	}
 	return output, nil
@@ -882,16 +894,10 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 		return removeCodeCaveModeStub(loader), nil
 	}
 	// calculate the section extend size
-	reservedInstSize := reversedCtxJunkInst // TODO add mew method calc reservedInstSize
-	if !inj.opts.NotSaveContext {
-		reservedInstSize += reversedContextInst
-	}
-	if inj.opts.NoGarbageInst {
-		reservedInstSize = 0
-	}
 	payload = inj.encryptPayload(ctx, payload)
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
+	reservedInstSize := inj.calcReservedInstSize()
 	payloadOffset := uint32(0)
 	payloadOffset += randomBeginSize
 	payloadOffset += reservedInstSize
@@ -942,12 +948,9 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 		return removeCodeCaveModeStub(loader), nil
 	}
 	// calculate the section extend size
-	reservedInstSize := reversedCtxJunkInst
-	if inj.opts.NoGarbageInst {
-		reservedInstSize = 0
-	}
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
+	reservedInstSize := inj.calcReservedInstSize()
 	size := uint32(0)
 	size += randomBeginSize
 	size += reservedInstSize
@@ -997,14 +1000,11 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 		inj.ctx.Mode = ModeCreateText
 		return removeCodeCaveModeStub(loader), nil
 	}
-	// calculate the section extend size
-	reservedInstSize := reversedCtxJunkInst
-	if inj.opts.NoGarbageInst {
-		reservedInstSize = 0
-	}
+	// calculate the section size
 	payload = inj.encryptPayload(ctx, payload)
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
+	reservedInstSize := inj.calcReservedInstSize()
 	payloadOffset := uint32(0)
 	payloadOffset += randomBeginSize
 	payloadOffset += reservedInstSize
@@ -1086,6 +1086,17 @@ func (inj *Injector) encryptPayload(ctx *loaderCtx, payload []byte) []byte {
 		}
 	}
 	return section.Bytes()
+}
+
+func (inj *Injector) calcReservedInstSize() uint32 {
+	if inj.opts.NotSaveContext {
+		return 0
+	}
+	if inj.opts.NoGarbageInst {
+		return reversedContextInst
+	} else {
+		return reversedCtxJunkInst
+	}
 }
 
 func (inj *Injector) insertGarbageInst() string {
