@@ -113,6 +113,9 @@ type Injector struct {
 	// try to extend text section
 	canTryExtend bool
 
+	// for insert garbage instruction
+	igir *rand.Rand
+
 	// record loader status for inject
 	loaderRVA  uint32
 	loaderFOA  uint32
@@ -282,7 +285,8 @@ func NewInjector() *Injector {
 		seed = time.Now().UTC().UnixNano()
 	}
 	injector := Injector{
-		rand: rand.New(rand.NewSource(seed)), // #nosec
+		rand: rand.New(rand.NewSource(seed + 2018)), // #nosec
+		igir: rand.New(rand.NewSource(seed + 4096)), // #nosec
 	}
 	return &injector
 }
@@ -1108,9 +1112,11 @@ func mergeBytes(b [][]byte) []byte {
 }
 
 func (inj *Injector) cleanup() {
-	rd := inj.rand
+	rd1 := inj.rand
+	rd2 := inj.igir
 	n := Injector{
-		rand: rd,
+		rand: rd1,
+		igir: rd2,
 	}
 	*inj = n
 }
