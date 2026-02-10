@@ -76,7 +76,11 @@ func (inj *Injector) garbageInst() []byte {
 }
 
 func (inj *Injector) garbageInstEx(broken bool) []byte {
-	// dynamically adjust probability
+	if broken && inj.rand.Intn(4) == 1 {
+		buf := make([]byte, 1+inj.rand.Intn(8))
+		inj.rand.Read(buf)
+		return buf
+	}
 	var junkCodes []string
 	switch inj.arch {
 	case "386":
@@ -84,25 +88,12 @@ func (inj *Injector) garbageInstEx(broken bool) []byte {
 	case "amd64":
 		junkCodes = inj.getJunkCodeX64()
 	}
-	if !broken {
-		switch inj.rand.Intn(2 + len(junkCodes)) {
-		case 0:
-			return nil
-		case 1:
-			return inj.garbageMultiByteNOP()
-		default:
-			return inj.garbageTemplate()
-		}
-	}
-	switch inj.rand.Intn(3 + len(junkCodes)) {
+	// dynamically adjust probability
+	switch inj.rand.Intn(2 + len(junkCodes)) {
 	case 0:
 		return nil
 	case 1:
 		return inj.garbageMultiByteNOP()
-	case 2:
-		buf := make([]byte, 1+inj.rand.Intn(8))
-		inj.rand.Read(buf)
-		return buf
 	default:
 		return inj.garbageTemplate()
 	}
