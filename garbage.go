@@ -9,7 +9,7 @@ import (
 	"text/template"
 )
 
-const maxJunkInstSize = 48
+const maxJunkInstSize = 64
 
 // The role of the junk code is to make the instruction sequence
 // as featureless as possible.
@@ -72,10 +72,10 @@ func (inj *Injector) garbageInst() []byte {
 	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
 		return nil
 	}
-	return inj.garbageInstForce()
+	return inj.garbageInstEx(false)
 }
 
-func (inj *Injector) garbageInstForce() []byte {
+func (inj *Injector) garbageInstEx(broken bool) []byte {
 	// dynamically adjust probability
 	var junkCodes []string
 	switch inj.arch {
@@ -84,11 +84,25 @@ func (inj *Injector) garbageInstForce() []byte {
 	case "amd64":
 		junkCodes = inj.getJunkCodeX64()
 	}
-	switch inj.rand.Intn(2 + len(junkCodes)) {
+	if !broken {
+		switch inj.rand.Intn(2 + len(junkCodes)) {
+		case 0:
+			return nil
+		case 1:
+			return inj.garbageMultiByteNOP()
+		default:
+			return inj.garbageTemplate()
+		}
+	}
+	switch inj.rand.Intn(3 + len(junkCodes)) {
 	case 0:
 		return nil
 	case 1:
 		return inj.garbageMultiByteNOP()
+	case 2:
+		buf := make([]byte, 1+inj.rand.Intn(8))
+		inj.rand.Read(buf)
+		return buf
 	default:
 		return inj.garbageTemplate()
 	}
