@@ -96,7 +96,7 @@ func TestRemoveSignature(t *testing.T) {
 	})
 
 	t.Run("extend text", func(t *testing.T) {
-		_, err = injector.ExtendTextSection(image, 8192)
+		_, _, err = injector.ExtendTextSection(image, 8192)
 		require.NoError(t, err)
 
 		check()
@@ -140,7 +140,7 @@ func TestRemoveLoadConfig(t *testing.T) {
 	})
 
 	t.Run("extend text", func(t *testing.T) {
-		_, err = injector.ExtendTextSection(image, 8192)
+		_, _, err = injector.ExtendTextSection(image, 8192)
 		require.NoError(t, err)
 
 		check()
