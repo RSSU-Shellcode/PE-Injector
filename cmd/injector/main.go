@@ -132,8 +132,11 @@ func main() {
 	fmt.Println("erase shellcode: ", ctx.EraseShellcode)
 	fmt.Println("has garbage inst:", ctx.HasGarbageInst)
 	fmt.Println("shellcode jumper:", ctx.HasShellcodeJumper)
-	if ctx.Mode == injector.ModeCreateText {
+	if ctx.SectionName != "" {
 		fmt.Println("section name:    ", ctx.SectionName)
+	}
+	if ctx.ExtendedSize != 0 {
+		fmt.Println("extended size:   ", ctx.ExtendedSize)
 	}
 	fmt.Println()
 	fmt.Println("Procedure Complete: ", ctx.HasAllProcedures)
