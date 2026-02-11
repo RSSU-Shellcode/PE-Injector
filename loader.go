@@ -879,7 +879,7 @@ func (inj *Injector) useCodeCaveNSMode(ctx *loaderCtx, loader string, payload []
 }
 
 func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
-	if !inj.canTryExtend {
+	if !inj.canTryExtendText {
 		return "", errors.New("the first section without RX")
 	}
 	// check is used to calculate loader size
@@ -924,16 +924,18 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	// write encrypted payload
 	copy(inj.dup[text.Offset+payloadOffset:], payload)
 	// update context
+	inj.extendTextSize = extended
 	inj.loaderRVA = text.VirtualAddress + randomBeginSize
 	inj.loaderFOA = text.Offset + randomBeginSize
 	ctx.PayloadRVA = text.VirtualAddress + payloadOffset
 	ctx.ExtendTextMode = true
 	inj.ctx.Mode = ModeExtendText
+	inj.ctx.ExtendedSize = extended
 	return removeCodeCaveModeStub(loader), nil
 }
 
 func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload []byte) (string, error) {
-	if !inj.canTryExtend {
+	if !inj.canTryExtendText {
 		return "", errors.New("the first section without RX")
 	}
 	// check is used to calculate loader size
@@ -980,11 +982,13 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	// write encrypted payload
 	copy(inj.dup[section.Offset:], payload)
 	// update context
+	inj.extendTextSize = extended
 	inj.loaderRVA = text.VirtualAddress + randomBeginSize
 	inj.loaderFOA = text.Offset + randomBeginSize
 	ctx.PayloadRVA = section.VirtualAddress
 	ctx.ExtendTextNSMode = true
 	inj.ctx.Mode = ModeExtendTextNS
+	inj.ctx.ExtendedSize = extended
 	return removeCodeCaveModeStub(loader), nil
 }
 
