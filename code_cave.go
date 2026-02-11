@@ -43,7 +43,7 @@ func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 		text = section
 		// when the first section is RX, we can try to extend
 		if idx == 0 {
-			inj.canTryExtend = true
+			inj.canTryExtendText = true
 		}
 		break
 	}

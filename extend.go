@@ -9,7 +9,7 @@ import (
 )
 
 func (inj *Injector) extendTextSection(size uint32) (image []byte, extend uint32, err error) {
-	if !inj.canTryExtend {
+	if !inj.canTryExtendText {
 		return nil, 0, errors.New("the first section without RX")
 	}
 	err = inj.checkImageAlignment()
