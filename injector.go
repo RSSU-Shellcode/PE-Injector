@@ -110,8 +110,9 @@ type Injector struct {
 	eat []*eat
 	iat []*iat
 
-	// try to extend text section
-	canTryExtend bool
+	// about extend text section
+	canTryExtendText bool
+	extendTextSize   uint32
 
 	// for insert garbage instruction
 	igir *rand.Rand
@@ -257,6 +258,7 @@ type Context struct {
 	HasGarbageInst     bool   `json:"has_garbage_inst"`
 	HasShellcodeJumper bool   `json:"has_shellcode_jumper"`
 	SectionName        string `json:"section_name"`
+	ExtendedSize       uint32 `json:"extended_size"`
 
 	HasAllProcedures       bool `json:"has_all_procedures"`
 	HasVirtualAlloc        bool `json:"has_virtual_alloc"`
@@ -639,6 +641,8 @@ func (inj *Injector) checkOptionConflict(opts *Options) error {
 func (inj *Injector) selectHookTarget() (uint32, error) {
 	address := inj.opts.Address
 	if address != 0 {
+		// adjust address if extend text section
+		address += uint64(inj.extendTextSize)
 		inj.abs = true
 		return inj.vaToRVA(address), nil
 	}
