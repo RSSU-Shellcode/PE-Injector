@@ -26,7 +26,7 @@ func TestRelocateInstructionSegment(t *testing.T) {
 
 		ctx, err := injector.Inject(image, shellcode, opts)
 		require.NoError(t, err)
-		require.Equal(t, ModeExtendText, ctx.Mode)
+		require.Equal(t, ModeCodeCaveNS, ctx.Mode)
 
 		testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 	})
