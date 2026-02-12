@@ -83,7 +83,7 @@ func (inj *Injector) garbageInst() []byte {
 func (inj *Injector) garbageInstEx(broken bool) []byte {
 	if broken && inj.rand.Intn(4) == 1 {
 		buf := make([]byte, 1+inj.rand.Intn(8))
-		inj.rand.Read(buf)
+		inj.rand.Read(buf) // #nosec
 		return buf
 	}
 	var junkCodes []string
