@@ -53,9 +53,9 @@ var (
 func init() {
 	rsvCtxJunkInst := 0
 	rsvCtxJunkInst += len(mergeBytes(saveContextX64)) + len(mergeBytes(saveContextFPX64))
-	reversedContextInst = uint32(rsvCtxJunkInst)
+	reversedContextInst = uint32(rsvCtxJunkInst) // #nosec G115
 	rsvCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkInstSize
-	reversedCtxJunkInst = uint32(rsvCtxJunkInst)
+	reversedCtxJunkInst = uint32(rsvCtxJunkInst) // #nosec G115
 }
 
 // The role of the payload loader is used to decrypt payload
@@ -900,7 +900,7 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	payloadOffset += inj.loaderSize
 	payloadOffset += reservedInstSize
 	payloadOffset += randomEndSize
-	payloadSize := uint32(len(payload))
+	payloadSize := uint32(len(payload)) // #nosec G115
 	size := payloadOffset + payloadSize
 	// extend text and update internal status
 	output, extended, err := inj.extendTextSection(size)
@@ -1011,7 +1011,7 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	payloadOffset += inj.loaderSize
 	payloadOffset += reservedInstSize
 	payloadOffset += randomEndSize
-	payloadSize := uint32(len(payload))
+	payloadSize := uint32(len(payload)) // #nosec G115
 	size := payloadOffset + payloadSize
 	section, err := inj.createSectionRX(inj.opts.SectionName, size)
 	if err != nil {
@@ -1094,9 +1094,8 @@ func (inj *Injector) calcReservedInstSize() uint32 {
 	}
 	if inj.opts.NoGarbageInst {
 		return reversedContextInst
-	} else {
-		return reversedCtxJunkInst
 	}
+	return reversedCtxJunkInst
 }
 
 func (inj *Injector) insertGarbageInst() string {
@@ -1115,7 +1114,7 @@ func (inj *Injector) paddingGarbageInst(foa, size uint32) {
 	rem := size
 	for {
 		inst := inj.garbageInstEx(true)
-		l := uint32(len(inst))
+		l := uint32(len(inst)) // #nosec G115
 		if rem >= l {
 			copy(inj.dup[foa:], inst)
 			foa += l
