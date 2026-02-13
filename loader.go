@@ -43,21 +43,6 @@ const (
 	extendTextNSThreshold = 1024
 )
 
-// for calculate the instruction size about save and
-// restore context and with insert garbage instruction
-var (
-	reversedContextInst uint32
-	reversedCtxJunkInst uint32
-)
-
-func init() {
-	rsvCtxJunkInst := 0
-	rsvCtxJunkInst += len(mergeBytes(saveContextX64)) + len(mergeBytes(saveContextFPX64))
-	reversedContextInst = uint32(rsvCtxJunkInst) // #nosec G115
-	rsvCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkInstSize
-	reversedCtxJunkInst = uint32(rsvCtxJunkInst) // #nosec G115
-}
-
 // The role of the payload loader is used to decrypt payload
 // in the tail section to a new RWX page, then create thread at
 // the decrypted payload(default loader template).
@@ -893,7 +878,7 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	payload = inj.encryptPayload(ctx, payload)
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
-	reservedInstSize := inj.calcReservedInstSize()
+	reservedInstSize := inj.calcReservedCtxInstSize()
 	payloadOffset := uint32(0)
 	payloadOffset += randomBeginSize
 	payloadOffset += reservedInstSize
@@ -948,7 +933,7 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	// calculate the section extend size
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
-	reservedInstSize := inj.calcReservedInstSize()
+	reservedInstSize := inj.calcReservedCtxInstSize()
 	size := uint32(0)
 	size += randomBeginSize
 	size += reservedInstSize
@@ -1004,7 +989,7 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	payload = inj.encryptPayload(ctx, payload)
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
-	reservedInstSize := inj.calcReservedInstSize()
+	reservedInstSize := inj.calcReservedCtxInstSize()
 	payloadOffset := uint32(0)
 	payloadOffset += randomBeginSize
 	payloadOffset += reservedInstSize
@@ -1086,16 +1071,6 @@ func (inj *Injector) encryptPayload(ctx *loaderCtx, payload []byte) []byte {
 		}
 	}
 	return section.Bytes()
-}
-
-func (inj *Injector) calcReservedInstSize() uint32 {
-	if inj.opts.NotSaveContext {
-		return 0
-	}
-	if inj.opts.NoGarbageInst {
-		return reversedContextInst
-	}
-	return reversedCtxJunkInst
 }
 
 func (inj *Injector) insertGarbageInst() string {
