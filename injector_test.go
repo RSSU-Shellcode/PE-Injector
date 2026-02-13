@@ -207,9 +207,6 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 		})
 
 		t.Run("custom address", func(t *testing.T) {
-			if opts.NotSaveContext {
-				return
-			}
 			opts.Address = 0x478101
 
 			image, err := os.ReadFile("testdata/image_exe_x86.dat")
@@ -249,9 +246,6 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 		})
 
 		t.Run("custom address", func(t *testing.T) {
-			if opts.NotSaveContext {
-				return
-			}
 			opts.Address = 0x140075DDC
 
 			image, err := os.ReadFile("testdata/image_exe_x64.dat")
