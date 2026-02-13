@@ -910,8 +910,8 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	copy(inj.dup[text.Offset+payloadOffset:], payload)
 	// update context
 	inj.extendTextSize = extended
-	inj.loaderRVA = text.VirtualAddress + randomBeginSize
-	inj.loaderFOA = text.Offset + randomBeginSize
+	inj.dstRVA = text.VirtualAddress + randomBeginSize
+	inj.dstFOA = text.Offset + randomBeginSize
 	ctx.PayloadRVA = text.VirtualAddress + payloadOffset
 	ctx.ExtendTextMode = true
 	inj.ctx.Mode = ModeExtendText
@@ -968,8 +968,8 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	copy(inj.dup[section.Offset:], payload)
 	// update context
 	inj.extendTextSize = extended
-	inj.loaderRVA = text.VirtualAddress + randomBeginSize
-	inj.loaderFOA = text.Offset + randomBeginSize
+	inj.dstRVA = text.VirtualAddress + randomBeginSize
+	inj.dstFOA = text.Offset + randomBeginSize
 	ctx.PayloadRVA = section.VirtualAddress
 	ctx.ExtendTextNSMode = true
 	inj.ctx.Mode = ModeExtendTextNS
@@ -1014,8 +1014,8 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	// write encrypted payload
 	copy(inj.dup[section.Offset+payloadOffset:], payload)
 	// update context
-	inj.loaderRVA = section.VirtualAddress + randomBeginSize
-	inj.loaderFOA = section.Offset + randomBeginSize
+	inj.dstRVA = section.VirtualAddress + randomBeginSize
+	inj.dstFOA = section.Offset + randomBeginSize
 	ctx.PayloadRVA = section.VirtualAddress + payloadOffset
 	ctx.CreateTextMode = true
 	inj.ctx.Mode = ModeCreateText
