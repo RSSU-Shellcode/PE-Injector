@@ -118,9 +118,11 @@ type Injector struct {
 	igir *rand.Rand
 
 	// record loader status for inject
-	loaderRVA  uint32
-	loaderFOA  uint32
 	loaderSize uint32
+
+	// about inject shellcode to section
+	dstRVA uint32
+	dstFOA uint32
 
 	// about hook function
 	oriInst [][]byte
@@ -157,7 +159,7 @@ type Options struct {
 	NoHook bool `toml:"no_hook" json:"no_hook"`
 
 	// not append instruction about save and restore context.
-	// if your shellcode need hijack function argument or
+	// if your shellcode need hijack function argument or some
 	// register, you need set it with true.
 	NotSaveContext bool `toml:"not_save_context" json:"not_save_context"`
 
@@ -359,16 +361,9 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		shellcode = bytes.Clone(shellcode)
 		shellcode = append(shellcode, endOfShellcode...)
 	}
-	// prepare force inject mode
-	opts = inj.opts
-	if opts.ForceCodeCave && opts.ForceCreateText {
-		return nil, errors.New("invalid force mode with shellcode source")
-	}
-	if opts.ForceCreateText {
-		err = inj.createSectionForRaw(len(shellcode))
-		if err != nil {
-			return nil, err
-		}
+	err = inj.selectInjectRawMode(shellcode)
+	if err != nil {
+		return nil, err
 	}
 	err = inj.injectShellcode(shellcode)
 	if err != nil {
@@ -422,8 +417,8 @@ func (inj *Injector) injectLoader(loader []byte) (err error) {
 	targetRVA = inj.fuzzHook(targetRVA)
 	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
-	if inj.loaderRVA != 0 {
-		dstRVA = inj.loaderRVA
+	if inj.dstRVA != 0 {
+		dstRVA = inj.dstRVA
 	} else {
 		if first == nil {
 			return errors.New("not enough code caves for inject shellcode")
@@ -438,7 +433,7 @@ func (inj *Injector) injectLoader(loader []byte) (err error) {
 	if err != nil {
 		return err
 	}
-	if inj.loaderRVA != 0 {
+	if inj.dstRVA != 0 {
 		inj.padding(loader, targetRVA)
 		return nil
 	}
@@ -461,8 +456,8 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 	targetRVA = inj.fuzzHook(targetRVA)
 	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
-	if inj.loaderRVA != 0 { // TODO replace loaderRVA
-		dstRVA = inj.loaderRVA
+	if inj.dstRVA != 0 { // TODO replace loaderRVA
+		dstRVA = inj.dstRVA
 	} else {
 		if first == nil {
 			return errors.New("not enough code caves for inject shellcode")
@@ -477,7 +472,7 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 	if err != nil {
 		return err
 	}
-	if inj.loaderRVA != 0 {
+	if inj.dstRVA != 0 {
 		inj.ctx.Mode = ModeCreateText
 		inj.padding(shellcode, targetRVA)
 		return nil
@@ -633,7 +628,7 @@ func (inj *Injector) checkOptionConflict(opts *Options) error {
 		return errors.New("both Address and Function are specified")
 	}
 	if opts.ReserveLoadConfig && !opts.NotCreateThread && !opts.NoShellcodeJumper {
-		return errors.New("cannot create thread with shellcode jumper when reserve CFG")
+		return errors.New("cannot create thread with shellcode jumper when reserve load config")
 	}
 	return nil
 }
@@ -1061,7 +1056,7 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 		segment := inj.segment[i]
 		// check it is contained the image base stub
 		if bytes.Contains(segment, imageBaseStub) {
-			addr := inj.loaderRVA + uint32(len(saveContext)) + scLen
+			addr := inj.dstRVA + uint32(len(saveContext)) + scLen
 			addr -= uint32(len(inj.segment[i-1]))
 			buf := make([]byte, 4)
 			binary.LittleEndian.PutUint32(buf, addr)
@@ -1089,7 +1084,7 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	for i := 0; i < len(inj.oriInst); i++ {
 		inst := inj.extendInstruction(nil, inj.oriInst[i])
 		// relocate instruction
-		current := int64(inj.loaderRVA + oriInstOffset + offInst)
+		current := int64(inj.dstRVA + oriInstOffset + offInst)
 		offset := current - int64(targetRVA+offTarget)
 		inst = inj.relocateInstruction(inst, offset)
 		insts.Write(inst)
@@ -1097,14 +1092,14 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 		offInst += uint32(len(inst))
 	}
 	// write jmp to the next original instruction
-	offset := inj.loaderRVA + oriInstOffset + offInst
+	offset := inj.dstRVA + oriInstOffset + offInst
 	rel := int64(inj.retRVA) - int64(offset) - nearJumpSize
 	jmp := make([]byte, nearJumpSize)
 	jmp[0] = 0xE9
 	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 	insts.Write(jmp)
 	// write shellcode loader
-	copy(inj.dup[inj.loaderFOA:], insts.Bytes())
+	copy(inj.dup[inj.dstFOA:], insts.Bytes())
 }
 
 func mergeBytes(b [][]byte) []byte {
