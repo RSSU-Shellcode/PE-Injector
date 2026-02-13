@@ -59,6 +59,21 @@ var (
 	}
 )
 
+// for calculate the instruction size about save and
+// restore context and with insert garbage instruction
+var (
+	reversedContextInst uint32
+	reversedCtxJunkInst uint32
+)
+
+func init() {
+	rsvCtxJunkInst := 0
+	rsvCtxJunkInst += len(mergeBytes(saveContextX64)) + len(mergeBytes(saveContextFPX64))
+	reversedContextInst = uint32(rsvCtxJunkInst) // #nosec G115
+	rsvCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkInstSize
+	reversedCtxJunkInst = uint32(rsvCtxJunkInst) // #nosec G115
+}
+
 func (inj *Injector) saveContext() [][]byte {
 	var (
 		save [][]byte
@@ -122,4 +137,14 @@ func (inj *Injector) restoreContext() [][]byte {
 		}
 	}
 	return insts
+}
+
+func (inj *Injector) calcReservedCtxInstSize() uint32 {
+	if inj.opts.NotSaveContext {
+		return 0
+	}
+	if inj.opts.NoGarbageInst {
+		return reversedContextInst
+	}
+	return reversedCtxJunkInst
 }
