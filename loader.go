@@ -1083,23 +1083,6 @@ func (inj *Injector) insertGarbageInst() string {
 	return ";" + toDB(inj.garbageInst())
 }
 
-// padding the garbage instruction to the extended text
-// section or created new text section code cave.
-func (inj *Injector) paddingGarbageInst(foa, size uint32) {
-	rem := size
-	for {
-		inst := inj.garbageInstEx(true)
-		l := uint32(len(inst)) // #nosec G115
-		if rem >= l {
-			copy(inj.dup[foa:], inst)
-			foa += l
-			rem -= l
-			continue
-		}
-		break
-	}
-}
-
 func removeCodeCaveModeStub(loader string) string {
 	return strings.ReplaceAll(loader, codeCaveModeStub, "")
 }
