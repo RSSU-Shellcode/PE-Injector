@@ -1,6 +1,8 @@
 package injector
 
 import (
+	"bytes"
+	"debug/pe"
 	"fmt"
 	"math/rand"
 	"os"
@@ -920,4 +922,32 @@ func testExecuteDLL(t *testing.T, path string, image []byte) {
 	err = os.WriteFile(path, image, 0600)
 	require.NoError(t, err)
 	t.FailNow()
+}
+
+func testCheckOutputImage(t *testing.T, origin, output []byte, mode string) {
+	ori, err := pe.NewFile(bytes.NewReader(origin))
+	require.NoError(t, err)
+	out, err := pe.NewFile(bytes.NewReader(output))
+	require.NoError(t, err)
+	switch mode {
+	case ModeCodeCave:
+		require.Equal(t, ori.FileHeader, out.FileHeader)
+		require.Equal(t, ori.OptionalHeader, out.OptionalHeader)
+	case ModeCodeCaveNS:
+		require.Equal(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
+		require.Equal(t, ori.Sections[0].Size, out.Sections[0].Size)
+		require.Equal(t, len(ori.Sections)+1, len(out.Sections))
+	case ModeExtendText:
+		require.Less(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
+		require.Less(t, ori.Sections[0].Size, out.Sections[0].Size)
+		require.Equal(t, len(ori.Sections), len(out.Sections))
+	case ModeExtendTextNS:
+		require.Less(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
+		require.Less(t, ori.Sections[0].Size, out.Sections[0].Size)
+		require.Equal(t, len(ori.Sections)+1, len(out.Sections))
+	case ModeCreateText:
+		require.Equal(t, ori.Sections[0].VirtualSize, out.Sections[0].VirtualSize)
+		require.Equal(t, ori.Sections[0].Size, out.Sections[0].Size)
+		require.Equal(t, len(ori.Sections)+1, len(out.Sections))
+	}
 }
