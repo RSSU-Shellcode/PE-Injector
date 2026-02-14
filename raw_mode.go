@@ -7,12 +7,12 @@ import (
 
 const reservedCodeCaves = 16
 
-func (inj *Injector) selectInjectRawMode(shellcode []byte) error {
+func (inj *Injector) selectInjectRawMode(shellcode []byte) (string, error) {
 	if inj.opts.ForceCodeCaveNS {
-		return errors.New("code cave with new section mode is not support")
+		return "", errors.New("code cave with new section mode is not support")
 	}
 	if inj.opts.ForceExtendTextNS {
-		return errors.New("extend text with new section mode is not support")
+		return "", errors.New("extend text with new section mode is not support")
 	}
 	var counter int
 	for _, sw := range []bool{
@@ -25,7 +25,7 @@ func (inj *Injector) selectInjectRawMode(shellcode []byte) error {
 		}
 	}
 	if counter > 1 {
-		return errors.New("set too many force mode in options")
+		return "", errors.New("set too many force mode in options")
 	}
 	if counter == 1 {
 		return inj.useForceRawMode(shellcode)
@@ -34,22 +34,20 @@ func (inj *Injector) selectInjectRawMode(shellcode []byte) error {
 	// 1. CodeCave
 	// 2. ExtendText
 	// 3. CreateText
-	err := inj.useCodeCaveRawMode(shellcode)
-	if err == nil {
-		return nil
+	for _, rm := range []func([]byte) (string, error){
+		inj.useCodeCaveRawMode,
+		inj.useExtendTextRawMode,
+		inj.useCreateTextRawMode,
+	} {
+		mode, err := rm(shellcode)
+		if err == nil {
+			return mode, nil
+		}
 	}
-	err = inj.useExtendTextRawMode(shellcode)
-	if err == nil {
-		return nil
-	}
-	err = inj.useCreateTextRawMode(shellcode)
-	if err == nil {
-		return nil
-	}
-	return errors.New("unable to select any mode for inject raw")
+	return "", errors.New("unable to select any mode for inject raw")
 }
 
-func (inj *Injector) useForceRawMode(shellcode []byte) error {
+func (inj *Injector) useForceRawMode(shellcode []byte) (string, error) {
 	switch {
 	case inj.opts.ForceCodeCave:
 		return inj.useCodeCaveRawMode(shellcode)
@@ -62,10 +60,10 @@ func (inj *Injector) useForceRawMode(shellcode []byte) error {
 	}
 }
 
-func (inj *Injector) useCodeCaveRawMode(shellcode []byte) error {
+func (inj *Injector) useCodeCaveRawMode(shellcode []byte) (string, error) {
 	insts, err := inj.disassemble(shellcode)
 	if err != nil {
-		return fmt.Errorf("failed to disassemble shellcode: %s", err)
+		return "", fmt.Errorf("failed to disassemble shellcode: %s", err)
 	}
 	var (
 		saveContext    [][]byte
@@ -77,35 +75,35 @@ func (inj *Injector) useCodeCaveRawMode(shellcode []byte) error {
 	}
 	num := len(saveContext) + len(restoreContext) + len(insts) + reservedCodeCaves
 	if num > len(inj.caves) {
-		return errors.New("not enough code caves for code cave mode")
+		return "", errors.New("not enough code caves for code cave mode")
 	}
 	inj.ctx.Mode = ModeCodeCave
-	return nil
+	return ModeCodeCave, nil
 }
 
-func (inj *Injector) useExtendTextRawMode(shellcode []byte) error {
+func (inj *Injector) useExtendTextRawMode(shellcode []byte) (string, error) {
 	if !inj.canTryExtendText {
-		return errors.New("the first section without RX")
+		return "", errors.New("the first section without RX")
 	}
-	scSize := uint32(len(shellcode))
 	// calculate the section extend size
+	shellcodeSize := uint32(len(shellcode))
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
 	reservedInstSize := inj.calcReservedCtxInstSize()
 	size := uint32(0)
 	size += randomBeginSize
 	size += reservedInstSize
-	size += scSize
+	size += shellcodeSize
 	size += reservedInstSize
 	size += randomEndSize
 	// extend text and update internal status
 	output, extended, err := inj.extendTextSection(size)
 	if err != nil {
-		return err
+		return "", err
 	}
 	err = inj.preprocess(output, inj.opts)
 	if err != nil {
-		return err
+		return "", err
 	}
 	text := inj.img.Sections[0]
 	// padding the extended section
@@ -113,7 +111,7 @@ func (inj *Injector) useExtendTextRawMode(shellcode []byte) error {
 		inj.dup[text.Offset+i] = 0xCC
 	}
 	inj.paddingGarbageInst(text.Offset, randomBeginSize+reservedInstSize)
-	off := randomBeginSize + reservedInstSize + scSize
+	off := randomBeginSize + reservedInstSize + shellcodeSize
 	inj.paddingGarbageInst(text.Offset+off, extended-off)
 	// update context
 	inj.extendTextSize = extended
@@ -121,11 +119,39 @@ func (inj *Injector) useExtendTextRawMode(shellcode []byte) error {
 	inj.dstFOA = text.Offset + randomBeginSize
 	inj.ctx.Mode = ModeExtendText
 	inj.ctx.ExtendedSize = extended
-	return nil
+	return ModeExtendText, nil
 }
 
-func (inj *Injector) useCreateTextRawMode(shellcode []byte) error {
-
+func (inj *Injector) useCreateTextRawMode(shellcode []byte) (string, error) {
+	// calculate the section size
+	shellcodeSize := uint32(len(shellcode))
+	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
+	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
+	reservedInstSize := inj.calcReservedCtxInstSize()
+	size := uint32(0)
+	size += randomBeginSize
+	size += reservedInstSize
+	size += shellcodeSize
+	size += reservedInstSize
+	size += randomEndSize
+	section, err := inj.createSectionRX(inj.opts.SectionName, size)
+	if err != nil {
+		return "", err
+	}
+	// padding the created section
+	for i := uint32(0); i < section.Size; i++ {
+		inj.dup[section.Offset+i] = 0xCC
+	}
+	// padding the created section
+	for i := uint32(0); i < section.Size; i++ {
+		inj.dup[section.Offset+i] = 0xCC
+	}
+	inj.paddingGarbageInst(section.Offset, randomBeginSize+reservedInstSize)
+	off := randomBeginSize + reservedInstSize + shellcodeSize
+	inj.paddingGarbageInst(section.Offset+off, section.Size-off)
+	// update context
+	inj.dstRVA = section.VirtualAddress + randomBeginSize
+	inj.dstFOA = section.Offset + randomBeginSize
 	inj.ctx.Mode = ModeCreateText
-	return nil
+	return ModeCreateText, nil
 }
