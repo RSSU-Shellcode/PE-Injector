@@ -14,6 +14,11 @@ func (inj *Injector) selectInjectRawMode(shellcode []byte) (string, error) {
 	if inj.opts.ForceExtendTextNS {
 		return "", errors.New("extend text with new section mode is not support")
 	}
+	// record seed for insert garbage instruction
+	seed := inj.rand.Int63()
+	inj.rand.Seed(seed + 4096)
+	inj.igir.Seed(seed + 8192)
+	// check will use force mode
 	var counter int
 	for _, sw := range []bool{
 		inj.opts.ForceCodeCave,
@@ -86,7 +91,7 @@ func (inj *Injector) useExtendTextRawMode(shellcode []byte) (string, error) {
 		return "", errors.New("the first section without RX")
 	}
 	// calculate the section extend size
-	shellcodeSize := uint32(len(shellcode))
+	shellcodeSize := uint32(len(shellcode))           // #nosec G115
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
 	reservedInstSize := inj.calcReservedCtxInstSize()
@@ -124,7 +129,7 @@ func (inj *Injector) useExtendTextRawMode(shellcode []byte) (string, error) {
 
 func (inj *Injector) useCreateTextRawMode(shellcode []byte) (string, error) {
 	// calculate the section size
-	shellcodeSize := uint32(len(shellcode))
+	shellcodeSize := uint32(len(shellcode))           // #nosec G115
 	randomBeginSize := uint32(64 + inj.rand.Intn(64)) // #nosec G115
 	randomEndSize := uint32(32 + inj.rand.Intn(256))  // #nosec G115
 	reservedInstSize := inj.calcReservedCtxInstSize()
