@@ -361,7 +361,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		shellcode = bytes.Clone(shellcode)
 		shellcode = append(shellcode, endOfShellcode...)
 	}
-	err = inj.selectInjectRawMode(shellcode)
+	_, err = inj.selectInjectRawMode(shellcode)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +456,7 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 	targetRVA = inj.fuzzHook(targetRVA)
 	first := inj.selectFirstCodeCave(targetRVA)
 	var dstRVA uint32
-	if inj.dstRVA != 0 { // TODO replace loaderRVA
+	if inj.dstRVA != 0 {
 		dstRVA = inj.dstRVA
 	} else {
 		if first == nil {
@@ -473,27 +473,10 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 		return err
 	}
 	if inj.dstRVA != 0 {
-		inj.ctx.Mode = ModeCreateText
 		inj.padding(shellcode, targetRVA)
 		return nil
 	}
-	// try to cove cave mode
-	inj.ctx.Mode = ModeCodeCave
-	err = inj.insert(targetRVA, first)
-	if err == nil {
-		return nil
-	}
-	if inj.opts.ForceCodeCave {
-		return err
-	}
-	inj.ctx.Mode = ModeCreateText
-	// if failed, try to use create section mode
-	err = inj.createSectionForRaw(len(shellcode))
-	if err != nil {
-		return err
-	}
-	inj.padding(shellcode, targetRVA)
-	return nil
+	return inj.insert(targetRVA, first)
 }
 
 func (inj *Injector) initAssembler() error {
@@ -1017,18 +1000,6 @@ func (inj *Injector) selectCodeCave() *codeCave {
 
 func (inj *Injector) removeCodeCave(i int) {
 	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
-}
-
-func (inj *Injector) createSectionForRaw(size int) error {
-	if !inj.opts.NotSaveContext {
-		size += 1024
-	}
-	section, err := inj.createSectionRX(inj.opts.SectionName, uint32(size)) // #nosec G115
-	if err != nil {
-		return err
-	}
-	_ = section // TODO use it
-	return nil
 }
 
 // padding is used to padding the shellcode to the
