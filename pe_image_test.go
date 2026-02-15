@@ -82,8 +82,9 @@ func TestRemoveSignature(t *testing.T) {
 	injector := NewInjector()
 	err = injector.preprocess(image, nil)
 	require.NoError(t, err)
-	check := func() {
-		peOut, err := pe.NewFile(bytes.NewReader(injector.dup))
+
+	check := func(img []byte) {
+		peOut, err := pe.NewFile(bytes.NewReader(img))
 		require.NoError(t, err)
 		hdr = peOut.OptionalHeader.(*pe.OptionalHeader64)
 		dd = hdr.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_SECURITY]
@@ -92,21 +93,21 @@ func TestRemoveSignature(t *testing.T) {
 	}
 
 	t.Run("code cave", func(t *testing.T) {
-		check()
+		check(injector.dup)
 	})
 
 	t.Run("extend text", func(t *testing.T) {
-		_, _, err = injector.ExtendTextSection(image, 8192)
+		output, _, err := injector.extendTextSection(8192)
 		require.NoError(t, err)
 
-		check()
+		check(output)
 	})
 
 	t.Run("create section", func(t *testing.T) {
 		_, err = injector.createSectionRO(".test", 4096)
 		require.NoError(t, err)
 
-		check()
+		check(injector.dup)
 	})
 
 	err = injector.Close()
@@ -126,8 +127,9 @@ func TestRemoveLoadConfig(t *testing.T) {
 	injector := NewInjector()
 	err = injector.preprocess(image, nil)
 	require.NoError(t, err)
-	check := func() {
-		peOut, err := pe.NewFile(bytes.NewReader(injector.dup))
+
+	check := func(img []byte) {
+		peOut, err := pe.NewFile(bytes.NewReader(img))
 		require.NoError(t, err)
 		hdr = peOut.OptionalHeader.(*pe.OptionalHeader64)
 		dd = hdr.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG]
@@ -136,21 +138,21 @@ func TestRemoveLoadConfig(t *testing.T) {
 	}
 
 	t.Run("code cave", func(t *testing.T) {
-		check()
+		check(injector.dup)
 	})
 
 	t.Run("extend text", func(t *testing.T) {
-		_, _, err = injector.ExtendTextSection(image, 8192)
+		output, _, err := injector.extendTextSection(8192)
 		require.NoError(t, err)
 
-		check()
+		check(output)
 	})
 
 	t.Run("create section", func(t *testing.T) {
 		_, err = injector.createSectionRO(".test", 4096)
 		require.NoError(t, err)
 
-		check()
+		check(injector.dup)
 	})
 
 	err = injector.Close()
@@ -187,7 +189,7 @@ func TestCreateSection(t *testing.T) {
 		output := injector.dup
 		peFile, err := pe.NewFile(bytes.NewReader(output))
 		require.NoError(t, err)
-		require.Equal(t, peFile.NumberOfSections+1, injector.img.NumberOfSections)
+		require.Equal(t, injector.img.NumberOfSections+1, peFile.NumberOfSections)
 
 		testExecuteEXE(t, "testdata/injected_x86.exe", output)
 	})
@@ -208,7 +210,7 @@ func TestCreateSection(t *testing.T) {
 		output := injector.dup
 		peFile, err := pe.NewFile(bytes.NewReader(output))
 		require.NoError(t, err)
-		require.Equal(t, peFile.NumberOfSections+1, injector.img.NumberOfSections)
+		require.Equal(t, injector.img.NumberOfSections+1, peFile.NumberOfSections)
 
 		testExecuteEXE(t, "testdata/injected_x64.exe", output)
 	})
