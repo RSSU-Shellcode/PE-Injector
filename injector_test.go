@@ -281,6 +281,14 @@ func TestInjector_InjectRaw(t *testing.T) {
 		testInjectorInjectRaw(t, injector, &opts)
 	})
 
+	t.Run("not fuzz hook", func(t *testing.T) {
+		opts := Options{
+			NotFuzzHook: true,
+		}
+
+		testInjectorInjectRaw(t, injector, &opts)
+	})
+
 	t.Run("no garbage inst", func(t *testing.T) {
 		opts := Options{
 			NoGarbageInst: true,
