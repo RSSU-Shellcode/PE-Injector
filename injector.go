@@ -991,17 +991,6 @@ func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave)
 	return inj.relocateInstruction(segment, offset)
 }
 
-func (inj *Injector) selectCodeCave() *codeCave {
-	i := inj.rand.Intn(len(inj.caves))
-	cave := inj.caves[i]
-	inj.removeCodeCave(i)
-	return cave
-}
-
-func (inj *Injector) removeCodeCave(i int) {
-	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
-}
-
 // padding is used to padding the shellcode to the
 // extended text section or created text section.
 // #nosec G115
@@ -1041,10 +1030,16 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 		}
 		offset := uint32(len(shellcode)) - scLen
 		rel := offset - nearJumpSize
-		jmp := make([]byte, nearJumpSize)
-		jmp[0] = 0xE9
-		binary.LittleEndian.PutUint32(jmp[1:], rel)
-		insts.Write(jmp)
+		// if the distance is zero, replace it to a nop5
+		if rel != 0 {
+			jmp := make([]byte, nearJumpSize)
+			jmp[0] = 0xE9
+			binary.LittleEndian.PutUint32(jmp[1:], rel)
+			insts.Write(jmp)
+		} else {
+			nop5 := endOfShellcode
+			insts.Write(nop5)
+		}
 	}
 	insts.Write(restoreContext)
 	// write hooked original instruction
@@ -1071,6 +1066,17 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	insts.Write(jmp)
 	// write shellcode loader
 	copy(inj.dup[inj.dstFOA:], insts.Bytes())
+}
+
+func (inj *Injector) selectCodeCave() *codeCave {
+	i := inj.rand.Intn(len(inj.caves))
+	cave := inj.caves[i]
+	inj.removeCodeCave(i)
+	return cave
+}
+
+func (inj *Injector) removeCodeCave(i int) {
+	inj.caves = append(inj.caves[:i], inj.caves[i+1:]...)
 }
 
 func mergeBytes(b [][]byte) []byte {
