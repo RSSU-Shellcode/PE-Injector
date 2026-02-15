@@ -50,11 +50,11 @@ func TestRawMode(t *testing.T) {
 }
 
 func testRawMode(t *testing.T, injector *Injector, opts *Options, mode string) {
+	if mode == "auto" {
+		mode = ModeCodeCave
+	}
+
 	t.Run("x86", func(t *testing.T) {
-		expected := mode
-		if expected == "auto" {
-			expected = ModeCodeCave
-		}
 
 		image, err := os.ReadFile("testdata/image_exe_x86.dat")
 		require.NoError(t, err)
@@ -65,7 +65,7 @@ func testRawMode(t *testing.T, injector *Injector, opts *Options, mode string) {
 
 		ctx, err := injector.InjectRaw(image, shellcode, opts)
 		require.NoError(t, err)
-		require.Equal(t, expected, ctx.Mode)
+		require.Equal(t, mode, ctx.Mode)
 		fmt.Println(ctx.LoaderHex)
 		fmt.Println(ctx.LoaderInst)
 
@@ -74,11 +74,6 @@ func testRawMode(t *testing.T, injector *Injector, opts *Options, mode string) {
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		expected := mode
-		if expected == "auto" {
-			expected = ModeCodeCave
-		}
-
 		image, err := os.ReadFile("testdata/image_exe_x64.dat")
 		require.NoError(t, err)
 		shellcode := []byte{
@@ -88,7 +83,7 @@ func testRawMode(t *testing.T, injector *Injector, opts *Options, mode string) {
 
 		ctx, err := injector.InjectRaw(image, shellcode, opts)
 		require.NoError(t, err)
-		require.Equal(t, expected, ctx.Mode)
+		require.Equal(t, mode, ctx.Mode)
 		fmt.Println(ctx.LoaderHex)
 		fmt.Println(ctx.LoaderInst)
 
