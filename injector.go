@@ -156,7 +156,7 @@ type Options struct {
 	// not hook any instruction in the text section for
 	// inject raw instruction only, it is used to deploy
 	// code for other advanced usage like shield stub.
-	NoHook bool `toml:"no_hook" json:"no_hook"`
+	NoHookMode bool `toml:"no_hook_mode" json:"no_hook_mode"`
 
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or some
@@ -253,6 +253,7 @@ type Context struct {
 	Mode string `json:"mode"`
 	Seed int64  `json:"seed"`
 
+	NoHookMode         bool   `json:"no_hook_mode"`
 	SaveContext        bool   `json:"save_context"`
 	CreateThread       bool   `json:"create_thread"`
 	WaitThread         bool   `json:"wait_thread"`
@@ -275,7 +276,7 @@ type Context struct {
 	NumCodeCaves  int    `json:"num_code_caves"`
 	NumLoaderInst int    `json:"num_loader_inst"`
 	HookAddress   uint64 `json:"hook_address"`
-	EntryAddress  uint64 `json:"entry_address"`
+	EntryAddress  uint64 `json:"entry_address"` // TODO set
 }
 
 // NewInjector is used to create a simple PE injector.
@@ -349,7 +350,7 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		return nil, fmt.Errorf("failed to initialize assembler: %s", err)
 	}
 	// auto append the mark about end of shellcode
-	if !bytes.Contains(shellcode, EndOfShellcode) {
+	if !bytes.Contains(shellcode, EndOfShellcode) && !inj.opts.NoHookMode {
 		shellcode = bytes.Clone(shellcode)
 		shellcode = append(shellcode, EndOfShellcode...)
 	}
@@ -403,7 +404,7 @@ func (inj *Injector) injectLoader(loader []byte) (err error) {
 	if err != nil {
 		return err
 	}
-	if targetRVA == 0 {
+	if targetRVA == 0 && !inj.opts.NoHookMode {
 		return errors.New("hook target function address is zero")
 	}
 	targetRVA = inj.fuzzHook(targetRVA)
@@ -442,7 +443,7 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 	if err != nil {
 		return err
 	}
-	if targetRVA == 0 {
+	if targetRVA == 0 && !inj.opts.NoHookMode {
 		return errors.New("hook target function address is zero")
 	}
 	targetRVA = inj.fuzzHook(targetRVA)
@@ -608,6 +609,7 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		Type: typ,
 		Seed: seed,
 
+		NoHookMode:     opts.NoHookMode,
 		SaveContext:    !opts.NotSaveContext,
 		CreateThread:   !opts.NotCreateThread,
 		HasGarbageInst: !opts.NoGarbageInst,
@@ -628,6 +630,9 @@ func (inj *Injector) checkOptionConflict(opts *Options) error {
 }
 
 func (inj *Injector) selectHookTarget() (uint32, error) {
+	if inj.opts.NoHookMode {
+		return 0, nil
+	}
 	address := inj.opts.Address
 	if address != 0 {
 		// adjust address if extend text section
@@ -659,6 +664,9 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 
 // select a random instruction after target address that can be hooked.
 func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
+	if inj.opts.NoHookMode {
+		return 0
+	}
 	if inj.abs || inj.opts.NotFuzzHook || inj.opts.NotSaveContext {
 		return targetRVA
 	}
@@ -732,6 +740,9 @@ func (inj *Injector) selectFirstCodeCave(target uint32) *codeCave {
 // hook target function for add a jmp to the first code cave
 // #nosec G115
 func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
+	if inj.opts.NoHookMode {
+		return nil
+	}
 	foa := inj.rvaToFOA(srcRVA)
 	if foa+32 > inj.size {
 		return errors.New("hook target is overflow")
@@ -815,14 +826,8 @@ func (inj *Injector) slice(shellcode []byte, raw bool) error {
 // insert shellcode segment and the patched instruction to code caves.
 // #nosec G115
 func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
-	var (
-		saveContext    [][]byte
-		restoreContext [][]byte
-	)
-	if !inj.opts.NotSaveContext {
-		saveContext = inj.saveContext()
-		restoreContext = inj.restoreContext()
-	}
+	saveContext := inj.saveContext()
+	restoreContext := inj.restoreContext()
 	num := len(saveContext) + len(restoreContext) + len(inj.segment) + len(inj.oriInst) + 4
 	if num > len(inj.caves) {
 		return errors.New("not enough code caves to inject shellcode")
@@ -880,13 +885,16 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			segment = bytes.ReplaceAll(segment, ImageBaseStub, buf)
 		}
 		// check it is the end of the shellcode
-		if bytes.Equal(segment, EndOfShellcode) {
+		if bytes.Equal(segment, EndOfShellcode) && !inj.opts.NoHookMode {
 			rel := int64(current.va) - int64(c.va) - nearJumpSize
 			jmp := make([]byte, nearJumpSize)
 			jmp[0] = 0xE9
 			binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
 			c.Write(inj.dup, jmp)
 			continue
+		}
+		if i == len(inj.segment)-1 {
+			break
 		}
 		// build jmp instruction to next code cave
 		rel := int64(n.va) - int64(c.va+size) - nearJumpSize
@@ -1006,14 +1014,8 @@ func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave)
 // extended text section or created text section.
 // #nosec G115
 func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
-	var (
-		saveContext    []byte
-		restoreContext []byte
-	)
-	if !inj.opts.NotSaveContext {
-		saveContext = mergeBytes(inj.saveContext())
-		restoreContext = mergeBytes(inj.restoreContext())
-	}
+	saveContext := mergeBytes(inj.saveContext())
+	restoreContext := mergeBytes(inj.restoreContext())
 	var oriInstOffset uint32
 	oriInstOffset += uint32(len(saveContext))
 	oriInstOffset += uint32(len(shellcode))
@@ -1034,7 +1036,7 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 			segment = bytes.ReplaceAll(segment, ImageBaseStub, buf)
 		}
 		// check it is the end of the shellcode
-		if !bytes.Equal(segment, EndOfShellcode) {
+		if !bytes.Equal(segment, EndOfShellcode) || inj.opts.NoHookMode {
 			insts.Write(segment)
 			scLen += uint32(len(segment))
 			continue
@@ -1069,12 +1071,14 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 		offInst += uint32(len(inst))
 	}
 	// write jmp to the next original instruction
-	offset := inj.dstRVA + oriInstOffset + offInst
-	rel := int64(inj.retRVA) - int64(offset) - nearJumpSize
-	jmp := make([]byte, nearJumpSize)
-	jmp[0] = 0xE9
-	binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
-	insts.Write(jmp)
+	if !inj.opts.NoHookMode {
+		offset := inj.dstRVA + oriInstOffset + offInst
+		rel := int64(inj.retRVA) - int64(offset) - nearJumpSize
+		jmp := make([]byte, nearJumpSize)
+		jmp[0] = 0xE9
+		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
+		insts.Write(jmp)
+	}
 	// write instructions
 	copy(inj.dup[inj.dstFOA:], insts.Bytes())
 }
