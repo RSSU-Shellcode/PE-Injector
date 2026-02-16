@@ -75,6 +75,9 @@ func init() {
 }
 
 func (inj *Injector) saveContext() [][]byte {
+	if inj.opts.NotSaveContext || inj.opts.NoHookMode {
+		return nil
+	}
 	var (
 		save [][]byte
 		fp   [][]byte
@@ -108,6 +111,9 @@ func (inj *Injector) saveContext() [][]byte {
 }
 
 func (inj *Injector) restoreContext() [][]byte {
+	if inj.opts.NotSaveContext || inj.opts.NoHookMode {
+		return nil
+	}
 	var (
 		restore [][]byte
 		fp      [][]byte
