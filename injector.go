@@ -73,8 +73,8 @@ type Injector struct {
 	rand *rand.Rand
 
 	// assembler engine
-	eng32 *keystone.Engine
-	eng64 *keystone.Engine
+	ase32 *keystone.Engine
+	ase64 *keystone.Engine
 
 	// context data
 	opts *Options
@@ -110,9 +110,6 @@ type Injector struct {
 	// about process EAT and IAT
 	eat []*eat
 	iat []*iat
-
-	// TODO no hook mode
-	noHook bool
 
 	// about extend text section
 	canTryExtendText bool
@@ -156,7 +153,7 @@ type Options struct {
 	// it not support forwarded function.
 	Function string `toml:"function" json:"function"`
 
-	// not hook any instruction in text section for
+	// not hook any instruction in the text section for
 	// inject raw instruction only, it is used to deploy
 	// code for other advanced usage like shield stub.
 	NoHook bool `toml:"no_hook" json:"no_hook"`
@@ -416,7 +413,7 @@ func (inj *Injector) injectLoader(loader []byte) (err error) {
 		dstRVA = inj.dstRVA
 	} else {
 		if first == nil {
-			return errors.New("not enough code caves for inject shellcode")
+			return errors.New("not enough code caves for inject loader")
 		}
 		dstRVA = first.va
 	}
@@ -478,23 +475,23 @@ func (inj *Injector) initAssembler() error {
 	var err error
 	switch inj.arch {
 	case "386":
-		if inj.eng32 != nil {
+		if inj.ase32 != nil {
 			return nil
 		}
-		inj.eng32, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
+		inj.ase32, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
 		if err != nil {
 			return err
 		}
-		return inj.eng32.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
+		return inj.ase32.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
 	case "amd64":
-		if inj.eng64 != nil {
+		if inj.ase64 != nil {
 			return nil
 		}
-		inj.eng64, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
+		inj.ase64, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
 		if err != nil {
 			return err
 		}
-		return inj.eng64.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
+		return inj.ase64.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
 	default:
 		panic("unreachable code")
 	}
@@ -509,9 +506,9 @@ func (inj *Injector) assemble(src string) ([]byte, error) {
 	}
 	switch inj.arch {
 	case "386":
-		return inj.eng32.Assemble(src, 0)
+		return inj.ase32.Assemble(src, 0)
 	case "amd64":
-		return inj.eng64.Assemble(src, 0)
+		return inj.ase64.Assemble(src, 0)
 	default:
 		panic("unreachable code")
 	}
@@ -1023,8 +1020,8 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	oriInstOffset += uint32(len(restoreContext))
 	// build final instructions
 	insts := bytes.NewBuffer(make([]byte, 0, len(shellcode)+64))
-	// replace the end of shellcode to jmp to the tail of shellcode
 	insts.Write(saveContext)
+	// replace the end of shellcode to jmp to the tail of shellcode
 	var scLen uint32
 	for i := 0; i < len(inj.segment); i++ {
 		segment := inj.segment[i]
@@ -1103,8 +1100,8 @@ func mergeBytes(b [][]byte) []byte {
 
 func (inj *Injector) cleanup() {
 	n := Injector{
-		eng32: inj.eng32,
-		eng64: inj.eng64,
+		ase32: inj.ase32,
+		ase64: inj.ase64,
 		rand:  inj.rand,
 		igir:  inj.igir,
 	}
@@ -1113,14 +1110,14 @@ func (inj *Injector) cleanup() {
 
 // Close is used to close injector.
 func (inj *Injector) Close() error {
-	if inj.eng32 != nil {
-		err := inj.eng32.Close()
+	if inj.ase32 != nil {
+		err := inj.ase32.Close()
 		if err != nil {
 			return err
 		}
 	}
-	if inj.eng64 != nil {
-		err := inj.eng64.Close()
+	if inj.ase64 != nil {
+		err := inj.ase64.Close()
 		if err != nil {
 			return err
 		}
