@@ -70,14 +70,8 @@ func (inj *Injector) useCodeCaveRawMode(shellcode []byte) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to disassemble shellcode: %s", err)
 	}
-	var (
-		saveContext    [][]byte
-		restoreContext [][]byte
-	)
-	if !inj.opts.NotSaveContext {
-		saveContext = inj.saveContext()
-		restoreContext = inj.restoreContext()
-	}
+	saveContext := inj.saveContext()
+	restoreContext := inj.restoreContext()
 	num := len(saveContext) + len(restoreContext) + len(insts) + reservedCodeCaves
 	if num > len(inj.caves) {
 		return "", errors.New("not enough code caves for code cave mode")
