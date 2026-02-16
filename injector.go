@@ -60,12 +60,12 @@ const (
 )
 
 var (
-	// imageBaseStub is used to mark the offset of the image base.
-	imageBaseStub = []byte{0x20, 0x25, 0x08, 0x21}
+	// ImageBaseStub is used to mark the offset of the image base.
+	ImageBaseStub = []byte{0x20, 0x25, 0x08, 0x21}
 
-	// endOfShellcode is used to mark the end of shellcode.
+	// EndOfShellcode is used to mark the end of shellcode.
 	// NOP DWORD ptr [EAX + EAX*1 + 00]
-	endOfShellcode = []byte{0x0F, 0x1F, 0x44, 0x00, 0x00}
+	EndOfShellcode = []byte{0x0F, 0x1F, 0x44, 0x00, 0x00}
 )
 
 // Injector is a simple PE injector for inject shellcode.
@@ -352,9 +352,9 @@ func (inj *Injector) InjectRaw(image []byte, shellcode []byte, opts *Options) (*
 		return nil, fmt.Errorf("failed to initialize assembler: %s", err)
 	}
 	// auto append the mark about end of shellcode
-	if !bytes.Contains(shellcode, endOfShellcode) {
+	if !bytes.Contains(shellcode, EndOfShellcode) {
 		shellcode = bytes.Clone(shellcode)
-		shellcode = append(shellcode, endOfShellcode...)
+		shellcode = append(shellcode, EndOfShellcode...)
 	}
 	_, err = inj.selectInjectRawMode(shellcode)
 	if err != nil {
@@ -876,14 +876,14 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			return errors.New("appear too large instruction in shellcode")
 		}
 		// check it is contained the image base stub
-		if bytes.Contains(segment, imageBaseStub) {
+		if bytes.Contains(segment, ImageBaseStub) {
 			addr := ccLi[i-2].va + 5
 			buf := make([]byte, 4)
 			binary.LittleEndian.PutUint32(buf, addr)
-			segment = bytes.ReplaceAll(segment, imageBaseStub, buf)
+			segment = bytes.ReplaceAll(segment, ImageBaseStub, buf)
 		}
 		// check it is the end of the shellcode
-		if bytes.Equal(segment, endOfShellcode) {
+		if bytes.Equal(segment, EndOfShellcode) {
 			rel := int64(current.va) - int64(c.va) - nearJumpSize
 			jmp := make([]byte, nearJumpSize)
 			jmp[0] = 0xE9
@@ -1029,15 +1029,15 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	for i := 0; i < len(inj.segment); i++ {
 		segment := inj.segment[i]
 		// check it is contained the image base stub
-		if bytes.Contains(segment, imageBaseStub) {
+		if bytes.Contains(segment, ImageBaseStub) {
 			addr := inj.dstRVA + uint32(len(saveContext)) + scLen
 			addr -= uint32(len(inj.segment[i-1]))
 			buf := make([]byte, 4)
 			binary.LittleEndian.PutUint32(buf, addr)
-			segment = bytes.ReplaceAll(segment, imageBaseStub, buf)
+			segment = bytes.ReplaceAll(segment, ImageBaseStub, buf)
 		}
 		// check it is the end of the shellcode
-		if !bytes.Equal(segment, endOfShellcode) {
+		if !bytes.Equal(segment, EndOfShellcode) {
 			insts.Write(segment)
 			scLen += uint32(len(segment))
 			continue
@@ -1051,7 +1051,7 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 			binary.LittleEndian.PutUint32(jmp[1:], rel)
 			insts.Write(jmp)
 		} else {
-			nop5 := endOfShellcode
+			nop5 := EndOfShellcode
 			insts.Write(nop5)
 		}
 	}

@@ -261,7 +261,7 @@ func (inj *Injector) generateLoader(loader string, payload []byte, process bool)
 		MemRegionSize: memRegionSize,
 		PayloadSize:   len(payload),
 
-		EndOfLoader: endOfShellcode,
+		EndOfLoader: EndOfShellcode,
 	}
 	if !process || inj.loaderSize == 0 {
 		switch inj.arch {
