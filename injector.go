@@ -885,7 +885,12 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			segment = bytes.ReplaceAll(segment, ImageBaseStub, buf)
 		}
 		// check it is the end of the shellcode
-		if bytes.Equal(segment, EndOfShellcode) && !inj.opts.NoHookMode {
+		if bytes.Equal(segment, EndOfShellcode) {
+			if inj.opts.NoHookMode {
+				ret := []byte{0xC3}
+				c.Write(inj.dup, ret)
+				continue
+			}
 			rel := int64(current.rva) - int64(c.rva) - nearJumpSize
 			jmp := make([]byte, nearJumpSize)
 			jmp[0] = 0xE9
@@ -893,7 +898,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			c.Write(inj.dup, jmp)
 			continue
 		}
-		if i == len(inj.segment)-1 {
+		if inj.opts.NoHookMode && i == len(inj.segment)-1 {
 			break
 		}
 		// build jmp instruction to next code cave
@@ -1040,9 +1045,16 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 			segment = bytes.ReplaceAll(segment, ImageBaseStub, buf)
 		}
 		// check it is the end of the shellcode
-		if !bytes.Equal(segment, EndOfShellcode) || inj.opts.NoHookMode {
+		if !bytes.Equal(segment, EndOfShellcode) {
 			insts.Write(segment)
 			scLen += uint32(len(segment))
+			continue
+		}
+		if inj.opts.NoHookMode {
+			ret := []byte{0xC3}
+			pad := bytes.Repeat([]byte{0xCC}, len(EndOfShellcode)-1)
+			ret = append(ret, pad...)
+			insts.Write(ret)
 			continue
 		}
 		offset := uint32(len(shellcode)) - scLen
