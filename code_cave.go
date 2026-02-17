@@ -14,7 +14,7 @@ const (
 )
 
 type codeCave struct {
-	va   uint32 // VirtualAddress
+	rva  uint32 // VirtualAddress
 	off  uint32 // PointerToRawData
 	size int
 }
@@ -67,7 +67,7 @@ func (inj *Injector) scanCodeCave() ([]*codeCave, error) {
 }
 
 // #nosec G115
-func (inj *Injector) scanSection(section []byte, va, off uint32) []*codeCave {
+func (inj *Injector) scanSection(section []byte, rva, off uint32) []*codeCave {
 	var expCaveSize int
 	switch inj.arch {
 	case "386":
@@ -111,7 +111,7 @@ func (inj *Injector) scanSection(section []byte, va, off uint32) []*codeCave {
 		}
 		if caveSize == expSize {
 			caves = append(caves, &codeCave{
-				va:   va + uint32(address+reserve),
+				rva:  rva + uint32(address+reserve),
 				off:  off + uint32(address+reserve),
 				size: caveSize - reserve,
 			})
