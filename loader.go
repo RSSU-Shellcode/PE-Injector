@@ -695,7 +695,7 @@ func (inj *Injector) writeShellcodeJumper(ctx *loaderCtx) error {
 	cave.Write(inj.dup, inst)
 	// update loader context
 	ctx.NeedShellcodeJumper = true
-	ctx.JumperRVA = cave.va
+	ctx.JumperRVA = cave.rva
 	return nil
 }
 

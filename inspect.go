@@ -43,7 +43,7 @@ func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, [
 	injector.dup = make([]byte, 16*1024)
 	injector.caves = []*codeCave{
 		{
-			va:   0x10000,
+			rva:  0x10000,
 			off:  0x1000,
 			size: 32,
 		},
