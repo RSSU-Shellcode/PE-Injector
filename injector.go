@@ -253,7 +253,6 @@ type Context struct {
 	Mode string `json:"mode"`
 	Seed int64  `json:"seed"`
 
-	NoHookMode         bool   `json:"no_hook_mode"`
 	SaveContext        bool   `json:"save_context"`
 	CreateThread       bool   `json:"create_thread"`
 	WaitThread         bool   `json:"wait_thread"`
@@ -275,8 +274,9 @@ type Context struct {
 
 	NumCodeCaves  int    `json:"num_code_caves"`
 	NumLoaderInst int    `json:"num_loader_inst"`
-	HookAddress   uint64 `json:"hook_address"`
-	EntryAddress  uint64 `json:"entry_address"` // TODO set
+	NoHookMode    bool   `json:"no_hook_mode"`
+	HookAddress   uint32 `json:"hook_address"`
+	EntryAddress  uint32 `json:"entry_address"`
 }
 
 // NewInjector is used to create a simple PE injector.
@@ -416,7 +416,7 @@ func (inj *Injector) injectLoader(loader []byte) (err error) {
 		if first == nil {
 			return errors.New("not enough code caves for inject loader")
 		}
-		dstRVA = first.va
+		dstRVA = first.rva
 	}
 	err = inj.hook(targetRVA, dstRVA)
 	if err != nil {
@@ -455,7 +455,7 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 		if first == nil {
 			return errors.New("not enough code caves for inject shellcode")
 		}
-		dstRVA = first.va
+		dstRVA = first.rva
 	}
 	err = inj.hook(targetRVA, dstRVA)
 	if err != nil {
@@ -609,12 +609,12 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		Type: typ,
 		Seed: seed,
 
-		NoHookMode:     opts.NoHookMode,
 		SaveContext:    !opts.NotSaveContext,
 		CreateThread:   !opts.NotCreateThread,
 		HasGarbageInst: !opts.NoGarbageInst,
 
 		NumCodeCaves: len(caves),
+		NoHookMode:   opts.NoHookMode,
 	}
 	return nil
 }
@@ -721,7 +721,7 @@ func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 func (inj *Injector) selectFirstCodeCave(target uint32) *codeCave {
 	var first *codeCave
 	for i, cave := range inj.caves {
-		offset := int64(cave.va) - int64(target)
+		offset := int64(cave.rva) - int64(target)
 		if offset <= 4096 && offset >= -4096 {
 			first = cave
 			inj.removeCodeCave(i)
@@ -774,7 +774,7 @@ func (inj *Injector) hook(srcRVA uint32, dstRVA uint32) error {
 	patch = append(patch, padding...)
 	copy(inj.dup[foa:], patch)
 	// update context
-	inj.ctx.HookAddress = inj.rvaToVA(srcRVA)
+	inj.ctx.HookAddress = srcRVA
 	return nil
 }
 
@@ -839,7 +839,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		inst := saveContext[i]
 		size := uint32(len(inst))
 		// build jmp instruction to next code cave
-		rel := int64(next.va) - int64(current.va+size) - nearJumpSize
+		rel := int64(next.rva) - int64(current.rva+size) - nearJumpSize
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
@@ -879,14 +879,14 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		}
 		// check it is contained the image base stub
 		if bytes.Contains(segment, ImageBaseStub) {
-			addr := ccLi[i-2].va + 5
+			addr := ccLi[i-2].rva + 5
 			buf := make([]byte, 4)
 			binary.LittleEndian.PutUint32(buf, addr)
 			segment = bytes.ReplaceAll(segment, ImageBaseStub, buf)
 		}
 		// check it is the end of the shellcode
 		if bytes.Equal(segment, EndOfShellcode) && !inj.opts.NoHookMode {
-			rel := int64(current.va) - int64(c.va) - nearJumpSize
+			rel := int64(current.rva) - int64(c.rva) - nearJumpSize
 			jmp := make([]byte, nearJumpSize)
 			jmp[0] = 0xE9
 			binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
@@ -897,7 +897,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			break
 		}
 		// build jmp instruction to next code cave
-		rel := int64(n.va) - int64(c.va+size) - nearJumpSize
+		rel := int64(n.rva) - int64(c.rva+size) - nearJumpSize
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
@@ -910,7 +910,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		inst := restoreContext[i]
 		size := uint32(len(inst))
 		// build jmp instruction to next code cave
-		rel := int64(next.va) - int64(current.va+size) - nearJumpSize
+		rel := int64(next.rva) - int64(current.rva+size) - nearJumpSize
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
 		binary.LittleEndian.PutUint32(jmp[1:], uint32(rel))
@@ -930,14 +930,14 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			return errors.New("appear too large original instruction in patch")
 		}
 		// relocate instruction
-		offset := int64(current.va) - int64(targetRVA+offTarget)
+		offset := int64(current.rva) - int64(targetRVA+offTarget)
 		inst = inj.relocateInstruction(inst, offset)
 		// build jmp instruction to next code cave or original instruction
 		var rel int64
 		if i != len(inj.oriInst)-1 {
-			rel = int64(next.va) - int64(current.va+size) - nearJumpSize
+			rel = int64(next.rva) - int64(current.rva+size) - nearJumpSize
 		} else {
-			rel = int64(inj.retRVA) - int64(current.va+size) - nearJumpSize
+			rel = int64(inj.retRVA) - int64(current.rva+size) - nearJumpSize
 		}
 		jmp := make([]byte, nearJumpSize)
 		jmp[0] = 0xE9
@@ -949,6 +949,10 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 		current = next
 		next = inj.selectCodeCave()
 		offTarget += uint32(len(inj.oriInst[i]))
+	}
+	// update context
+	if inj.opts.NoHookMode {
+		inj.ctx.EntryAddress = list[0].current.rva
 	}
 	return nil
 }
@@ -1003,8 +1007,8 @@ func (inj *Injector) relocateSegment(segment []byte, idx int, current *codeCave)
 		panic(err)
 	}
 	// calculate the two code cave offset
-	vDst := int64(inj.ccList[dst].va)
-	vSrc := int64(current.va + uint32(inst.Len))
+	vDst := int64(inj.ccList[dst].rva)
+	vSrc := int64(current.rva + uint32(inst.Len))
 	offset := vSrc - vDst + int64(rel)
 	// calculate the last offset and relocate instruction
 	return inj.relocateInstruction(segment, offset)
@@ -1081,6 +1085,8 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 	}
 	// write instructions
 	copy(inj.dup[inj.dstFOA:], insts.Bytes())
+	// update context
+	inj.ctx.EntryAddress = inj.dstRVA
 }
 
 func (inj *Injector) selectCodeCave() *codeCave {
