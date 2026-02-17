@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -15,6 +16,23 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+// for test no hook mode
+var (
+	testAddX86 = []byte{
+		0x31, 0xC0, //               xor eax, eax
+		0x03, 0x44, 0x24, 0x04, //   add eax, [esp+04]
+		0x03, 0x44, 0x24, 0x08, //   add eax, [esp+08]
+		0xC3, //                     ret
+	}
+
+	testAddX64 = []byte{
+		0x31, 0xC0, //               xor eax, eax
+		0x48, 0x01, 0xC8, //         add rax, rcx
+		0x48, 0x01, 0xD0, //         add rax, rdx
+		0xC3, //                     ret
+	}
 )
 
 func TestMain(m *testing.M) {
@@ -409,6 +427,25 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
 		})
+
+		t.Run("no hook mode", func(t *testing.T) {
+			opts.NoHookMode = true
+			defer func() {
+				opts.NoHookMode = false
+			}()
+
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
+			require.NoError(t, err)
+
+			ctx, err := injector.InjectRaw(image, testAddX64, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			require.Equal(t, mode, ctx.Mode)
+
+			entry := strconv.Itoa(int(ctx.EntryAddress))
+			args := []string{"-entry", entry}
+			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output, args...)
+		})
 	})
 }
 
@@ -441,7 +478,6 @@ func TestInjector_ExtendTextSection(t *testing.T) {
 
 			testExecuteEXE(t, "testdata/extended_x64.exe", output)
 		})
-
 	})
 
 	t.Run("dll", func(t *testing.T) {
@@ -860,7 +896,7 @@ func TestInjectorFuzz(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func testExecuteEXE(t *testing.T, path string, image []byte) {
+func testExecuteEXE(t *testing.T, path string, image []byte, args ...string) {
 	err := os.WriteFile(path, image, 0600)
 	require.NoError(t, err)
 
@@ -871,7 +907,7 @@ func testExecuteEXE(t *testing.T, path string, image []byte) {
 		_ = w.Close()
 	}()
 
-	cmd := exec.Command(path)
+	cmd := exec.Command(path, args...)
 	cmd.Stdout = w
 	cmd.Stderr = w
 	err = cmd.Start()
