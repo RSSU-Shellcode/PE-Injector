@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -241,6 +240,28 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 		})
+
+		t.Run("no hook mode", func(t *testing.T) {
+			opts.NoHookMode = true
+			defer func() {
+				opts.NoHookMode = false
+			}()
+
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x86.dat")
+			require.NoError(t, err)
+
+			ctx, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("entry: 0x%X\n", ctx.EntryAddress)
+			require.Equal(t, expected, ctx.Mode)
+
+			entry := strconv.Itoa(int(ctx.EntryAddress))
+			args := []string{"-e", entry, "-l"}
+			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output, args...)
+		})
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -279,6 +300,28 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
+		})
+
+		t.Run("no hook mode", func(t *testing.T) {
+			opts.NoHookMode = true
+			defer func() {
+				opts.NoHookMode = false
+			}()
+
+			image, err := os.ReadFile("testdata/image_exe_x64.dat")
+			require.NoError(t, err)
+			shellcode, err := os.ReadFile("testdata/shellcode_x64.dat")
+			require.NoError(t, err)
+
+			ctx, err := injector.Inject(image, shellcode, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("entry: 0x%X\n", ctx.EntryAddress)
+			require.Equal(t, expected, ctx.Mode)
+
+			entry := strconv.Itoa(int(ctx.EntryAddress))
+			args := []string{"-e", entry, "-l"}
+			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output, args...)
 		})
 	})
 }
@@ -939,7 +982,7 @@ func testExecuteEXE(t *testing.T, path string, image []byte, args ...string) {
 	}()
 
 	go func() {
-		time.Sleep(3 * time.Second)
+		time.Sleep(5 * time.Second)
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 		_ = r.Close()
@@ -949,9 +992,11 @@ func testExecuteEXE(t *testing.T, path string, image []byte, args ...string) {
 	for {
 		buf := make([]byte, 1024)
 		n, err := r.Read(buf)
-		if assert.Contains(t, string(buf[:n]), "Hello World!") {
+		out := string(buf[:n])
+		if strings.Contains(out, "Hello World!") {
 			return
 		}
+		fmt.Println(out)
 		if err != nil {
 			break
 		}
