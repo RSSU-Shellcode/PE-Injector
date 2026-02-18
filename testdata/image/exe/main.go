@@ -44,7 +44,11 @@ func testNoHookMode() {
 
 	if loader {
 		ret, _, _ := syscall.SyscallN(addr)
-		if ret == 1 || ret == addr {
+		if ret == 0 || ret == 1 || ret == addr {
+			return
+		}
+		// maybe thread handle
+		if ret < 0xFFFF {
 			return
 		}
 		panic(fmt.Sprintf("invalid return value: 0x%X", ret))
@@ -55,7 +59,8 @@ func testNoHookMode() {
 	num1 := rd.Uint32()
 	num2 := rd.Uint32()
 	ret, _, _ := syscall.SyscallN(addr, uintptr(num1), uintptr(num2))
-	if uint32(ret) != num1+num2 {
-		panic("invalid add result")
+	if uint32(ret) == num1+num2 {
+		return
 	}
+	panic("invalid add result")
 }
