@@ -267,7 +267,7 @@ entry:
 
   // allocate memory for shellcode
   mov rax, [rsp+0x10]                          {{igi}} // address of VirtualAlloc
-  xor rcx, rcx                                 {{igi}} // lpAddress
+  xor ecx, ecx                                 {{igi}} // lpAddress
   mov rdx, {{hex .MemRegionSize}}              {{igi}} // dwSize
   mov r8, {{hex .PAData.AllocationType}}       {{igi}} // flAllocationType MEM_RESERVE|MEM_COMMIT
   mov r10, {{hex .PAKey.AllocationType}}       {{igi}} // set decrypt key
@@ -387,8 +387,8 @@ entry:
   mov rax, [rsp+0x28]                          {{igi}} // address of CreateThread
 
   sub rsp, 0x10                                {{igi}} // reserve stack for argument
-  xor rcx, rcx                                 {{igi}} // lpThreadAttributes
-  xor rdx, rdx                                 {{igi}} // dwStackSize
+  xor ecx, ecx                                 {{igi}} // lpThreadAttributes
+  xor edx, edx                                 {{igi}} // dwStackSize
   mov r8, r10                                  {{igi}} // lpStartAddress
   mov r9, r11                                  {{igi}} // lpParameter
   mov [rsp+0], rcx                             {{igi}} // dwCreationFlags
@@ -447,7 +447,7 @@ entry:
   // release allocated memory page
   mov rax, [rsp+0x18]                          {{igi}} // address of VirtualFree
   mov rcx, [rsp+0x08]                          {{igi}} // address of allocated memory
-  xor rdx, rdx                                 {{igi}} // dwSize
+  xor edx, edx                                 {{igi}} // dwSize
   mov r8, {{hex .PAData.FreeType}}             {{igi}} // dwFreeType MEM_RELEASE
   mov r9, {{hex .PAKey.FreeType}}              {{igi}} // set decrypt key
   xor r8, r9                                   {{igi}} // decrypt argument
