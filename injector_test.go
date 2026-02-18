@@ -226,7 +226,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 		})
 
 		t.Run("custom address", func(t *testing.T) {
-			opts.Address = 0x478101
+			opts.Address = 0x4783DD
 
 			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
@@ -287,7 +287,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 		})
 
 		t.Run("custom address", func(t *testing.T) {
-			opts.Address = 0x140075DDC
+			opts.Address = 0x14007617C
 
 			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
@@ -416,7 +416,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 		})
 
 		t.Run("custom address", func(t *testing.T) {
-			opts.Address = 0x478101
+			opts.Address = 0x4783DD
 
 			image, err := os.ReadFile("testdata/image_exe_x86.dat")
 			require.NoError(t, err)
@@ -474,7 +474,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 		})
 
 		t.Run("custom address", func(t *testing.T) {
-			opts.Address = 0x140075DDC
+			opts.Address = 0x14007617C
 
 			image, err := os.ReadFile("testdata/image_exe_x64.dat")
 			require.NoError(t, err)
@@ -586,7 +586,7 @@ func TestSpecificAddress(t *testing.T) {
 	t.Run("loader", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x478101,
+				Address: 0x4783DD,
 			}
 
 			image, err := os.ReadFile("testdata/image_exe_x86.dat")
@@ -604,7 +604,7 @@ func TestSpecificAddress(t *testing.T) {
 
 		t.Run("x64", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x140075DDC,
+				Address: 0x14007617C,
 			}
 
 			image, err := os.ReadFile("testdata/image_exe_x64.dat")
@@ -624,7 +624,7 @@ func TestSpecificAddress(t *testing.T) {
 	t.Run("raw", func(t *testing.T) {
 		t.Run("x86", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x478101,
+				Address: 0x4783DD,
 			}
 
 			image, err := os.ReadFile("testdata/image_exe_x86.dat")
@@ -644,7 +644,7 @@ func TestSpecificAddress(t *testing.T) {
 
 		t.Run("x64", func(t *testing.T) {
 			opts := &Options{
-				Address: 0x140075DDC,
+				Address: 0x14007617C,
 			}
 
 			image, err := os.ReadFile("testdata/image_exe_x64.dat")
