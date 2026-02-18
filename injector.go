@@ -899,6 +899,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			continue
 		}
 		if inj.opts.NoHookMode && i == len(inj.segment)-1 {
+			c.Write(inj.dup, segment)
 			break
 		}
 		// build jmp instruction to next code cave
@@ -1057,6 +1058,7 @@ func (inj *Injector) padding(shellcode []byte, targetRVA uint32) {
 			insts.Write(ret)
 			continue
 		}
+		// write a jmp to restore context
 		offset := uint32(len(shellcode)) - scLen
 		rel := offset - nearJumpSize
 		// if the distance is zero, replace it to a nop5
