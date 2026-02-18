@@ -40,16 +40,22 @@ func main() {
 func testNoHookMode() {
 	peb := windows.RtlGetCurrentPeb()
 	addr := peb.ImageBaseAddress + uintptr(entry)
+	fmt.Printf("entry: 0x%X", addr)
 
-	if !loader {
-		rd := rand.New(rand.NewSource(time.Now().UnixNano()))
-		num1 := rd.Uint32()
-		num2 := rd.Uint32()
-		// test function entry is a simple Add
-		ret, _, _ := syscall.SyscallN(addr, uintptr(num1), uintptr(num2))
-		if uint32(ret) != num1+num2 {
-			panic("invalid entry address")
+	if loader {
+		ret, _, _ := syscall.SyscallN(addr)
+		if ret == 1 || ret == addr {
+			return
 		}
-		return
+		panic(fmt.Sprintf("invalid return value: 0x%X", ret))
+	}
+
+	// test function entry is a simple Add
+	rd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	num1 := rd.Uint32()
+	num2 := rd.Uint32()
+	ret, _, _ := syscall.SyscallN(addr, uintptr(num1), uintptr(num2))
+	if uint32(ret) != num1+num2 {
+		panic("invalid add result")
 	}
 }
