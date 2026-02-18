@@ -24,7 +24,7 @@ var (
 		0x31, 0xC0, //               xor eax, eax
 		0x03, 0x44, 0x24, 0x04, //   add eax, [esp+04]
 		0x03, 0x44, 0x24, 0x08, //   add eax, [esp+08]
-		0xC3, //                     ret
+		0xC2, 0x08, 0x00, //         ret 8
 	}
 
 	testAddX64 = []byte{
@@ -389,6 +389,26 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
 		})
+
+		t.Run("no hook mode", func(t *testing.T) {
+			opts.NoHookMode = true
+			defer func() {
+				opts.NoHookMode = false
+			}()
+
+			image, err := os.ReadFile("testdata/image_exe_x86.dat")
+			require.NoError(t, err)
+
+			ctx, err := injector.InjectRaw(image, testAddX86, opts)
+			require.NoError(t, err)
+			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("entry: 0x%X\n", ctx.EntryAddress)
+			require.Equal(t, mode, ctx.Mode)
+
+			entry := strconv.Itoa(int(ctx.EntryAddress))
+			args := []string{"-e", entry}
+			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output, args...)
+		})
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -440,10 +460,11 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 			ctx, err := injector.InjectRaw(image, testAddX64, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("entry: 0x%X\n", ctx.EntryAddress)
 			require.Equal(t, mode, ctx.Mode)
 
 			entry := strconv.Itoa(int(ctx.EntryAddress))
-			args := []string{"-entry", entry}
+			args := []string{"-e", entry}
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output, args...)
 		})
 	})
