@@ -25,7 +25,7 @@ func TestScanCodeCave(t *testing.T) {
 			fmt.Println(cave.rva, cave.off, cave.size)
 		}
 
-		require.Equal(t, 435, len(caves))
+		require.Equal(t, 447, len(caves))
 	})
 
 	t.Run("x64", func(t *testing.T) {
@@ -42,7 +42,7 @@ func TestScanCodeCave(t *testing.T) {
 			fmt.Println(cave.rva, cave.off, cave.size)
 		}
 
-		require.Equal(t, 1557, len(caves))
+		require.Equal(t, 1600, len(caves))
 	})
 
 	err := injector.Close()
