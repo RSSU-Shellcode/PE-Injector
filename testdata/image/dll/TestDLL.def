@@ -1,3 +1,4 @@
 LIBRARY
 EXPORTS
-    Add = Add
+    Add  = Add
+    Load = Load

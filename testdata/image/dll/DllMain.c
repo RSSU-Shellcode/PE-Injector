@@ -15,7 +15,7 @@ INT32 Add(INT32 a, INT32 b)
     return a + b;
 }
 
-// only let procedure LoadLibraryW and GetProcAddress in IAT
+// only let procedure LoadLibraryW and GetProcAddress in IAT.
 BOOL Load()
 {
     HMODULE hKernel32 = LoadLibrary(L"kernel32.dll");
