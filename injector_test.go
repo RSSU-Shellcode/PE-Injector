@@ -682,7 +682,7 @@ func TestSpecificFunction(t *testing.T) {
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeCodeCaveNS, ctx.Mode)
+			require.Equal(t, ModeExtendText, ctx.Mode)
 
 			if runtime.GOARCH != "386" {
 				return
@@ -699,7 +699,7 @@ func TestSpecificFunction(t *testing.T) {
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeCodeCave, ctx.Mode)
+			require.Equal(t, ModeExtendText, ctx.Mode)
 
 			if runtime.GOARCH != "amd64" {
 				return
@@ -720,7 +720,7 @@ func TestSpecificFunction(t *testing.T) {
 			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeCodeCave, ctx.Mode)
+			require.Equal(t, ModeExtendText, ctx.Mode)
 
 			if runtime.GOARCH != "386" {
 				return
@@ -739,7 +739,7 @@ func TestSpecificFunction(t *testing.T) {
 			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
-			require.Equal(t, ModeCodeCave, ctx.Mode)
+			require.Equal(t, ModeExtendText, ctx.Mode)
 
 			if runtime.GOARCH != "amd64" {
 				return
