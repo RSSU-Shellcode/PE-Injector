@@ -385,7 +385,6 @@ entry:
   {{end}}
 
   mov rax, [rsp+0x28]                          {{igi}} // address of CreateThread
-
   sub rsp, 0x10                                {{igi}} // reserve stack for argument
   xor ecx, ecx                                 {{igi}} // lpThreadAttributes
   xor edx, edx                                 {{igi}} // dwStackSize
@@ -459,10 +458,10 @@ entry:
 // ================================== clean environment ==================================
 
   // clear volatile register that store sensitive data
-  xor {{.RegN.rdi}}, {{.RegN.rdi}}                             {{igi}}
-  xor {{.RegN.rsi}}, {{.RegN.rsi}}                             {{igi}}
-  xor {{.RegN.rbx}}, {{.RegN.rbx}}                             {{igi}}
-  xor {{.RegN.rbp}}, {{.RegN.rbp}}                             {{igi}}
+  xor {{.RegN.rdi}}, {{.RegN.rbx}}                             {{igi}}
+  xor {{.RegN.rsi}}, {{.RegN.rdi}}                             {{igi}}
+  xor {{.RegN.rbx}}, {{.RegN.rbp}}                             {{igi}}
+  xor {{.RegN.rbp}}, {{.RegN.rsi}}                             {{igi}}
 
   // clear stack that store sensitive data
   mov [rsp+0x08], {{.RegN.rdi}}                                {{igi}}
