@@ -55,7 +55,7 @@ func testNoHookMode() {
 	}
 
 	// test function entry is a simple Add
-	rd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rd := rand.New(rand.NewSource(time.Now().UnixNano())) // #nosec
 	num1 := rd.Uint32()
 	num2 := rd.Uint32()
 	ret, _, _ := syscall.SyscallN(addr, uintptr(num1), uintptr(num2))
