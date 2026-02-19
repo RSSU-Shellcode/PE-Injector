@@ -181,8 +181,8 @@ type Options struct {
 	// it is useless for method InjectRaw.
 	NotEraseShellcode bool `toml:"not_erase_shellcode" json:"not_erase_shellcode"`
 
-	// not select a random instruction after target address
-	// that can be hooked.
+	// not select a random instruction after the injected
+	// target address that can be hooked.
 	// when Address is set or NotSaveContext, it will be ignored.
 	NotFuzzHook bool `toml:"not_fuzz_hook" json:"not_fuzz_hook"`
 
@@ -662,7 +662,7 @@ func (inj *Injector) selectHookTarget() (uint32, error) {
 	return entryPoint, nil
 }
 
-// select a random instruction after target address that can be hooked.
+//gocyclo:ignore
 func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 	if inj.opts.NoHookMode {
 		return 0
@@ -898,7 +898,7 @@ func (inj *Injector) insert(targetRVA uint32, first *codeCave) error {
 			c.Write(inj.dup, jmp)
 			continue
 		}
-		if inj.opts.NoHookMode && i == len(inj.segment)-1 {
+		if i == len(inj.segment)-1 {
 			c.Write(inj.dup, segment)
 			break
 		}
