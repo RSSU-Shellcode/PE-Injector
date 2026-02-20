@@ -104,9 +104,9 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
-	t.Run("not fuzz hook", func(t *testing.T) {
+	t.Run("fuzz hook", func(t *testing.T) {
 		opts := Options{
-			NotFuzzHook: true,
+			FuzzHook: true,
 		}
 
 		testInjectorInject(t, injector, &opts)
@@ -340,9 +340,9 @@ func TestInjector_InjectRaw(t *testing.T) {
 		testInjectorInjectRaw(t, injector, &opts)
 	})
 
-	t.Run("not fuzz hook", func(t *testing.T) {
+	t.Run("fuzz hook", func(t *testing.T) {
 		opts := Options{
-			NotFuzzHook: true,
+			FuzzHook: true,
 		}
 
 		testInjectorInjectRaw(t, injector, &opts)
