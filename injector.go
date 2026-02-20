@@ -158,6 +158,11 @@ type Options struct {
 	// code for other advanced usage like shield stub.
 	NoHookMode bool `toml:"no_hook_mode" json:"no_hook_mode"`
 
+	// select a random instruction after the injected
+	// target address that can be hooked.
+	// when Address is set or NotSaveContext, it will be ignored.
+	FuzzHook bool `toml:"fuzz_hook" json:"fuzz_hook"`
+
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or some
 	// register, you need set it with true.
@@ -180,11 +185,6 @@ type Options struct {
 	// program, you need set it with true.
 	// it is useless for method InjectRaw.
 	NotEraseShellcode bool `toml:"not_erase_shellcode" json:"not_erase_shellcode"`
-
-	// not select a random instruction after the injected
-	// target address that can be hooked.
-	// when Address is set or NotSaveContext, it will be ignored.
-	NotFuzzHook bool `toml:"not_fuzz_hook" json:"not_fuzz_hook"`
 
 	// not append garbage instruction to loader.
 	// It is ignored when use modes about code cave.
@@ -667,7 +667,7 @@ func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 	if inj.opts.NoHookMode {
 		return 0
 	}
-	if inj.abs || inj.opts.NotFuzzHook || inj.opts.NotSaveContext {
+	if inj.abs || !inj.opts.FuzzHook || inj.opts.NotSaveContext {
 		return targetRVA
 	}
 	// select a random instruction that can be hooked.
