@@ -15,7 +15,7 @@ func TestProcessEAT(t *testing.T) {
 	injector := NewInjector()
 
 	t.Run("x86", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/kernel32_x86.dat")
+		image, err := os.ReadFile("testdata/image_dll_x86.dat")
 		require.NoError(t, err)
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
@@ -26,7 +26,7 @@ func TestProcessEAT(t *testing.T) {
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		image, err := os.ReadFile("testdata/kernel32_x64.dat")
+		image, err := os.ReadFile("testdata/image_dll_x64.dat")
 		require.NoError(t, err)
 		err = injector.preprocess(image, nil)
 		require.NoError(t, err)
