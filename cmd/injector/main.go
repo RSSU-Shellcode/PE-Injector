@@ -37,11 +37,12 @@ func init() {
 	flag.BoolVar(&raw, "raw", false, "inject shellcode without loader")
 	flag.Uint64Var(&opts.Address, "addr", 0, "specify the target function address that will be hooked")
 	flag.StringVar(&opts.Function, "func", "", "specify the target function in EAT that will be hooked")
+	flag.BoolVar(&opts.NoHookMode, "nhm", false, "not hook any instruction in the text section")
+	flag.BoolVar(&opts.FuzzHook, "fuzz", false, "hook random instruction after target address")
 	flag.BoolVar(&opts.NotSaveContext, "nsc", false, "not append instruction about save and restore context")
 	flag.BoolVar(&opts.NotCreateThread, "nct", false, "not create thread at the shellcode")
 	flag.BoolVar(&opts.NotWaitThread, "nwt", false, "not wait created thread at the shellcode")
 	flag.BoolVar(&opts.NotEraseShellcode, "nes", false, "not erase shellcode after execute finish")
-	flag.BoolVar(&opts.NotFuzzHook, "nfh", false, "not hook random instruction after target address")
 	flag.BoolVar(&opts.NoGarbageInst, "ngi", false, "not append garbage instruction to loader")
 	flag.BoolVar(&opts.NoShellcodeJumper, "nsj", false, "not add a shellcode jumper to call shellcode")
 	flag.BoolVar(&opts.CalculateCheckSum, "ccs", false, "overwrite checksum after inject or extend image")
@@ -151,13 +152,16 @@ func main() {
 	fmt.Println()
 	fmt.Println("num code caves:  ", ctx.NumCodeCaves)
 	fmt.Println("num loader insts:", ctx.NumLoaderInst)
-	fmt.Printf("hook address:     0x%X\n", ctx.HookAddress)
-
-	fmt.Println()
-	fmt.Println("================Hook================")
-	fmt.Println("  " + strings.ReplaceAll(ctx.HookInst, "\r\n", "\r\n  "))
-	fmt.Println("====================================")
-	fmt.Println()
+	if ctx.NoHookMode {
+		fmt.Printf("entry address:    0x%X\n", ctx.EntryAddress)
+	} else {
+		fmt.Printf("hook address:     0x%X\n", ctx.HookAddress)
+		fmt.Println()
+		fmt.Println("================Hook================")
+		fmt.Println("  " + strings.ReplaceAll(ctx.HookInst, "\r\n", "\r\n  "))
+		fmt.Println("====================================")
+		fmt.Println()
+	}
 
 	fmt.Printf("write output image to \"%s\"\n", out)
 	err = os.WriteFile(out, ctx.Output, 0600)
