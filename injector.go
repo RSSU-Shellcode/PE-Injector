@@ -682,6 +682,19 @@ func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 		if err != nil {
 			break
 		}
+		// stop when reach ret or int
+		if inst.Op == x86asm.RET || inst.Op == x86asm.INT {
+			break
+		}
+		// stop when reach a judgement jump
+		if inst.PCRelOff != 0 {
+			if inst.Op != x86asm.CALL {
+				break
+			}
+			if inst.Len != 5 {
+				break
+			}
+		}
 		// skip too small instructions for debug easily
 		if inst.Len < nearJumpSize {
 			foa += uint32(inst.Len)
@@ -696,18 +709,6 @@ func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 		if inst.Op == x86asm.JMP {
 			foa += uint32(inst.Len + int(inst.Args[0].(x86asm.Rel))) // #nosec G115
 			continue
-		}
-		if inst.Op == x86asm.RET || inst.Op == x86asm.INT {
-			break
-		}
-		// stop when reach a judgement jump
-		if inst.PCRelOff != 0 {
-			if inst.Op != x86asm.CALL {
-				break
-			}
-			if inst.Len != 5 {
-				break
-			}
 		}
 		// set preselected target
 		target = foa
