@@ -70,6 +70,14 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, opts)
 	})
 
+	t.Run("fuzz hook", func(t *testing.T) {
+		opts := Options{
+			FuzzHook: true,
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
 	t.Run("not save context", func(t *testing.T) {
 		opts := Options{
 			NotSaveContext: true,
@@ -99,14 +107,6 @@ func TestInjector_Inject(t *testing.T) {
 	t.Run("not erase shellcode", func(t *testing.T) {
 		opts := Options{
 			NotEraseShellcode: true,
-		}
-
-		testInjectorInject(t, injector, &opts)
-	})
-
-	t.Run("fuzz hook", func(t *testing.T) {
-		opts := Options{
-			FuzzHook: true,
 		}
 
 		testInjectorInject(t, injector, &opts)
@@ -218,6 +218,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("hook: 0x%X\n", ctx.HookAddress)
 			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
@@ -234,6 +235,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("hook: 0x%X\n", ctx.HookAddress)
 			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
@@ -279,6 +281,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("hook: 0x%X\n", ctx.HookAddress)
 			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
@@ -295,6 +298,7 @@ func testInjectorInjectWithOpts(t *testing.T, injector *Injector, opts *Options,
 			ctx, err := injector.Inject(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("hook: 0x%X\n", ctx.HookAddress)
 			require.Equal(t, expected, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
@@ -333,18 +337,18 @@ func TestInjector_InjectRaw(t *testing.T) {
 		testInjectorInjectRaw(t, injector, opts)
 	})
 
-	t.Run("not save context", func(t *testing.T) {
-		opts := Options{
-			NotSaveContext: true,
-		}
-		testInjectorInjectRaw(t, injector, &opts)
-	})
-
 	t.Run("fuzz hook", func(t *testing.T) {
 		opts := Options{
 			FuzzHook: true,
 		}
 
+		testInjectorInjectRaw(t, injector, &opts)
+	})
+
+	t.Run("not save context", func(t *testing.T) {
+		opts := Options{
+			NotSaveContext: true,
+		}
 		testInjectorInjectRaw(t, injector, &opts)
 	})
 
@@ -408,6 +412,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("hook: 0x%X\n", ctx.HookAddress)
 			require.Equal(t, mode, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
@@ -426,6 +431,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("hook: 0x%X\n", ctx.HookAddress)
 			require.Equal(t, mode, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x86.exe", ctx.Output)
@@ -466,6 +472,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("hook: 0x%X\n", ctx.HookAddress)
 			require.Equal(t, mode, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
@@ -484,6 +491,7 @@ func testInjectorInjectRawWithOpts(t *testing.T, injector *Injector, opts *Optio
 			ctx, err := injector.InjectRaw(image, shellcode, opts)
 			require.NoError(t, err)
 			fmt.Println("seed:", ctx.Seed)
+			fmt.Printf("hook: 0x%X\n", ctx.HookAddress)
 			require.Equal(t, mode, ctx.Mode)
 
 			testExecuteEXE(t, "testdata/injected_x64.exe", ctx.Output)
