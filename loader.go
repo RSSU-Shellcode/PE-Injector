@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -312,7 +313,6 @@ func (inj *Injector) generateLoader(loader string, payload []byte, process bool)
 	tpl, err := template.New("loader").Funcs(template.FuncMap{
 		"db":  toDB,
 		"hex": toHex,
-		"dr":  toRegDWORD,
 		"igi": inj.insertGarbageInst,
 	}).Parse(loader)
 	if err != nil {
@@ -383,6 +383,7 @@ func (inj *Injector) buildRandomRegisterMap() map[string]string {
 		for _, reg := range registerX64 {
 			register[reg] = inj.selectRegister()
 		}
+		inj.buildLowBitRegisterMap(register)
 	}
 	return register
 }
@@ -406,6 +407,7 @@ func (inj *Injector) buildVolatileRegisterMap() map[string]string {
 		for _, reg := range regVolatileX64 {
 			register[reg] = inj.selectRegister()
 		}
+		inj.buildLowBitRegisterMap(register)
 	}
 	return register
 }
@@ -429,8 +431,18 @@ func (inj *Injector) buildNonvolatileRegisterMap() map[string]string {
 		for _, reg := range regNonvolatileX64 {
 			register[reg] = inj.selectRegister()
 		}
+		inj.buildLowBitRegisterMap(register)
 	}
 	return register
+}
+
+func (inj *Injector) buildLowBitRegisterMap(register map[string]string) {
+	// build register map about low dword
+	low := make(map[string]string, len(register))
+	for reg, act := range register {
+		low[toRegDWORD(reg)] = toRegDWORD(act)
+	}
+	maps.Copy(register, low)
 }
 
 // selectRegister is used to make sure each register will be selected once.
