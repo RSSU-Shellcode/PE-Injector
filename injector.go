@@ -691,7 +691,7 @@ exit:
 		if inst.PCRelOff != 0 {
 			switch inst.Op {
 			case x86asm.CALL:
-				foa += uint32(inst.Len)
+				foa += uint32(inst.Len) // #nosec G115
 				continue
 			case x86asm.JMP:
 				// walk into the next instruction
@@ -703,18 +703,18 @@ exit:
 		}
 		// skip too small instructions for debug easily
 		if inst.Len < nearJumpSize {
-			foa += uint32(inst.Len)
+			foa += uint32(inst.Len) // #nosec G115
 			continue
 		}
 		// skip mov instruction for skip absolute address on x86
 		if inst.Op == x86asm.MOV {
-			foa += uint32(inst.Len)
+			foa += uint32(inst.Len) // #nosec G115
 			continue
 		}
 		// set preselected target
 		target = foa
 		// decode next instruction
-		foa += uint32(inst.Len)
+		foa += uint32(inst.Len) // #nosec G115
 	}
 	return inj.foaToRVA(target)
 }
