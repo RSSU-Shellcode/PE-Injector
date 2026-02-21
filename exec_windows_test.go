@@ -1,5 +1,3 @@
-//go:build windows
-
 package injector
 
 import (
