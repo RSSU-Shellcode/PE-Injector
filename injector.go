@@ -674,6 +674,7 @@ func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 	num := 4 + inj.rand.Intn(40)
 	foa := inj.rvaToFOA(targetRVA)
 	target := foa
+exit:
 	for i := 0; i < num; i++ {
 		if foa+32 > inj.size {
 			break
@@ -688,11 +689,16 @@ func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 		}
 		// stop when reach a judgement jump
 		if inst.PCRelOff != 0 {
-			if inst.Op != x86asm.CALL {
-				break
-			}
-			if inst.Len != 5 {
-				break
+			switch inst.Op {
+			case x86asm.CALL:
+				foa += uint32(inst.Len)
+				continue
+			case x86asm.JMP:
+				// walk into the next instruction
+				foa += uint32(inst.Len + int(inst.Args[0].(x86asm.Rel))) // #nosec G115
+				continue
+			default:
+				break exit
 			}
 		}
 		// skip too small instructions for debug easily
@@ -703,11 +709,6 @@ func (inj *Injector) fuzzHook(targetRVA uint32) uint32 {
 		// skip mov instruction for skip absolute address on x86
 		if inst.Op == x86asm.MOV {
 			foa += uint32(inst.Len)
-			continue
-		}
-		// walk into the next instruction
-		if inst.Op == x86asm.JMP {
-			foa += uint32(inst.Len + int(inst.Args[0].(x86asm.Rel))) // #nosec G115
 			continue
 		}
 		// set preselected target
