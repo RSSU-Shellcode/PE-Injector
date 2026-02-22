@@ -473,29 +473,33 @@ func (inj *Injector) injectShellcode(shellcode []byte) (err error) {
 }
 
 func (inj *Injector) initAssembler() error {
-	var err error
+	var (
+		ase *keystone.Engine
+		err error
+	)
 	switch inj.arch {
 	case "386":
 		if inj.ase32 != nil {
 			return nil
 		}
-		inj.ase32, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
+		ase, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_32)
 		if err != nil {
 			return err
 		}
-		return inj.ase32.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
+		inj.ase32 = ase
 	case "amd64":
 		if inj.ase64 != nil {
 			return nil
 		}
-		inj.ase64, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
+		ase, err = keystone.NewEngine(keystone.ARCH_X86, keystone.MODE_64)
 		if err != nil {
 			return err
 		}
-		return inj.ase64.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
+		inj.ase64 = ase
 	default:
 		panic("unreachable code")
 	}
+	return ase.Option(keystone.OPT_SYNTAX, keystone.OPT_SYNTAX_INTEL)
 }
 
 func (inj *Injector) assemble(src string) ([]byte, error) {
