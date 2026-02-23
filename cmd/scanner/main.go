@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/RSSU-Shellcode/PE-Injector"
+	"github.com/RTS-Framework/PE-Injector"
 )
 
 var (

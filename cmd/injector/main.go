@@ -10,7 +10,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/RSSU-Shellcode/PE-Injector"
+	"github.com/RTS-Framework/PE-Injector"
 )
 
 var (
