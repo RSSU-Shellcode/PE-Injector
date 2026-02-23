@@ -1,4 +1,4 @@
-module github.com/RSSU-Shellcode/PE-Injector
+module github.com/RTS-Framework/PE-Injector
 
 go 1.25.0
 
