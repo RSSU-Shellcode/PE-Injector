@@ -59,7 +59,7 @@ func testNoHookMode() {
 	num1 := rd.Uint32()
 	num2 := rd.Uint32()
 	ret, _, _ := syscall.SyscallN(addr, uintptr(num1), uintptr(num2))
-	if uint32(ret) == num1+num2 {
+	if uint32(ret) == num1+num2 { // #nosec G115
 		return
 	}
 	panic("invalid add result")
