@@ -164,7 +164,7 @@ func main() {
 	}
 
 	fmt.Printf("write output image to \"%s\"\n", out)
-	err = os.WriteFile(out, ctx.Output, 0600)
+	err = os.WriteFile(out, ctx.Output, 0600) // #nosec
 	checkError(err)
 
 	err = inj.Close()
