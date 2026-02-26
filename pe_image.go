@@ -396,7 +396,7 @@ func (inj *Injector) generateRandomSectionName() string {
 	}
 	name := "."
 	for i := 0; i < 3; i++ {
-		name += string(byte(offset + inj.rand.Intn(26)))
+		name += string(byte(offset + inj.rand.Intn(26))) // #nosec G115
 	}
 	return name
 }
