@@ -72,13 +72,12 @@ func (inj *Injector) paddingGarbageInst(foa, size uint32) {
 	for {
 		inst := inj.garbageInstEx(true)
 		l := uint32(len(inst)) // #nosec G115
-		if rem >= l {
-			copy(inj.dup[foa:], inst)
-			foa += l
-			rem -= l
-			continue
+		if rem < l {
+			break
 		}
-		break
+		copy(inj.dup[foa:], inst)
+		foa += l
+		rem -= l
 	}
 }
 
@@ -103,15 +102,15 @@ func (inj *Injector) garbageInstEx(broken bool) []byte {
 		inj.rand.Read(buf) // #nosec
 		return buf
 	}
-	var junkCodes []string
+	var numJunkCodes int
 	switch inj.arch {
 	case "386":
-		junkCodes = inj.getJunkCodeX86()
+		numJunkCodes = len(inj.getJunkCodeX86())
 	case "amd64":
-		junkCodes = inj.getJunkCodeX64()
+		numJunkCodes = len(inj.getJunkCodeX64())
 	}
 	// dynamically adjust probability
-	switch inj.rand.Intn(2 + len(junkCodes)) {
+	switch inj.rand.Intn(2 + numJunkCodes) {
 	case 0:
 		return nil
 	case 1:
@@ -119,20 +118,6 @@ func (inj *Injector) garbageInstEx(broken bool) []byte {
 	default:
 		return inj.garbageTemplate()
 	}
-}
-
-func (inj *Injector) getJunkCodeX86() []string {
-	if len(inj.opts.JunkCodeX86) > 0 {
-		return inj.opts.JunkCodeX86
-	}
-	return defaultJunkCodeX86
-}
-
-func (inj *Injector) getJunkCodeX64() []string {
-	if len(inj.opts.JunkCodeX64) > 0 {
-		return inj.opts.JunkCodeX64
-	}
-	return defaultJunkCodeX64
 }
 
 func (inj *Injector) garbageMultiByteNOP() []byte {
@@ -171,6 +156,20 @@ func (inj *Injector) garbageTemplate() []byte {
 		panic(fmt.Sprintf("junk code is larger than %d", maxJunkInstSize))
 	}
 	return inst
+}
+
+func (inj *Injector) getJunkCodeX86() []string {
+	if len(inj.opts.JunkCodeX86) > 0 {
+		return inj.opts.JunkCodeX86
+	}
+	return defaultJunkCodeX86
+}
+
+func (inj *Injector) getJunkCodeX64() []string {
+	if len(inj.opts.JunkCodeX64) > 0 {
+		return inj.opts.JunkCodeX64
+	}
+	return defaultJunkCodeX64
 }
 
 // #nosec G115
