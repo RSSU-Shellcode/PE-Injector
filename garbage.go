@@ -97,10 +97,14 @@ func (inj *Injector) garbageInst() []byte {
 }
 
 func (inj *Injector) garbageInstEx(broken bool) []byte {
-	if broken && inj.rand.Intn(4) == 1 {
+	if broken && inj.rand.Intn(10) == 0 {
 		buf := make([]byte, 1+inj.rand.Intn(8))
 		inj.rand.Read(buf) // #nosec
 		return buf
+	}
+	// random not insert garbage
+	if inj.rand.Intn(10) == 0 {
+		return nil
 	}
 	var numJunkCodes int
 	switch inj.arch {
@@ -110,10 +114,8 @@ func (inj *Injector) garbageInstEx(broken bool) []byte {
 		numJunkCodes = len(inj.getJunkCodeX64())
 	}
 	// dynamically adjust probability
-	switch inj.rand.Intn(2 + numJunkCodes) {
+	switch inj.rand.Intn(1 + numJunkCodes) {
 	case 0:
-		return nil
-	case 1:
 		return inj.garbageMultiByteNOP()
 	default:
 		return inj.garbageTemplate()
