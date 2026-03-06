@@ -107,4 +107,11 @@ func TestInspectJunkCodeTemplate(t *testing.T) {
 			spew.Dump(inst)
 		}
 	})
+
+	t.Run("invalid arch", func(t *testing.T) {
+		asm, inst, err := InspectJunkCodeTemplate("test", "")
+		require.EqualError(t, err, "unsupported architecture: test")
+		require.Nil(t, inst)
+		require.Zero(t, asm)
+	})
 }
