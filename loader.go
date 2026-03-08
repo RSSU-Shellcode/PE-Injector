@@ -590,13 +590,19 @@ func (inj *Injector) encryptAPIConstants(ctx *loaderCtx) {
 	}{
 		{name: acAllocationType, value: 0x3000}, // MEM_RESERVE|MEM_COMMIT
 		{name: acProtect, value: 0x04},          // PAGE_READWRITE
-		{name: acNewProtect, value: 0x40},       // PAGE_EXECUTE_READWRITE
+		{name: acNewProtect, value: 0x20},       // PAGE_EXECUTE_READ
 		{name: acInfinite, value: 0xFFFFFFFF},   // INFINITE
 		{name: acFreeType, value: 0x8000},       // MEM_RELEASE
 	} {
 		data, key := inj.encryptValue(item.value)
 		ctx.PAData[item.name] = data
 		ctx.PAKey[item.name] = key
+	}
+
+	if inj.opts.PageRWX {
+		data, key := inj.encryptValue(0x40) // PAGE_EXECUTE_READWRITE
+		ctx.PAData[acNewProtect] = data
+		ctx.PAKey[acNewProtect] = key
 	}
 }
 
