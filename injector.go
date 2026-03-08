@@ -163,6 +163,10 @@ type Options struct {
 	// when Address is set or NotSaveContext, it will be ignored.
 	FuzzHook bool `toml:"fuzz_hook" json:"fuzz_hook"`
 
+	// set the memory page protect about shellcode to PAGE_EXECUTE_READWRITE.
+	// It is a not recommended option, please use it only when necessary.
+	PageRWX bool `toml:"page_rwx" json:"page_rwx"`
+
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or some
 	// register, you need set it with true.
