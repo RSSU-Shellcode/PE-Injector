@@ -442,20 +442,22 @@ entry:
 // =================================== erase shellcode ===================================
 
 {{if .NeedEraseShellcode}}
-  // adjust memory region protect before erase
-  mov  {{.RegV.eax}}, [esp+0x10]                   {{igi}} // address of VirtualProtect
-  mov  {{.RegV.ecx}}, [esp+0x04]                   {{igi}} // lpAddress
-  sub esp, 0x04                                    {{igi}} // lpflOldProtect
-  push esp                                         {{igi}} // push argument
-  mov  {{.RegV.edx}}, {{hex .PAData.Protect}}      {{igi}} // PAGE_READWRITE
-  xor  {{.RegV.edx}}, {{hex .PAKey.Protect}}       {{igi}} // decrypt argument
-  push {{.RegV.edx}}                               {{igi}} // push argument
-  mov  {{.RegV.edx}}, {{hex .MemRegionSize}}       {{igi}} // dwSize
-  push {{.RegV.edx}}                               {{igi}} // push argument
-  mov  {{.RegV.edx}}, {{.RegV.ecx}}                {{igi}} // lpAddress
-  push {{.RegV.edx}}                               {{igi}} // push argument
-  call {{.RegV.eax}}                               {{igi}} // call VirtualProtect
-  add esp, 0x04                                    {{igi}} // restore stack for old protect
+  {{if .NeedAdjustProtect}}
+    // adjust memory region protect before erase
+    mov  {{.RegV.eax}}, [esp+0x10]                 {{igi}} // address of VirtualProtect
+    mov  {{.RegV.ecx}}, [esp+0x04]                 {{igi}} // lpAddress
+    sub esp, 0x04                                  {{igi}} // lpflOldProtect
+    push esp                                       {{igi}} // push argument
+    mov  {{.RegV.edx}}, {{hex .PAData.Protect}}    {{igi}} // PAGE_READWRITE
+    xor  {{.RegV.edx}}, {{hex .PAKey.Protect}}     {{igi}} // decrypt argument
+    push {{.RegV.edx}}                             {{igi}} // push argument
+    mov  {{.RegV.edx}}, {{hex .MemRegionSize}}     {{igi}} // dwSize
+    push {{.RegV.edx}}                             {{igi}} // push argument
+    mov  {{.RegV.edx}}, {{.RegV.ecx}}              {{igi}} // lpAddress
+    push {{.RegV.edx}}                             {{igi}} // push argument
+    call {{.RegV.eax}}                             {{igi}} // call VirtualProtect
+    add esp, 0x04                                  {{igi}} // restore stack for old protect
+  {{end}}
 
   // overwrite memory data
   mov {{.RegV.edx}}, [esp+0x04]                    {{igi}} // address of memory page
