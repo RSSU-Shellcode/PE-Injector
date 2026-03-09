@@ -194,8 +194,6 @@ entry:
   // get procedure address of WaitForSingleObject
   {{if .NeedWaitThread}}
     {{if .LackWaitForSingleObject}}
-      // ensure stack is 16 bytes aligned
-      push {{.RegV.rax}}                                       {{igi}}
       // push procedure name to stack
       mov {{.RegV.rax}}, {{index .WaitForSingleObjectDB  0}}   {{igi}}
       mov {{.RegV.r8}},  {{index .WaitForSingleObjectKey 0}}   {{igi}}
@@ -211,11 +209,11 @@ entry:
       push {{.RegV.rdx}}                                       {{igi}}
       mov rcx, {{.RegN.rsi}}   {{igi}} // hModule
       mov rdx, rsp             {{igi}} // lpProcName
-      sub rsp, 0x20            {{igi}} // reserve stack for call convention
+      sub rsp, 0x28            {{igi}} // reserve stack for call convention
       call {{.RegN.rbp}}       {{igi}} // call GetProcAddress
-      add rsp, 0x20            {{igi}} // restore stack for call convention
+      add rsp, 0x28            {{igi}} // restore stack for call convention
       // restore stack for procedure name
-      add rsp, 4*8                                             {{igi}}
+      add rsp, 3*8                                             {{igi}}
       // store procedure address to stack
       mov [rsp+0x30], rax                                      {{igi}}
     {{else}}
