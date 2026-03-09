@@ -164,8 +164,9 @@ type Options struct {
 	FuzzHook bool `toml:"fuzz_hook" json:"fuzz_hook"`
 
 	// set the memory page protect about shellcode to PAGE_EXECUTE_READWRITE.
-	// It is a not recommended option, please use it only when necessary.
-	PageRWX bool `toml:"page_rwx" json:"page_rwx"`
+	// it is a not recommended option, please use it only when necessary,
+	// like use some self-modifying shellcode.
+	UseRWXPage bool `toml:"use_rwx_page" json:"use_rwx_page"`
 
 	// not append instruction about save and restore context.
 	// if your shellcode need hijack function argument or some

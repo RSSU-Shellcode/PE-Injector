@@ -599,7 +599,7 @@ func (inj *Injector) encryptAPIConstants(ctx *loaderCtx) {
 		ctx.PAKey[item.name] = key
 	}
 
-	if inj.opts.PageRWX {
+	if inj.opts.UseRWXPage {
 		data, key := inj.encryptValue(0x40) // PAGE_EXECUTE_READWRITE
 		ctx.PAData[acNewProtect] = data
 		ctx.PAKey[acNewProtect] = key
