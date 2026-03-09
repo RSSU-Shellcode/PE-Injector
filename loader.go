@@ -108,6 +108,9 @@ type loaderCtx struct {
 	// custom switch for if statements
 	Switches map[string]bool
 
+	// special options
+	UseRWXPage bool
+
 	// store procedure status
 	LackProcedure           bool
 	LackVirtualAlloc        bool
@@ -145,7 +148,6 @@ type loaderCtx struct {
 	WaitForSingleObject uint32
 
 	// store status about options
-	NeedAdjustProtect   bool
 	NeedCreateThread    bool
 	NeedWaitThread      bool
 	NeedEraseShellcode  bool
@@ -250,7 +252,7 @@ func (inj *Injector) generateLoader(loader string, payload []byte, process bool)
 		PAData: make(map[string]uint64),
 		PAKey:  make(map[string]uint64),
 
-		NeedAdjustProtect: !inj.opts.UseRWXPage,
+		UseRWXPage: inj.opts.UseRWXPage,
 
 		CodeCaveMode:     inj.opts.ForceCodeCave,
 		CodeCaveNSMode:   inj.opts.ForceCodeCaveNS,
