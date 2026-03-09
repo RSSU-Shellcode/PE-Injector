@@ -418,7 +418,7 @@ entry:
 // =================================== erase shellcode ===================================
 
 {{if .NeedEraseShellcode}}
-  {{if .NeedAdjustProtect}}
+  {{if not .UseRWXPage}}
     // adjust memory region protect before erase
     mov rax, [rsp+0x20]                        {{igi}} // address of VirtualProtect
     mov rcx, [rsp+0x08]                        {{igi}} // lpAddress
