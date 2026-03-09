@@ -78,6 +78,14 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
+	t.Run("use rwx page", func(t *testing.T) {
+		opts := Options{
+			UseRWXPage: true,
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
 	t.Run("not save context", func(t *testing.T) {
 		opts := Options{
 			NotSaveContext: true,
