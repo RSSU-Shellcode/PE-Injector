@@ -173,6 +173,11 @@ type Options struct {
 	// register, you need set it with true.
 	NotSaveContext bool `toml:"not_save_context" json:"not_save_context"`
 
+	// not generate instruction about save and restore last error.
+	// if the current function call context does not depend on LastError,
+	// you can disable it for better output loader.
+	NotSaveLastError bool `toml:"not_save_last_error" json:"not_save_last_error"`
+
 	// not create thread at the shellcode,
 	// ensure the shellcode can be called as a function.
 	// on x86, the calling convention is stdcall.
