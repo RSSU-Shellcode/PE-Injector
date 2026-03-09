@@ -44,9 +44,6 @@ const (
 	extendTextNSThreshold = 1024
 )
 
-// The role of the payload loader is used to decrypt payload
-// in the tail section to a new RWX page, then create thread at
-// the decrypted payload(default loader template).
 var (
 	//go:embed loader/loader_x86.asm
 	defaultLoaderX86 string
@@ -147,7 +144,8 @@ type loaderCtx struct {
 	CreateThread        uint32
 	WaitForSingleObject uint32
 
-	// store options status
+	// store status about options
+	NeedAdjustProtect   bool
 	NeedCreateThread    bool
 	NeedWaitThread      bool
 	NeedEraseShellcode  bool
@@ -251,6 +249,8 @@ func (inj *Injector) generateLoader(loader string, payload []byte, process bool)
 
 		PAData: make(map[string]uint64),
 		PAKey:  make(map[string]uint64),
+
+		NeedAdjustProtect: !inj.opts.UseRWXPage,
 
 		CodeCaveMode:     inj.opts.ForceCodeCave,
 		CodeCaveNSMode:   inj.opts.ForceCodeCaveNS,
