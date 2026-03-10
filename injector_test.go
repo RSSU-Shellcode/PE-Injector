@@ -94,6 +94,14 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
+	t.Run("not save last error", func(t *testing.T) {
+		opts := Options{
+			NotSaveLastError: true,
+		}
+
+		testInjectorInject(t, injector, &opts)
+	})
+
 	t.Run("not create thread", func(t *testing.T) {
 		opts := Options{
 			NotCreateThread: true,
