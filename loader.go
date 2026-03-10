@@ -18,8 +18,8 @@ import (
 var _ embed.FS
 
 const (
-	defaultMaxNumLoaderInstX86 = 350
-	defaultMaxNumLoaderInstX64 = 300
+	defaultMaxNumLoaderInstX86 = 360
+	defaultMaxNumLoaderInstX64 = 310
 )
 
 const (
