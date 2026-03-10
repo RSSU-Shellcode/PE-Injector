@@ -26,6 +26,14 @@ entry:
   sub rsp, 0x28                                                {{igi}}
   sub rsp, 0x30                                                {{igi}}
 
+{{if .NeedSaveLastError}}
+  xor {{.Reg.rax}}, {{.Reg.rax}}                               {{igi}}
+  add {{.Reg.rax}}, 0x30                                       {{igi}}
+  mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]                          {{igi}}
+  mov {{.Reg.rcx}}, [{{.Reg.rbx}}+0x68]                        {{igi}}
+  mov [rsp+0x40], {{.Reg.rcx}}                                 {{igi}}
+{{end}}
+
 // =============================== get procedure address ===============================
 
 {{if .LackProcedure}}
@@ -472,6 +480,14 @@ entry:
 {{end}}
 
 // ================================== clean environment ==================================
+
+{{if .NeedSaveLastError}}
+  xor {{.RegV.rax}}, {{.RegV.rax}}                             {{igi}}
+  add {{.RegV.rax}}, 0x30                                      {{igi}}
+  mov {{.RegV.rcx}}, gs:[{{.RegV.rax}}]                        {{igi}}
+  mov {{.RegV.rdx}}, [rsp+0x40]                                {{igi}}
+  mov [{{.RegV.rcx}}+0x68], {{.RegV.rdx}}                      {{igi}}
+{{end}}
 
   // clear volatile register that store sensitive data
   xor {{.RegN.edi}}, {{.RegN.edi}}                             {{igi}}
