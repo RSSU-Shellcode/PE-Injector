@@ -148,6 +148,7 @@ type loaderCtx struct {
 	WaitForSingleObject uint32
 
 	// store status about options
+	NeedSaveLastError   bool
 	NeedCreateThread    bool
 	NeedWaitThread      bool
 	NeedEraseShellcode  bool
@@ -259,6 +260,8 @@ func (inj *Injector) generateLoader(loader string, payload []byte, process bool)
 		ExtendTextMode:   inj.opts.ForceExtendText,
 		ExtendTextNSMode: inj.opts.ForceExtendTextNS,
 		CreateTextMode:   inj.opts.ForceCreateText,
+
+		NeedSaveLastError: !inj.opts.NotSaveLastError,
 
 		EntryOffset:   entryOffset,
 		MemRegionSize: memRegionSize,
