@@ -26,6 +26,15 @@ entry:
   sub esp, 0x20                                                {{igi}}
   sub esp, 0x0C                                                {{igi}}
 
+{{if .NeedSaveLastError}}
+  // save the last error to stack
+  xor {{.Reg.eax}}, {{.Reg.eax}}                               {{igi}}
+  add {{.Reg.eax}}, 0x18                                       {{igi}}
+  mov {{.Reg.ebx}}, fs:[{{.Reg.eax}}]                          {{igi}}
+  mov {{.Reg.ecx}}, [{{.Reg.ebx}}+0x34]                        {{igi}}
+  mov [esp+0x20], {{.Reg.ecx}}                                 {{igi}}
+{{end}}
+
 // =============================== get procedure address ===============================
 
 {{if .LackProcedure}}
@@ -495,6 +504,15 @@ entry:
 {{end}}
 
 // ================================== clean environment ==================================
+
+{{if .NeedSaveLastError}}
+  // restore the last error from stack
+  xor {{.RegV.eax}}, {{.RegV.eax}}                             {{igi}}
+  add {{.RegV.eax}}, 0x18                                      {{igi}}
+  mov {{.RegV.ecx}}, fs:[{{.RegV.eax}}]                        {{igi}}
+  mov {{.RegV.edx}}, [esp+0x20]                                {{igi}}
+  mov [{{.RegV.ecx}}+0x34], {{.RegV.edx}}                      {{igi}}
+{{end}}
 
   // clear volatile register that store sensitive data
   xor {{.RegN.edi}}, {{.RegN.edi}}                             {{igi}}
