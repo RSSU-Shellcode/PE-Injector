@@ -178,8 +178,8 @@ type Options struct {
 	// you can disable it for better output loader.
 	NotSaveLastError bool `toml:"not_save_last_error" json:"not_save_last_error"`
 
-	// not create thread at the shellcode,
-	// ensure the shellcode can be called as a function.
+	// not create thread at the entry of shellcode,
+	// ensure the shellcode can be called as common function.
 	// on x86, the calling convention is stdcall.
 	// if it is true, it will ignore the option NotWaitThread.
 	// it is useless for method InjectRaw.
