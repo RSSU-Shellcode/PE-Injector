@@ -27,6 +27,7 @@ entry:
   sub rsp, 0x30                                                {{igi}}
 
 {{if .NeedSaveLastError}}
+  // save the last error to stack
   xor {{.Reg.rax}}, {{.Reg.rax}}                               {{igi}}
   add {{.Reg.rax}}, 0x30                                       {{igi}}
   mov {{.Reg.rbx}}, gs:[{{.Reg.rax}}]                          {{igi}}
@@ -482,11 +483,16 @@ entry:
 // ================================== clean environment ==================================
 
 {{if .NeedSaveLastError}}
+  // store return value about VirtualFree
+  push rax                                                     {{igi}}
+  // restore the last error from stack
   xor {{.RegV.rax}}, {{.RegV.rax}}                             {{igi}}
   add {{.RegV.rax}}, 0x30                                      {{igi}}
   mov {{.RegV.rcx}}, gs:[{{.RegV.rax}}]                        {{igi}}
   mov {{.RegV.rdx}}, [rsp+0x40]                                {{igi}}
   mov [{{.RegV.rcx}}+0x68], {{.RegV.rdx}}                      {{igi}}
+  // restore return value about VirtualFree
+  pop rax                                                      {{igi}}
 {{end}}
 
   // clear volatile register that store sensitive data
