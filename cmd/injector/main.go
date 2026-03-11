@@ -17,7 +17,6 @@ var (
 	img   string
 	sc    string
 	hexSC bool
-	out   string
 	ana   bool
 	exp   bool
 	raw   bool
@@ -25,13 +24,13 @@ var (
 	jcx64 string
 	tpl   string
 	opts  injector.Options
+	out   string
 )
 
 func init() {
 	flag.StringVar(&img, "img", "", "set input pe image file path")
 	flag.StringVar(&sc, "sc", "", "set input shellcode file path")
 	flag.BoolVar(&hexSC, "hex", false, "input shellcode with hex format")
-	flag.StringVar(&out, "o", "", "set output pe image file path")
 	flag.BoolVar(&ana, "ana", false, "analyze the pe image for inject")
 	flag.BoolVar(&exp, "exp", false, "dump the pe image export functions")
 	flag.BoolVar(&raw, "raw", false, "inject shellcode without loader")
@@ -61,6 +60,7 @@ func init() {
 	flag.StringVar(&jcx86, "junk-x86", "", "specify the x86 junk template directory path")
 	flag.StringVar(&jcx64, "junk-x64", "", "specify the x64 junk template directory path")
 	flag.StringVar(&tpl, "tpl", "", "use custom loader template config from a toml file")
+	flag.StringVar(&out, "out", "", "set output pe image file path")
 	flag.Parse()
 }
 
@@ -165,7 +165,7 @@ func main() {
 		fmt.Println()
 	}
 
-	fmt.Printf("write output image to \"%s\"\n", out)
+	fmt.Printf("save output image to \"%s\"\n", out)
 	err = os.WriteFile(out, ctx.Output, 0600) // #nosec
 	checkError(err)
 
