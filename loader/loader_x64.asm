@@ -19,7 +19,9 @@ entry:
   // ensure stack is 16 bytes aligned
   push rbp                                                     {{igi}}
   mov rbp, rsp                                                 {{igi}}
-  and rsp, 0xFFFFFFFFFFFFFFF0                                  {{igi}}
+  mov {{.RegV.rax}}, rbp                                       {{igi}}
+  and {{.RegV.rax}}, 0x0F                                      {{igi}}
+  sub rsp, {{.RegV.rax}}                                       {{igi}}
   push rbp                                                     {{igi}}
 
   // reserve stack for store variables
