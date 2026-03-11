@@ -506,12 +506,16 @@ entry:
 // ================================== clean environment ==================================
 
 {{if .NeedSaveLastError}}
+  // store return value about VirtualFree
+  push eax                                                     {{igi}}
   // restore the last error from stack
   xor {{.RegV.eax}}, {{.RegV.eax}}                             {{igi}}
   add {{.RegV.eax}}, 0x18                                      {{igi}}
   mov {{.RegV.ecx}}, fs:[{{.RegV.eax}}]                        {{igi}}
   mov {{.RegV.edx}}, [esp+0x20]                                {{igi}}
   mov [{{.RegV.ecx}}+0x34], {{.RegV.edx}}                      {{igi}}
+  // restore return value about VirtualFree
+  pop eax                                                      {{igi}}
 {{end}}
 
   // clear volatile register that store sensitive data
