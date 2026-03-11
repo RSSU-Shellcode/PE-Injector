@@ -17,12 +17,12 @@ entry:
 // ================================ prepare environment ================================
 
   // ensure stack is 16 bytes aligned
-  push ebp                                                     {{igi}}
-  mov ebp, esp                                                 {{igi}}
-  mov {{.RegV.eax}}, ebp                                       {{igi}}
+  push {{.RegN.ebp}}                                           {{igi}}
+  mov {{.RegN.ebp}}, esp                                       {{igi}}
+  mov {{.RegV.eax}}, {{.RegN.ebp}}                             {{igi}}
   and {{.RegV.eax}}, 0x0F                                      {{igi}}
   sub esp, {{.RegV.eax}}                                       {{igi}}
-  push ebp                                                     {{igi}}
+  push {{.RegN.ebp}}                                           {{igi}}
 
   // reserve stack for store variables
   sub esp, 0x20                                                {{igi}}
@@ -540,9 +540,9 @@ entry:
   add esp, 0x20                                                {{igi}}
 
   // restore stack and ebp
-  pop ebp                                                      {{igi}}
-  mov esp, ebp                                                 {{igi}}
-  pop ebp                                                      {{igi}}
+  pop {{.RegN.ebp}}                                            {{igi}}
+  mov esp, {{.RegN.ebp}}                                       {{igi}}
+  pop {{.RegN.ebp}}                                            {{igi}}
 
   // mark the end of loader
   {{db .EndOfLoader}}
