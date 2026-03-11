@@ -97,10 +97,11 @@ func main() {
 	}
 	fmt.Println("input shellcode size:", len(shellcode))
 
-	opts.LoaderX86 = loadLoaderTemplate(opts.LoaderX86)
-	opts.LoaderX64 = loadLoaderTemplate(opts.LoaderX64)
-	opts.JunkCodeX86 = loadJunkCodeTemplate(jcx86)
-	opts.JunkCodeX64 = loadJunkCodeTemplate(jcx64)
+	opts.LoaderX86 = loadLoaderTemplate("x86", opts.LoaderX86)
+	opts.LoaderX64 = loadLoaderTemplate("x64", opts.LoaderX64)
+	opts.JunkCodeX86 = loadJunkCodeTemplate("x86", jcx86)
+	opts.JunkCodeX64 = loadJunkCodeTemplate("x64", jcx64)
+
 	if tpl != "" {
 		fmt.Println("use custom loader template")
 		config, err := os.ReadFile(tpl) // #nosec
@@ -220,17 +221,20 @@ func dumpImageExports() {
 	}
 }
 
-func loadLoaderTemplate(path string) string {
+func loadLoaderTemplate(arch, path string) string {
 	if path == "" {
 		return ""
 	}
 	fmt.Println("load custom loader template:", path)
-	template, err := os.ReadFile(path) // #nosec
+	data, err := os.ReadFile(path) // #nosec
 	checkError(err)
-	return string(template)
+	template := string(data)
+	// _, _, err = injector.InspectLoaderTemplate(arch, template, nil) // TODO
+	checkError(err)
+	return template
 }
 
-func loadJunkCodeTemplate(dir string) []string {
+func loadJunkCodeTemplate(arch, dir string) []string {
 	if dir == "" {
 		return nil
 	}
@@ -244,7 +248,10 @@ func loadJunkCodeTemplate(dir string) []string {
 		}
 		data, err := os.ReadFile(filepath.Join(dir, file.Name())) // #nosec
 		checkError(err)
-		templates = append(templates, string(data))
+		template := string(data)
+		_, _, err = injector.InspectJunkCodeTemplate(arch, template)
+		checkError(err)
+		templates = append(templates, template)
 	}
 	return templates
 }
