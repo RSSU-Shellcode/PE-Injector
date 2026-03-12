@@ -81,6 +81,16 @@ func (inj *Injector) paddingGarbageInst(foa, size uint32) {
 	}
 }
 
+func (inj *Injector) insertGarbageInst() string {
+	if inj.opts.NoGarbageInst {
+		return ""
+	}
+	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
+		return ""
+	}
+	return ";" + toDB(inj.garbageInst())
+}
+
 func (inj *Injector) garbageInst() []byte {
 	if inj.opts.NoGarbageInst {
 		return nil
