@@ -4,12 +4,8 @@ import (
 	"bytes"
 	"embed"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
-	"strconv"
 	"strings"
 	"text/template"
 )
@@ -50,38 +46,6 @@ var (
 
 	//go:embed loader/loader_x64.asm
 	defaultLoaderX64 string
-)
-
-var (
-	registerX86 = []string{
-		"eax", "ebx", "ecx", "edx",
-		"ebp", "edi", "esi",
-	}
-
-	regVolatileX86 = []string{
-		"eax", "ecx", "edx",
-	}
-
-	regNonvolatileX86 = []string{
-		"ebx", "ebp", "edi", "esi",
-	}
-
-	registerX64 = []string{
-		"rax", "rbx", "rcx", "rdx",
-		"rbp", "rdi", "rsi",
-		"r8", "r9", "r10", "r11",
-		"r12", "r13", "r14", "r15",
-	}
-
-	regVolatileX64 = []string{
-		"rax", "rcx", "rdx",
-		"r8", "r9", "r10", "r11",
-	}
-
-	regNonvolatileX64 = []string{
-		"rbx", "rbp", "rdi", "rsi",
-		"r12", "r13", "r14", "r15",
-	}
 )
 
 type loaderCtx struct {
@@ -367,96 +331,6 @@ func (inj *Injector) getMaxNumLoaderInstX64() int {
 		return tpl.MaxNumInstX64
 	}
 	return defaultMaxNumLoaderInstX64
-}
-
-func (inj *Injector) buildRandomRegisterMap() map[string]string {
-	var reg []string
-	switch inj.arch {
-	case "386":
-		reg = slices.Clone(registerX86)
-	case "amd64":
-		reg = slices.Clone(registerX64)
-	}
-	inj.regBox = reg
-	register := make(map[string]string, len(reg))
-	switch inj.arch {
-	case "386":
-		for _, reg := range registerX86 {
-			register[reg] = inj.selectRegister()
-		}
-	case "amd64":
-		for _, reg := range registerX64 {
-			register[reg] = inj.selectRegister()
-		}
-		inj.buildLowBitRegisterMap(register)
-	}
-	return register
-}
-
-func (inj *Injector) buildVolatileRegisterMap() map[string]string {
-	var reg []string
-	switch inj.arch {
-	case "386":
-		reg = slices.Clone(regVolatileX86)
-	case "amd64":
-		reg = slices.Clone(regVolatileX64)
-	}
-	inj.regBox = reg
-	register := make(map[string]string, len(reg))
-	switch inj.arch {
-	case "386":
-		for _, reg := range regVolatileX86 {
-			register[reg] = inj.selectRegister()
-		}
-	case "amd64":
-		for _, reg := range regVolatileX64 {
-			register[reg] = inj.selectRegister()
-		}
-		inj.buildLowBitRegisterMap(register)
-	}
-	return register
-}
-
-func (inj *Injector) buildNonvolatileRegisterMap() map[string]string {
-	var reg []string
-	switch inj.arch {
-	case "386":
-		reg = slices.Clone(regNonvolatileX86)
-	case "amd64":
-		reg = slices.Clone(regNonvolatileX64)
-	}
-	inj.regBox = reg
-	register := make(map[string]string, len(reg))
-	switch inj.arch {
-	case "386":
-		for _, reg := range regNonvolatileX86 {
-			register[reg] = inj.selectRegister()
-		}
-	case "amd64":
-		for _, reg := range regNonvolatileX64 {
-			register[reg] = inj.selectRegister()
-		}
-		inj.buildLowBitRegisterMap(register)
-	}
-	return register
-}
-
-func (inj *Injector) buildLowBitRegisterMap(register map[string]string) {
-	// build register map about low dword
-	low := make(map[string]string, len(register))
-	for reg, act := range register {
-		low[toRegDWORD(reg)] = toRegDWORD(act)
-	}
-	maps.Copy(register, low)
-}
-
-// selectRegister is used to make sure each register will be selected once.
-func (inj *Injector) selectRegister() string {
-	idx := inj.rand.Intn(len(inj.regBox))
-	reg := inj.regBox[idx]
-	// remove selected register
-	inj.regBox = append(inj.regBox[:idx], inj.regBox[idx+1:]...)
-	return reg
 }
 
 func (inj *Injector) findProcFromIAT(ctx *loaderCtx) error {
@@ -1096,16 +970,6 @@ func (inj *Injector) encryptPayload(ctx *loaderCtx, payload []byte) []byte {
 	return section.Bytes()
 }
 
-func (inj *Injector) insertGarbageInst() string {
-	if inj.opts.NoGarbageInst {
-		return ""
-	}
-	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
-		return ""
-	}
-	return ";" + toDB(inj.garbageInst())
-}
-
 func removeCodeCaveModeStub(loader string) string {
 	return strings.ReplaceAll(loader, codeCaveModeStub, "")
 }
@@ -1132,32 +996,4 @@ func toUTF16(s string) string {
 		u.WriteByte(0x00)
 	}
 	return u.String()
-}
-
-func toDB(b []byte) string {
-	if len(b) == 0 {
-		return ""
-	}
-	builder := strings.Builder{}
-	builder.WriteString(".byte ")
-	for i := 0; i < len(b); i++ {
-		builder.WriteString("0x")
-		s := hex.EncodeToString([]byte{b[i]})
-		builder.WriteString(strings.ToUpper(s))
-		builder.WriteString(", ")
-	}
-	return builder.String()
-}
-
-func toHex(v any) string {
-	return fmt.Sprintf("0x%X", v)
-}
-
-// convert r8 -> r8d, rax -> eax
-func toRegDWORD(reg string) string {
-	_, err := strconv.Atoi(reg[1:])
-	if err == nil {
-		return reg + "d"
-	}
-	return strings.ReplaceAll(reg, "r", "e")
 }
