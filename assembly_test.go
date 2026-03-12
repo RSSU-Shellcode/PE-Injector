@@ -39,6 +39,68 @@ func TestBuildRandomRegisterMap(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestBuildVolatileRegisterMap(t *testing.T) {
+	injector := NewInjector()
+
+	t.Run("x86", func(t *testing.T) {
+		injector.arch = "386"
+		err := injector.initAssembler()
+		require.NoError(t, err)
+
+		regMap := injector.buildVolatileRegisterMap()
+		for src, dst := range regMap {
+			fmt.Printf("%s -> %s\n", src, dst)
+			require.NotEqual(t, src, dst)
+		}
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		injector.arch = "amd64"
+		err := injector.initAssembler()
+		require.NoError(t, err)
+
+		regMap := injector.buildVolatileRegisterMap()
+		for src, dst := range regMap {
+			fmt.Printf("%s -> %s\n", src, dst)
+			require.NotEqual(t, src, dst)
+		}
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
+}
+
+func TestBuildNonvolatileRegisterMap(t *testing.T) {
+	injector := NewInjector()
+
+	t.Run("x86", func(t *testing.T) {
+		injector.arch = "386"
+		err := injector.initAssembler()
+		require.NoError(t, err)
+
+		regMap := injector.buildNonvolatileRegisterMap()
+		for src, dst := range regMap {
+			fmt.Printf("%s -> %s\n", src, dst)
+			require.NotEqual(t, src, dst)
+		}
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		injector.arch = "amd64"
+		err := injector.initAssembler()
+		require.NoError(t, err)
+
+		regMap := injector.buildNonvolatileRegisterMap()
+		for src, dst := range regMap {
+			fmt.Printf("%s -> %s\n", src, dst)
+			require.NotEqual(t, src, dst)
+		}
+	})
+
+	err := injector.Close()
+	require.NoError(t, err)
+}
+
 func TestRelocateInstructionSegment(t *testing.T) {
 	injector := NewInjector()
 
