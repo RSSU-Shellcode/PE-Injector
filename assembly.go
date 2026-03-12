@@ -48,93 +48,82 @@ var (
 )
 
 func (inj *Injector) buildRandomRegisterMap() map[string]string {
-	var reg []string
+	var registers []string
 	switch inj.arch {
 	case "386":
-		reg = slices.Clone(registerX86)
+		registers = registerX86
 	case "amd64":
-		reg = slices.Clone(registerX64)
+		registers = registerX64
 	}
-	inj.regBox = reg
-	register := make(map[string]string, len(reg))
-	switch inj.arch {
-	case "386":
-		for _, reg := range registerX86 {
-			register[reg] = inj.selectRegister()
-		}
-	case "amd64":
-		for _, reg := range registerX64 {
-			register[reg] = inj.selectRegister()
-		}
-		inj.buildLowBitRegisterMap(register)
+	reg := inj.shuffleRegisterMap(registers)
+	if inj.arch == "amd64" {
+		inj.buildLowBitRegisterMap(reg)
 	}
-	return register
+	return reg
 }
 
 func (inj *Injector) buildVolatileRegisterMap() map[string]string {
-	var reg []string
+	var registers []string
 	switch inj.arch {
 	case "386":
-		reg = slices.Clone(regVolatileX86)
+		registers = regVolatileX86
 	case "amd64":
-		reg = slices.Clone(regVolatileX64)
+		registers = regVolatileX64
 	}
-	inj.regBox = reg
-	register := make(map[string]string, len(reg))
-	switch inj.arch {
-	case "386":
-		for _, reg := range regVolatileX86 {
-			register[reg] = inj.selectRegister()
-		}
-	case "amd64":
-		for _, reg := range regVolatileX64 {
-			register[reg] = inj.selectRegister()
-		}
-		inj.buildLowBitRegisterMap(register)
+	reg := inj.shuffleRegisterMap(registers)
+	if inj.arch == "amd64" {
+		inj.buildLowBitRegisterMap(reg)
 	}
-	return register
+	return reg
 }
 
 func (inj *Injector) buildNonvolatileRegisterMap() map[string]string {
-	var reg []string
+	var registers []string
 	switch inj.arch {
 	case "386":
-		reg = slices.Clone(regNonvolatileX86)
+		registers = regNonvolatileX86
 	case "amd64":
-		reg = slices.Clone(regNonvolatileX64)
+		registers = regNonvolatileX64
 	}
-	inj.regBox = reg
-	register := make(map[string]string, len(reg))
-	switch inj.arch {
-	case "386":
-		for _, reg := range regNonvolatileX86 {
-			register[reg] = inj.selectRegister()
-		}
-	case "amd64":
-		for _, reg := range regNonvolatileX64 {
-			register[reg] = inj.selectRegister()
-		}
-		inj.buildLowBitRegisterMap(register)
+	reg := inj.shuffleRegisterMap(registers)
+	if inj.arch == "amd64" {
+		inj.buildLowBitRegisterMap(reg)
 	}
-	return register
-}
-
-func (inj *Injector) buildLowBitRegisterMap(register map[string]string) {
-	// build register map about low dword
-	low := make(map[string]string, len(register))
-	for reg, act := range register {
-		low[toRegDWORD(reg)] = toRegDWORD(act)
-	}
-	maps.Copy(register, low)
-}
-
-// selectRegister is used to make sure each register will be selected once.
-func (inj *Injector) selectRegister() string {
-	idx := inj.rand.Intn(len(inj.regBox))
-	reg := inj.regBox[idx]
-	// remove selected register
-	inj.regBox = append(inj.regBox[:idx], inj.regBox[idx+1:]...)
 	return reg
+}
+
+func (inj *Injector) shuffleRegisterMap(registers []string) map[string]string {
+	src := registers
+	dst := slices.Clone(registers)
+	for {
+		inj.rand.Shuffle(len(dst), func(i, j int) {
+			dst[i], dst[j] = dst[j], dst[i]
+		})
+		var same bool
+		for i := 0; i < len(src); i++ {
+			if src[i] == dst[i] {
+				same = true
+				break
+			}
+		}
+		if !same {
+			break
+		}
+	}
+	reg := make(map[string]string, len(src))
+	for i := 0; i < len(src); i++ {
+		reg[src[i]] = dst[i]
+	}
+	return reg
+}
+
+// build register map about low dword
+func (inj *Injector) buildLowBitRegisterMap(regMap map[string]string) {
+	low := make(map[string]string, len(regMap))
+	for src, dst := range regMap {
+		low[toRegDWORD(src)] = toRegDWORD(dst)
+	}
+	maps.Copy(regMap, low)
 }
 
 func (inj *Injector) decodeInst(src []byte) (*x86asm.Inst, error) {
