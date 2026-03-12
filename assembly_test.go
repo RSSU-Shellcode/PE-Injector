@@ -1,6 +1,7 @@
 package injector
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -49,6 +50,22 @@ func TestRelocateInstructionSegment(t *testing.T) {
 
 	err := injector.Close()
 	require.NoError(t, err)
+}
+
+func TestPrintInstructions(t *testing.T) {
+	t.Run("x86", func(t *testing.T) {
+		binHex, insts, err := printInstructions(testAddX86, 32)
+		require.NoError(t, err)
+		fmt.Println(binHex)
+		fmt.Println(insts)
+	})
+
+	t.Run("x64", func(t *testing.T) {
+		binHex, insts, err := printInstructions(testAddX64, 64)
+		require.NoError(t, err)
+		fmt.Println(binHex)
+		fmt.Println(insts)
+	})
 }
 
 func TestToDB(t *testing.T) {
