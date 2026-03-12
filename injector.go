@@ -136,9 +136,6 @@ type Injector struct {
 
 	// for write shellcode segment
 	caves []*codeCave
-
-	// for select random register
-	regBox []string
 }
 
 // Options contains options about inject shellcode.
