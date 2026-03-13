@@ -1,7 +1,11 @@
 package injector
 
 import (
+	"context"
 	"fmt"
+	"runtime"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // InspectConfig contains configuration about inspect loader template.
@@ -21,8 +25,44 @@ type InspectConfig struct {
 	HasLoadLibraryW        bool `toml:"has_load_library_w"         json:"has_load_library_w"`
 }
 
-// InspectLoaderTemplate is used to inspect loader template.
-func InspectLoaderTemplate(arch, template string, cfg *InspectConfig) (string, []byte, error) {
+// InspectLoaderTemplate is used to inspect loader template with all possible configurations.
+func InspectLoaderTemplate(arch, template string) error {
+	configs := buildPossibleConfigs()
+	// send configs to channel
+	configCh := make(chan *InspectConfig, len(configs))
+	for _, config := range configs {
+		configCh <- config
+	}
+	close(configCh)
+	// start inspectors
+	numWorker := runtime.NumCPU()/2 + 1
+	if numWorker > 8 {
+		numWorker = 1
+	}
+	group, ctx := errgroup.WithContext(context.Background())
+	for i := 0; i < numWorker; i++ {
+		group.Go(func() error {
+			for {
+				select {
+				case config, ok := <-configCh:
+					if !ok {
+						return nil
+					}
+					_, _, err := InspectLoaderTemplateWithConfig(arch, template, config)
+					if err != nil {
+						return err
+					}
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		})
+	}
+	return group.Wait()
+}
+
+// InspectLoaderTemplateWithConfig is used to inspect loader template with config.
+func InspectLoaderTemplateWithConfig(arch, template string, cfg *InspectConfig) (string, []byte, error) {
 	arch, err := selectInspectArch(arch)
 	if err != nil {
 		return "", nil, err
@@ -97,6 +137,50 @@ func InspectJunkCodeTemplate(arch, template string) (string, []byte, error) {
 		return "", nil, err
 	}
 	return asm, inst, nil
+}
+
+func buildPossibleConfigs() []*InspectConfig {
+	var configs []*InspectConfig
+	for i := 0; i < 5; i++ {
+		config := InspectConfig{}
+		config.CodeCaveMode = i == 0
+		config.CodeCaveNSMode = i == 1
+		config.ExtendTextMode = i == 2
+		config.ExtendTextNSMode = i == 3
+		config.CreateTextMode = i == 4
+
+		for i1 := 0; i1 < 2; i1++ {
+			config.HasVirtualAlloc = i1 == 0
+			for i2 := 0; i2 < 2; i2++ {
+				config.HasVirtualFree = i2 == 0
+				for i3 := 0; i3 < 2; i3++ {
+					config.HasVirtualProtect = i3 == 0
+					for i4 := 0; i4 < 2; i4++ {
+						config.HasCreateThread = i4 == 0
+						for i5 := 0; i5 < 2; i5++ {
+							config.HasWaitForSingleObject = i5 == 0
+
+							config.HasLoadLibraryA = true
+							config.HasLoadLibraryW = false
+							cp := config
+							configs = append(configs, &cp)
+
+							config.HasLoadLibraryA = false
+							config.HasLoadLibraryW = true
+							cp = config
+							configs = append(configs, &cp)
+
+							config.HasLoadLibraryA = true
+							config.HasLoadLibraryW = true
+							cp = config
+							configs = append(configs, &cp)
+						}
+					}
+				}
+			}
+		}
+	}
+	return configs
 }
 
 func selectInspectArch(arch string) (string, error) {
