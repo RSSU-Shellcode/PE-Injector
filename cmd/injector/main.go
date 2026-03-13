@@ -17,6 +17,7 @@ var (
 	img   string
 	sc    string
 	hexSC bool
+	sin   bool
 	ana   bool
 	exp   bool
 	raw   bool
@@ -31,6 +32,7 @@ func init() {
 	flag.StringVar(&img, "img", "", "set input pe image file path")
 	flag.StringVar(&sc, "sc", "", "set input shellcode file path")
 	flag.BoolVar(&hexSC, "hex", false, "input shellcode with hex format")
+	flag.BoolVar(&sin, "sin", false, "skip custom loader template inspection")
 	flag.BoolVar(&ana, "ana", false, "analyze the pe image for inject")
 	flag.BoolVar(&exp, "exp", false, "dump the pe image export functions")
 	flag.BoolVar(&raw, "raw", false, "inject shellcode without loader")
@@ -229,9 +231,32 @@ func loadLoaderTemplate(arch, path string) string {
 	data, err := os.ReadFile(path) // #nosec
 	checkError(err)
 	template := string(data)
-	// _, _, err = injector.InspectLoaderTemplate(arch, template, nil) // TODO
+	if sin {
+		return template
+	}
+	fmt.Println("inspect custom loader template")
+	cfg, err := injector.InspectLoaderTemplate(arch, template)
+	if err == nil || cfg == nil {
+		return template
+	}
+	fmt.Println("failed to inspect template with this configuration")
+	fmt.Println()
+	fmt.Println("CodeCaveMode:    ", cfg.CodeCaveMode)
+	fmt.Println("CodeCaveNSMode:  ", cfg.CodeCaveNSMode)
+	fmt.Println("ExtendTextMode:  ", cfg.ExtendTextMode)
+	fmt.Println("ExtendTextNSMode:", cfg.ExtendTextNSMode)
+	fmt.Println("CreateTextMode:  ", cfg.CreateTextMode)
+	fmt.Println()
+	fmt.Println("HasVirtualAlloc:       ", cfg.HasVirtualAlloc)
+	fmt.Println("HasVirtualFree:        ", cfg.HasVirtualFree)
+	fmt.Println("HasVirtualProtect:     ", cfg.HasVirtualProtect)
+	fmt.Println("HasCreateThread:       ", cfg.HasCreateThread)
+	fmt.Println("HasWaitForSingleObject:", cfg.HasWaitForSingleObject)
+	fmt.Println("HasLoadLibraryA:       ", cfg.HasLoadLibraryA)
+	fmt.Println("HasLoadLibraryW:       ", cfg.HasLoadLibraryW)
+	fmt.Println()
 	checkError(err)
-	return template
+	return ""
 }
 
 func loadJunkCodeTemplate(arch, dir string) []string {
