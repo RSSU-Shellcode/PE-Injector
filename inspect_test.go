@@ -10,18 +10,30 @@ import (
 
 func TestInspectLoaderTemplate(t *testing.T) {
 	t.Run("x86", func(t *testing.T) {
-		err := InspectLoaderTemplate("x86", defaultLoaderX86)
+		cfg, err := InspectLoaderTemplate("386", defaultLoaderX86)
 		require.NoError(t, err)
+		require.Nil(t, cfg)
 	})
 
 	t.Run("x64", func(t *testing.T) {
-		err := InspectLoaderTemplate("x64", defaultLoaderX64)
+		cfg, err := InspectLoaderTemplate("amd64", defaultLoaderX64)
 		require.NoError(t, err)
+		require.Nil(t, cfg)
+	})
+
+	t.Run("invalid template", func(t *testing.T) {
+		cfg, err := InspectLoaderTemplate("amd64", "invalid")
+		errStr := "failed to assemble loader: failed to assemble: "
+		errStr += "Invalid mnemonic (KS_ERR_ASM_MNEMONICFAIL)"
+		require.EqualError(t, err, errStr)
+		require.NotNil(t, cfg)
+		spew.Dump(cfg)
 	})
 }
 
 func TestInspectLoaderTemplateWithConfig(t *testing.T) {
 	configs := buildPossibleConfigs()
+
 	t.Run("x86", func(t *testing.T) {
 		for _, cfg := range configs {
 			asm, inst, err := InspectLoaderTemplateWithConfig("386", defaultLoaderX86, cfg)
