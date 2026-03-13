@@ -40,29 +40,30 @@ func InspectLoaderTemplate(arch, template string) (*InspectConfig, error) {
 	close(configCh)
 	// start inspectors
 	var errCfg atomic.Value
+	group, ctx := errgroup.WithContext(context.Background())
+	worker := func() error {
+		for {
+			select {
+			case config, ok := <-configCh:
+				if !ok {
+					return nil
+				}
+				_, _, err := InspectLoaderTemplateWithConfig(arch, template, config)
+				if err != nil {
+					errCfg.Store(config)
+					return err
+				}
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
 	numWorker := runtime.NumCPU()/2 + 1
 	if numWorker > maxInspectors {
 		numWorker = maxInspectors
 	}
-	group, ctx := errgroup.WithContext(context.Background())
 	for i := 0; i < numWorker; i++ {
-		group.Go(func() error {
-			for {
-				select {
-				case config, ok := <-configCh:
-					if !ok {
-						return nil
-					}
-					_, _, err := InspectLoaderTemplateWithConfig(arch, template, config)
-					if err != nil {
-						errCfg.Store(config)
-						return err
-					}
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		})
+		group.Go(worker)
 	}
 	err := group.Wait()
 	if err == nil {
