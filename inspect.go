@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
 )
+
+const maxInspectors = 8
 
 // InspectConfig contains configuration about inspect loader template.
 type InspectConfig struct {
@@ -26,7 +29,8 @@ type InspectConfig struct {
 }
 
 // InspectLoaderTemplate is used to inspect loader template with all possible configurations.
-func InspectLoaderTemplate(arch, template string) error {
+// If appear error when inspected, it will return the InspectConfig that cause error.
+func InspectLoaderTemplate(arch, template string) (*InspectConfig, error) {
 	configs := buildPossibleConfigs()
 	// send configs to channel
 	configCh := make(chan *InspectConfig, len(configs))
@@ -35,9 +39,10 @@ func InspectLoaderTemplate(arch, template string) error {
 	}
 	close(configCh)
 	// start inspectors
+	var errCfg atomic.Value
 	numWorker := runtime.NumCPU()/2 + 1
-	if numWorker > 8 {
-		numWorker = 1
+	if numWorker > maxInspectors {
+		numWorker = maxInspectors
 	}
 	group, ctx := errgroup.WithContext(context.Background())
 	for i := 0; i < numWorker; i++ {
@@ -50,6 +55,7 @@ func InspectLoaderTemplate(arch, template string) error {
 					}
 					_, _, err := InspectLoaderTemplateWithConfig(arch, template, config)
 					if err != nil {
+						errCfg.Store(config)
 						return err
 					}
 				case <-ctx.Done():
@@ -58,7 +64,12 @@ func InspectLoaderTemplate(arch, template string) error {
 			}
 		})
 	}
-	return group.Wait()
+	err := group.Wait()
+	if err == nil {
+		return nil, nil
+	}
+	errConfig := errCfg.Load().(*InspectConfig)
+	return errConfig, err
 }
 
 // InspectLoaderTemplateWithConfig is used to inspect loader template with config.
@@ -102,35 +113,6 @@ func InspectLoaderTemplateWithConfig(arch, template string, cfg *InspectConfig) 
 	inst, err := injector.assemble(asm)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to assemble loader: %s", err)
-	}
-	err = injector.Close()
-	if err != nil {
-		return "", nil, err
-	}
-	return asm, inst, nil
-}
-
-// InspectJunkCodeTemplate is used to inspect junk code template.
-func InspectJunkCodeTemplate(arch, template string) (string, []byte, error) {
-	arch, err := selectInspectArch(arch)
-	if err != nil {
-		return "", nil, err
-	}
-	// build injector internal status
-	injector := NewInjector()
-	injector.arch = arch
-	injector.opts = new(Options)
-	err = injector.initAssembler()
-	if err != nil {
-		return "", nil, err
-	}
-	asm, err := injector.buildJunkCode(template)
-	if err != nil {
-		return "", nil, err
-	}
-	inst, err := injector.assemble(asm)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to assemble junk code: %s", err)
 	}
 	err = injector.Close()
 	if err != nil {
@@ -253,4 +235,33 @@ func buildFakeIATList(cfg *InspectConfig) []*iat {
 		rva:  0x8000,
 	})
 	return list
+}
+
+// InspectJunkCodeTemplate is used to inspect junk code template.
+func InspectJunkCodeTemplate(arch, template string) (string, []byte, error) {
+	arch, err := selectInspectArch(arch)
+	if err != nil {
+		return "", nil, err
+	}
+	// build injector internal status
+	injector := NewInjector()
+	injector.arch = arch
+	injector.opts = new(Options)
+	err = injector.initAssembler()
+	if err != nil {
+		return "", nil, err
+	}
+	asm, err := injector.buildJunkCode(template)
+	if err != nil {
+		return "", nil, err
+	}
+	inst, err := injector.assemble(asm)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to assemble junk code: %s", err)
+	}
+	err = injector.Close()
+	if err != nil {
+		return "", nil, err
+	}
+	return asm, inst, nil
 }
