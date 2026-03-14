@@ -9,7 +9,7 @@ import (
 	"text/template"
 )
 
-const maxJunkICodeShortSize = 64
+const maxJunkInstShortSize = 64
 
 // The role of the junk code is to make the instruction sequence
 // as featureless as possible.
@@ -65,12 +65,12 @@ type junkCodeCtx struct {
 	Less64 map[string]int
 }
 
-// padding the garbage instruction to the extended text
+// padding the junk instruction to the extended text
 // section or created new text section code cave.
-func (inj *Injector) paddingGarbageInst(foa, size uint32) {
+func (inj *Injector) paddingJunkInst(foa, size uint32) {
 	rem := size
 	for {
-		inst := inj.garbageInstEx(true, false)
+		inst := inj.buildJunkInst(true, false)
 		l := uint32(len(inst)) // #nosec G115
 		if rem < l {
 			break
@@ -81,53 +81,43 @@ func (inj *Injector) paddingGarbageInst(foa, size uint32) {
 	}
 }
 
-func (inj *Injector) insertGarbageInst() string {
-	if inj.opts.NoGarbageInst {
+func (inj *Injector) insertJunkInst() string {
+	if inj.opts.NoJunkCode {
 		return ""
 	}
 	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
 		return ""
 	}
-	return ";" + toDB(inj.garbageInst())
+	// must reset seed to ensure that the generation
+	// sequence of junk instructions is consistent
+	// in both cases, the correct size of the loader
+	// can be calculated.
+	inj.rand.Seed(inj.ijir.Int63())
+	return ";" + toDB(inj.buildJunkInst(false, false))
 }
 
-func (inj *Injector) garbageInst() []byte {
-	if inj.opts.NoGarbageInst {
+func (inj *Injector) junkInstShort() []byte {
+	if inj.opts.NoJunkCode {
 		return nil
 	}
 	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
 		return nil
 	}
 	// must reset seed to ensure that the generation
-	// sequence of garbage instructions is consistent
+	// sequence of junk instructions is consistent
 	// in both cases, the correct size of the loader
 	// can be calculated.
-	inj.rand.Seed(inj.igir.Int63())
-	return inj.garbageInstEx(false, false)
+	inj.rand.Seed(inj.ijir.Int63())
+	return inj.buildJunkInst(false, true)
 }
 
-func (inj *Injector) garbageInstShort() []byte {
-	if inj.opts.NoGarbageInst {
-		return nil
-	}
-	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
-		return nil
-	}
-	// must reset seed to ensure that the generation
-	// sequence of garbage instructions is consistent
-	// in both cases, the correct size of the loader
-	// can be calculated.
-	inj.rand.Seed(inj.igir.Int63())
-	return inj.garbageInstEx(false, true)
-}
-
-func (inj *Injector) garbageInstEx(broken, short bool) []byte {
+func (inj *Injector) buildJunkInst(broken, short bool) []byte {
 	if broken && inj.rand.Intn(10) == 0 {
 		buf := make([]byte, 1+inj.rand.Intn(8))
 		inj.rand.Read(buf) // #nosec
 		return buf
 	}
-	// random not insert garbage
+	// random not insert junk instruction
 	if inj.rand.Intn(10) == 0 {
 		return nil
 	}
@@ -141,13 +131,13 @@ func (inj *Injector) garbageInstEx(broken, short bool) []byte {
 	// dynamically adjust probability
 	switch inj.rand.Intn(1 + numJunkCodes) {
 	case 0:
-		return inj.garbageMultiByteNOP()
+		return inj.junkMultiByteNOP()
 	default:
-		return inj.garbageTemplate(short)
+		return inj.junkTemplate(short)
 	}
 }
 
-func (inj *Injector) garbageMultiByteNOP() []byte {
+func (inj *Injector) junkMultiByteNOP() []byte {
 	var nop []byte
 	switch inj.rand.Intn(2) {
 	case 0:
@@ -159,7 +149,7 @@ func (inj *Injector) garbageMultiByteNOP() []byte {
 }
 
 // #nosec G115
-func (inj *Injector) garbageTemplate(short bool) []byte {
+func (inj *Injector) junkTemplate(short bool) []byte {
 	var junkCodes []string
 	switch inj.arch {
 	case "386":
@@ -179,8 +169,8 @@ func (inj *Injector) garbageTemplate(short bool) []byte {
 	if err != nil {
 		panic(fmt.Sprintf("failed to assemble junk code: %s", err))
 	}
-	if len(inst) > maxJunkICodeShortSize {
-		panic(fmt.Sprintf("junk code is larger than %d", maxJunkICodeShortSize))
+	if short && len(inst) > maxJunkInstShortSize {
+		return inj.junkMultiByteNOP()
 	}
 	return inst
 }
@@ -205,7 +195,7 @@ func (inj *Injector) buildJunkCode(src string) (string, error) {
 	tpl, err := template.New("junk_code").Funcs(template.FuncMap{
 		"db":  toDB,
 		"hex": toHex,
-		"igi": inj.insertGarbageInst,
+		"iji": inj.insertJunkInst,
 	}).Parse(src)
 	if err != nil {
 		return "", fmt.Errorf("invalid junk code template: %s", err)
