@@ -70,7 +70,7 @@ func init() {
 	rsvCtxJunkInst := 0
 	rsvCtxJunkInst += len(mergeBytes(saveContextX64)) + len(mergeBytes(saveContextFPX64))
 	reversedContextInst = uint32(rsvCtxJunkInst) // #nosec G115
-	rsvCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkInstSize
+	rsvCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkICodeShortSize
 	reversedCtxJunkInst = uint32(rsvCtxJunkInst) // #nosec G115
 }
 
@@ -94,7 +94,7 @@ func (inj *Injector) saveContext() [][]byte {
 	insts := make([][]byte, 0, len(fp)+len(save))
 	for i := 0; i < len(fp); i++ {
 		insts = append(insts, bytes.Clone(fp[i]))
-		garbage := inj.garbageInst()
+		garbage := inj.garbageInstShort()
 		if len(garbage) > 0 {
 			insts = append(insts, garbage)
 		}
@@ -102,7 +102,7 @@ func (inj *Injector) saveContext() [][]byte {
 	for i := 0; i < len(save); i++ {
 		selected := save[inj.contextSeq[i]]
 		insts = append(insts, bytes.Clone(selected))
-		garbage := inj.garbageInst()
+		garbage := inj.garbageInstShort()
 		if len(garbage) > 0 {
 			insts = append(insts, garbage)
 		}
@@ -130,14 +130,14 @@ func (inj *Injector) restoreContext() [][]byte {
 	for i := len(restore) - 1; i >= 0; i-- {
 		selected := restore[inj.contextSeq[i]]
 		insts = append(insts, bytes.Clone(selected))
-		garbage := inj.garbageInst()
+		garbage := inj.garbageInstShort()
 		if len(garbage) > 0 {
 			insts = append(insts, garbage)
 		}
 	}
 	for i := 0; i < len(fp); i++ {
 		insts = append(insts, bytes.Clone(fp[i]))
-		garbage := inj.garbageInst()
+		garbage := inj.garbageInstShort()
 		if len(garbage) > 0 {
 			insts = append(insts, garbage)
 		}
