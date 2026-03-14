@@ -9,7 +9,7 @@ import (
 	"text/template"
 )
 
-const maxJunkInstSize = 64
+const maxJunkICodeShortSize = 64
 
 // The role of the junk code is to make the instruction sequence
 // as featureless as possible.
@@ -70,7 +70,7 @@ type junkCodeCtx struct {
 func (inj *Injector) paddingGarbageInst(foa, size uint32) {
 	rem := size
 	for {
-		inst := inj.garbageInstEx(true)
+		inst := inj.garbageInstEx(true, false)
 		l := uint32(len(inst)) // #nosec G115
 		if rem < l {
 			break
@@ -103,10 +103,25 @@ func (inj *Injector) garbageInst() []byte {
 	// in both cases, the correct size of the loader
 	// can be calculated.
 	inj.rand.Seed(inj.igir.Int63())
-	return inj.garbageInstEx(false)
+	return inj.garbageInstEx(false, false)
 }
 
-func (inj *Injector) garbageInstEx(broken bool) []byte {
+func (inj *Injector) garbageInstShort() []byte {
+	if inj.opts.NoGarbageInst {
+		return nil
+	}
+	if inj.ctx.Mode == ModeCodeCave || inj.ctx.Mode == ModeCodeCaveNS {
+		return nil
+	}
+	// must reset seed to ensure that the generation
+	// sequence of garbage instructions is consistent
+	// in both cases, the correct size of the loader
+	// can be calculated.
+	inj.rand.Seed(inj.igir.Int63())
+	return inj.garbageInstEx(false, true)
+}
+
+func (inj *Injector) garbageInstEx(broken, short bool) []byte {
 	if broken && inj.rand.Intn(10) == 0 {
 		buf := make([]byte, 1+inj.rand.Intn(8))
 		inj.rand.Read(buf) // #nosec
@@ -128,7 +143,7 @@ func (inj *Injector) garbageInstEx(broken bool) []byte {
 	case 0:
 		return inj.garbageMultiByteNOP()
 	default:
-		return inj.garbageTemplate()
+		return inj.garbageTemplate(short)
 	}
 }
 
@@ -144,7 +159,7 @@ func (inj *Injector) garbageMultiByteNOP() []byte {
 }
 
 // #nosec G115
-func (inj *Injector) garbageTemplate() []byte {
+func (inj *Injector) garbageTemplate(short bool) []byte {
 	var junkCodes []string
 	switch inj.arch {
 	case "386":
@@ -164,8 +179,8 @@ func (inj *Injector) garbageTemplate() []byte {
 	if err != nil {
 		panic(fmt.Sprintf("failed to assemble junk code: %s", err))
 	}
-	if len(inst) > maxJunkInstSize {
-		panic(fmt.Sprintf("junk code is larger than %d", maxJunkInstSize))
+	if len(inst) > maxJunkICodeShortSize {
+		panic(fmt.Sprintf("junk code is larger than %d", maxJunkICodeShortSize))
 	}
 	return inst
 }
@@ -190,6 +205,7 @@ func (inj *Injector) buildJunkCode(src string) (string, error) {
 	tpl, err := template.New("junk_code").Funcs(template.FuncMap{
 		"db":  toDB,
 		"hex": toHex,
+		"igi": inj.insertGarbageInst,
 	}).Parse(src)
 	if err != nil {
 		return "", fmt.Errorf("invalid junk code template: %s", err)
