@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGarbage(t *testing.T) {
+func TestJunkCode(t *testing.T) {
 	injector := NewInjector()
 
 	opts := &Options{
@@ -42,17 +42,27 @@ func TestGarbage(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestGarbageTemplate(t *testing.T) {
+func TestJunkTemplate(t *testing.T) {
 	t.Run("common", func(t *testing.T) {
-		testGarbageTemplate(t, false)
+		testJunkTemplate(t, 10, false)
 	})
 
-	t.Run("common", func(t *testing.T) {
-		testGarbageTemplate(t, true)
+	t.Run("short", func(t *testing.T) {
+		testJunkTemplate(t, 10, true)
 	})
 }
 
-func testGarbageTemplate(t *testing.T, short bool) {
+func TestJunkTemplateFuzz(t *testing.T) {
+	t.Run("common", func(t *testing.T) {
+		testJunkTemplate(t, 1000, false)
+	})
+
+	t.Run("short", func(t *testing.T) {
+		testJunkTemplate(t, 1000, true)
+	})
+}
+
+func testJunkTemplate(t *testing.T, times int, short bool) {
 	t.Run("x86", func(t *testing.T) {
 		injector := NewInjector()
 		injector.arch = "386"
@@ -61,8 +71,8 @@ func testGarbageTemplate(t *testing.T, short bool) {
 		err := injector.initAssembler()
 		require.NoError(t, err)
 
-		for i := 0; i < 10; i++ {
-			data := injector.garbageTemplate(short)
+		for i := 0; i < times; i++ {
+			data := injector.junkTemplate(short)
 			require.NotEmpty(t, data)
 		}
 
@@ -78,54 +88,8 @@ func testGarbageTemplate(t *testing.T, short bool) {
 		err := injector.initAssembler()
 		require.NoError(t, err)
 
-		for i := 0; i < 10; i++ {
-			data := injector.garbageTemplate(short)
-			require.NotEmpty(t, data)
-		}
-
-		err = injector.Close()
-		require.NoError(t, err)
-	})
-}
-
-func TestGarbageTemplateFuzz(t *testing.T) {
-	t.Run("common", func(t *testing.T) {
-		testGarbageTemplateFuzz(t, false)
-	})
-
-	t.Run("common", func(t *testing.T) {
-		testGarbageTemplateFuzz(t, true)
-	})
-}
-
-func testGarbageTemplateFuzz(t *testing.T, short bool) {
-	t.Run("x86", func(t *testing.T) {
-		injector := NewInjector()
-		injector.arch = "386"
-		injector.opts = new(Options)
-		injector.ctx = new(Context)
-		err := injector.initAssembler()
-		require.NoError(t, err)
-
-		for i := 0; i < 1000; i++ {
-			data := injector.garbageTemplate(short)
-			require.NotEmpty(t, data)
-		}
-
-		err = injector.Close()
-		require.NoError(t, err)
-	})
-
-	t.Run("x64", func(t *testing.T) {
-		injector := NewInjector()
-		injector.arch = "amd64"
-		injector.opts = new(Options)
-		injector.ctx = new(Context)
-		err := injector.initAssembler()
-		require.NoError(t, err)
-
-		for i := 0; i < 1000; i++ {
-			data := injector.garbageTemplate(short)
+		for i := 0; i < times; i++ {
+			data := injector.junkTemplate(short)
 			require.NotEmpty(t, data)
 		}
 
