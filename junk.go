@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 	"text/template"
 )
 
@@ -96,7 +97,7 @@ func (inj *Injector) insertJunkInst() string {
 	return ";" + toDB(inj.buildJunkInst(false, false))
 }
 
-func (inj *Injector) junkInstShort() []byte {
+func (inj *Injector) insertJunkInstShort() []byte {
 	if inj.opts.NoJunkCode {
 		return nil
 	}
@@ -148,7 +149,6 @@ func (inj *Injector) junkMultiByteNOP() []byte {
 	return nop
 }
 
-// #nosec G115
 func (inj *Injector) junkTemplate(short bool) []byte {
 	var junkCodes []string
 	switch inj.arch {
@@ -160,11 +160,16 @@ func (inj *Injector) junkTemplate(short bool) []byte {
 	// select random junk code template
 	idx := inj.rand.Intn(len(junkCodes))
 	src := junkCodes[idx]
+	// if source contains the mark about insertJunkInst,
+	// not assemble it and return for build faster.
+	if short && strings.Contains(src, "{{iji}}") {
+		return inj.junkMultiByteNOP()
+	}
+	// assemble junk code
 	asm, err := inj.buildJunkCode(src)
 	if err != nil {
 		panic(err)
 	}
-	// assemble junk code
 	inst, err := inj.assemble(asm)
 	if err != nil {
 		panic(fmt.Sprintf("failed to assemble junk code: %s", err))
@@ -196,6 +201,7 @@ func (inj *Injector) buildJunkCode(src string) (string, error) {
 		"db":  toDB,
 		"hex": toHex,
 		"iji": inj.insertJunkInst,
+		"ijs": inj.insertJunkInstShort,
 	}).Parse(src)
 	if err != nil {
 		return "", fmt.Errorf("invalid junk code template: %s", err)
