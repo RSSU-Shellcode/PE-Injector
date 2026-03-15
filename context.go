@@ -60,7 +60,7 @@ var (
 )
 
 // for calculate the instruction size about save and
-// restore context and with insert garbage instruction
+// restore context and with insert junk instruction
 var (
 	reversedContextInst uint32
 	reversedCtxJunkInst uint32
@@ -70,7 +70,7 @@ func init() {
 	rsvCtxJunkInst := 0
 	rsvCtxJunkInst += len(mergeBytes(saveContextX64)) + len(mergeBytes(saveContextFPX64))
 	reversedContextInst = uint32(rsvCtxJunkInst) // #nosec G115
-	rsvCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkICodeShortSize
+	rsvCtxJunkInst += (len(saveContextX64) + len(saveContextFPX64)) * maxJunkInstShortSize
 	reversedCtxJunkInst = uint32(rsvCtxJunkInst) // #nosec G115
 }
 
@@ -94,17 +94,17 @@ func (inj *Injector) saveContext() [][]byte {
 	insts := make([][]byte, 0, len(fp)+len(save))
 	for i := 0; i < len(fp); i++ {
 		insts = append(insts, bytes.Clone(fp[i]))
-		garbage := inj.garbageInstShort()
-		if len(garbage) > 0 {
-			insts = append(insts, garbage)
+		junk := inj.insertJunkInstShort()
+		if len(junk) > 0 {
+			insts = append(insts, junk)
 		}
 	}
 	for i := 0; i < len(save); i++ {
 		selected := save[inj.contextSeq[i]]
 		insts = append(insts, bytes.Clone(selected))
-		garbage := inj.garbageInstShort()
-		if len(garbage) > 0 {
-			insts = append(insts, garbage)
+		junk := inj.insertJunkInstShort()
+		if len(junk) > 0 {
+			insts = append(insts, junk)
 		}
 	}
 	return insts
@@ -130,16 +130,16 @@ func (inj *Injector) restoreContext() [][]byte {
 	for i := len(restore) - 1; i >= 0; i-- {
 		selected := restore[inj.contextSeq[i]]
 		insts = append(insts, bytes.Clone(selected))
-		garbage := inj.garbageInstShort()
-		if len(garbage) > 0 {
-			insts = append(insts, garbage)
+		junk := inj.insertJunkInstShort()
+		if len(junk) > 0 {
+			insts = append(insts, junk)
 		}
 	}
 	for i := 0; i < len(fp); i++ {
 		insts = append(insts, bytes.Clone(fp[i]))
-		garbage := inj.garbageInstShort()
-		if len(garbage) > 0 {
-			insts = append(insts, garbage)
+		junk := inj.insertJunkInstShort()
+		if len(junk) > 0 {
+			insts = append(insts, junk)
 		}
 	}
 	return insts
@@ -149,7 +149,7 @@ func (inj *Injector) calcReservedCtxInstSize() uint32 {
 	if inj.opts.NotSaveContext {
 		return 0
 	}
-	if inj.opts.NoGarbageInst {
+	if inj.opts.NoJunkCode {
 		return reversedContextInst
 	}
 	return reversedCtxJunkInst
