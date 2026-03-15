@@ -16,6 +16,7 @@ entry:
   {{if .Switch.B}}
   xor {{.Reg.rax}}, {{.Reg.rcx}}
   {{iji}}
+  jmp leave
   {{end}}
 
   {{if .Switch.C}}
@@ -30,6 +31,7 @@ entry:
   {{iji}}
  next_3:
   {{iji}}
+  jmp leave
   {{end}}
 
   {{if .Switch.E}}
@@ -39,6 +41,7 @@ entry:
   call func_3
   {{end}}
 
+leave:
   pop {{.Reg.rax}}
   popfq
   jmp exit
@@ -51,11 +54,11 @@ func_2:
   push {{.Reg.rbx}}
   mov {{.Reg.rbx}}, {{.Reg.rcx}}
   {{if .Switch.F}}
-  test {{.Reg.rbx}}, {{.Reg.rbx}}
-  jnz next_2
-  {{iji}}
- next_2:
-  call func_1
+    test {{.Reg.rbx}}, {{.Reg.rbx}}
+    jnz next_2
+    {{iji}}
+   next_2:
+    call func_1
   {{end}}
   pop {{.Reg.rbx}}
   ret
