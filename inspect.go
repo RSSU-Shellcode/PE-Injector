@@ -248,6 +248,7 @@ func InspectJunkCodeTemplate(arch, template string) (string, []byte, error) {
 	injector := NewInjector()
 	injector.arch = arch
 	injector.opts = new(Options)
+	injector.ctx = new(Context)
 	err = injector.initAssembler()
 	if err != nil {
 		return "", nil, err
