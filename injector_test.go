@@ -128,9 +128,9 @@ func TestInjector_Inject(t *testing.T) {
 		testInjectorInject(t, injector, &opts)
 	})
 
-	t.Run("no garbage inst", func(t *testing.T) {
+	t.Run("no junk code", func(t *testing.T) {
 		opts := Options{
-			NoGarbageInst: true,
+			NoJunkCode: true,
 		}
 
 		testInjectorInject(t, injector, &opts)
@@ -368,9 +368,9 @@ func TestInjector_InjectRaw(t *testing.T) {
 		testInjectorInjectRaw(t, injector, &opts)
 	})
 
-	t.Run("no garbage inst", func(t *testing.T) {
+	t.Run("no junk code", func(t *testing.T) {
 		opts := Options{
-			NoGarbageInst: true,
+			NoJunkCode: true,
 		}
 		testInjectorInjectRaw(t, injector, &opts)
 	})
