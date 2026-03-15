@@ -83,7 +83,7 @@ func InspectLoaderTemplateWithConfig(arch, template string, cfg *InspectConfig) 
 	injector := NewInjector()
 	injector.arch = arch
 	injector.opts = &Options{
-		NoGarbageInst: true,
+		NoJunkCode: true,
 
 		ForceCodeCave:     cfg.CodeCaveMode,
 		ForceCodeCaveNS:   cfg.CodeCaveNSMode,
