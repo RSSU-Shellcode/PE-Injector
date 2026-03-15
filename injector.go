@@ -115,8 +115,8 @@ type Injector struct {
 	canTryExtendText bool
 	extendTextSize   uint32
 
-	// for insert garbage instruction
-	igir *rand.Rand
+	// for insert junk instruction
+	ijir *rand.Rand
 
 	// record loader status for inject
 	loaderSize uint32
@@ -193,9 +193,9 @@ type Options struct {
 	// it is useless for method InjectRaw.
 	NotEraseShellcode bool `toml:"not_erase_shellcode" json:"not_erase_shellcode"`
 
-	// not append garbage instruction to loader.
+	// not insert junk code to loader for analyze or debug.
 	// It is ignored when use modes about code cave.
-	NoGarbageInst bool `toml:"no_garbage_inst" json:"no_garbage_inst"`
+	NoJunkCode bool `toml:"no_junk_code" json:"no_junk_code"`
 
 	// not add a shellcode jumper to call shellcode.
 	// it is useless for method InjectRaw.
@@ -264,7 +264,7 @@ type Context struct {
 	CreateThread       bool   `json:"create_thread"`
 	WaitThread         bool   `json:"wait_thread"`
 	EraseShellcode     bool   `json:"erase_shellcode"`
-	HasGarbageInst     bool   `json:"has_garbage_inst"`
+	HasJunkCode        bool   `json:"has_junk_code"`
 	HasShellcodeJumper bool   `json:"has_shellcode_jumper"`
 	SectionName        string `json:"section_name"`
 	ExtendedSize       uint32 `json:"extended_size"`
@@ -298,7 +298,7 @@ func NewInjector() *Injector {
 	}
 	injector := Injector{
 		rand: rand.New(rand.NewSource(seed + 2018)), // #nosec
-		igir: rand.New(rand.NewSource(seed + 4096)), // #nosec
+		ijir: rand.New(rand.NewSource(seed + 4096)), // #nosec
 	}
 	return &injector
 }
@@ -620,9 +620,9 @@ func (inj *Injector) preprocess(image []byte, opts *Options) error {
 		Type: typ,
 		Seed: seed,
 
-		SaveContext:    !opts.NotSaveContext,
-		CreateThread:   !opts.NotCreateThread,
-		HasGarbageInst: !opts.NoGarbageInst,
+		SaveContext:  !opts.NotSaveContext,
+		CreateThread: !opts.NotCreateThread,
+		HasJunkCode:  !opts.NoJunkCode,
 
 		NumCodeCaves: len(caves),
 		NoHookMode:   opts.NoHookMode,
@@ -1140,7 +1140,7 @@ func (inj *Injector) cleanup() {
 		ase32: inj.ase32,
 		ase64: inj.ase64,
 		rand:  inj.rand,
-		igir:  inj.igir,
+		ijir:  inj.ijir,
 	}
 	*inj = n
 }
