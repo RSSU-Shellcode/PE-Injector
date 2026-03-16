@@ -14,10 +14,10 @@ func (inj *Injector) selectInjectRawMode(shellcode []byte) (string, error) {
 	if inj.opts.ForceExtendTextNS {
 		return "", errors.New("extend text with new section mode is not support")
 	}
-	// record seed for insert garbage instruction
+	// set seed for insert junk instruction
 	seed := inj.rand.Int63()
 	inj.rand.Seed(seed + 4096)
-	inj.igir.Seed(seed + 8192)
+	inj.ijir.Seed(seed + 8192)
 	// check will use force mode
 	var counter int
 	for _, sw := range []bool{
@@ -109,9 +109,9 @@ func (inj *Injector) useExtendTextRawMode(shellcode []byte) (string, error) {
 	for i := uint32(0); i < extended; i++ {
 		inj.dup[text.Offset+i] = 0xCC
 	}
-	inj.paddingGarbageInst(text.Offset, randomBeginSize+reservedInstSize)
+	inj.paddingJunkInst(text.Offset, randomBeginSize+reservedInstSize)
 	off := randomBeginSize + reservedInstSize + shellcodeSize
-	inj.paddingGarbageInst(text.Offset+off, extended-off)
+	inj.paddingJunkInst(text.Offset+off, extended-off)
 	// update context
 	inj.extendTextSize = extended
 	inj.dstRVA = text.VirtualAddress + randomBeginSize
@@ -145,9 +145,9 @@ func (inj *Injector) useCreateTextRawMode(shellcode []byte) (string, error) {
 	for i := uint32(0); i < section.Size; i++ {
 		inj.dup[section.Offset+i] = 0xCC
 	}
-	inj.paddingGarbageInst(section.Offset, randomBeginSize+reservedInstSize)
+	inj.paddingJunkInst(section.Offset, randomBeginSize+reservedInstSize)
 	off := randomBeginSize + reservedInstSize + shellcodeSize
-	inj.paddingGarbageInst(section.Offset+off, section.Size-off)
+	inj.paddingJunkInst(section.Offset+off, section.Size-off)
 	// update context
 	inj.dstRVA = section.VirtualAddress + randomBeginSize
 	inj.dstFOA = section.Offset + randomBeginSize
