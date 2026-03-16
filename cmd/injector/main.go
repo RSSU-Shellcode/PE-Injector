@@ -46,7 +46,7 @@ func init() {
 	flag.BoolVar(&opts.NotCreateThread, "nct", false, "not create thread at the shellcode")
 	flag.BoolVar(&opts.NotWaitThread, "nwt", false, "not wait created thread at the shellcode")
 	flag.BoolVar(&opts.NotEraseShellcode, "nes", false, "not erase shellcode after execute finish")
-	flag.BoolVar(&opts.NoGarbageInst, "ngi", false, "not append garbage instruction to loader")
+	flag.BoolVar(&opts.NoJunkCode, "njc", false, "not insert junk code to loader")
 	flag.BoolVar(&opts.NoShellcodeJumper, "nsj", false, "not add a shellcode jumper to call shellcode")
 	flag.BoolVar(&opts.CalculateCheckSum, "ccs", false, "overwrite checksum after inject or extend image")
 	flag.BoolVar(&opts.ReserveLoadConfig, "cfg", false, "reserve load config data directory")
@@ -136,7 +136,7 @@ func main() {
 	fmt.Println("create thread:   ", ctx.CreateThread)
 	fmt.Println("wait thread:     ", ctx.WaitThread)
 	fmt.Println("erase shellcode: ", ctx.EraseShellcode)
-	fmt.Println("has garbage inst:", ctx.HasGarbageInst)
+	fmt.Println("junk code:       ", ctx.HasJunkCode)
 	fmt.Println("shellcode jumper:", ctx.HasShellcodeJumper)
 	if ctx.SectionName != "" {
 		fmt.Println("section name:    ", ctx.SectionName)
@@ -271,7 +271,11 @@ func loadJunkCodeTemplate(arch, dir string) []string {
 		if file.IsDir() {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(dir, file.Name())) // #nosec
+		name := file.Name()
+		if filepath.Ext(name) != ".asm" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, name)) // #nosec
 		checkError(err)
 		template := string(data)
 		_, _, err = injector.InspectJunkCodeTemplate(arch, template)
