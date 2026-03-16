@@ -13,7 +13,7 @@ func TestLoader(t *testing.T) {
 
 	opts := &Options{
 		NotSaveContext: true,
-		NoGarbageInst:  true,
+		NoJunkCode:     true,
 		RandSeed:       1234,
 	}
 

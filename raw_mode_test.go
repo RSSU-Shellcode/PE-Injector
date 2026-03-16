@@ -13,7 +13,7 @@ func TestRawMode(t *testing.T) {
 
 	opts := &Options{
 		NotSaveContext: true,
-		NoGarbageInst:  true,
+		NoJunkCode:     true,
 		RandSeed:       1234,
 	}
 
@@ -55,7 +55,6 @@ func testRawMode(t *testing.T, injector *Injector, opts *Options, mode string) {
 	}
 
 	t.Run("x86", func(t *testing.T) {
-
 		image, err := os.ReadFile("testdata/image_exe_x86.dat")
 		require.NoError(t, err)
 		shellcode := []byte{
