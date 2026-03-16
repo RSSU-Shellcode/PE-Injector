@@ -101,6 +101,7 @@ func InspectLoaderTemplateWithConfig(arch, template string, cfg *InspectConfig) 
 		},
 	}
 	injector.iat = buildFakeIATList(cfg)
+	defer func() { _ = injector.Close() }()
 	err = injector.initAssembler()
 	if err != nil {
 		return "", nil, err
@@ -249,6 +250,7 @@ func InspectJunkCodeTemplate(arch, template string) (string, []byte, error) {
 	injector.arch = arch
 	injector.opts = new(Options)
 	injector.ctx = new(Context)
+	defer func() { _ = injector.Close() }()
 	err = injector.initAssembler()
 	if err != nil {
 		return "", nil, err
