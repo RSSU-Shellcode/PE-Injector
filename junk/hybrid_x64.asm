@@ -65,6 +65,9 @@ func_2:
 
 func_3:
   rol {{.Reg.rax}}, {{.Less32.C}}
+  {{if .Switch.E}}
+  {{iji}}
+  {{end}}
   ret
 
 exit:
