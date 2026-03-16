@@ -294,7 +294,7 @@ func NewInjector() *Injector {
 	if err == nil {
 		seed = int64(binary.LittleEndian.Uint64(buf)) // #nosec G115
 	} else {
-		seed = time.Now().UTC().UnixNano()
+		seed = time.Now().UnixNano()
 	}
 	injector := Injector{
 		rand: rand.New(rand.NewSource(seed + 2018)), // #nosec
@@ -1152,12 +1152,14 @@ func (inj *Injector) Close() error {
 		if err != nil {
 			return err
 		}
+		inj.ase32 = nil
 	}
 	if inj.ase64 != nil {
 		err := inj.ase64.Close()
 		if err != nil {
 			return err
 		}
+		inj.ase64 = nil
 	}
 	return nil
 }
